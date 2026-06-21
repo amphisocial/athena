@@ -1,0 +1,18 @@
+{
+  "name": "athenabot",
+  "version": "0.1.0",
+  "private": true,
+  "description": "White-label healthcare voice AI orchestration layer + product site (AthenaBot).",
+  "main": "server/server.js",
+  "scripts": {
+    "start": "node server/server.js",
+    "dev": "node server/server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "express": "^4.19.2"
+  },
+  "license": "UNLICENSED"
+}

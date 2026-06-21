@@ -1,0 +1,81 @@
+{
+  "version": "0.3.0-illustrative",
+  "reviewedBy": null,
+  "reviewRequired": true,
+  "disclaimer": "ILLUSTRATIVE LOGIC ONLY. This decision tree is a demonstration scaffold and has NOT been validated for clinical use. It must be reviewed, edited, and signed off by a licensed clinician for each deploying organization before handling any real patient call.",
+  "outcomes": {
+    "EMERGENCY": {
+      "label": "Seek emergency care now",
+      "severity": 4,
+      "action": "Advise the caller to hang up and call 911 (or local emergency services) immediately, then create a high-priority staff alert.",
+      "color": "emergency"
+    },
+    "URGENT_CARE": {
+      "label": "Visit urgent care",
+      "severity": 3,
+      "action": "Direct the caller to the nearest urgent care, offer the address, and log the interaction for clinician follow-up.",
+      "color": "urgent"
+    },
+    "CLINICIAN": {
+      "label": "Speak with a clinician",
+      "severity": 2,
+      "action": "Warm-transfer to the nurse line or place a priority callback on the clinician queue, passing the full intake summary.",
+      "color": "clinician"
+    },
+    "SCHEDULE": {
+      "label": "Schedule an appointment",
+      "severity": 1,
+      "action": "Offer the next available appointment slots and book directly through the connected scheduling system.",
+      "color": "schedule"
+    }
+  },
+  "rules": [
+    {
+      "id": "er-cardiac-resp",
+      "outcome": "EMERGENCY",
+      "matchAny": ["chest pain", "chest pressure", "can't breathe", "cannot breathe", "trouble breathing", "shortness of breath", "blue lips", "passed out", "unconscious", "unresponsive"],
+      "rationale": "Possible cardiac or respiratory emergency."
+    },
+    {
+      "id": "er-stroke",
+      "outcome": "EMERGENCY",
+      "matchAny": ["face drooping", "face droop", "slurred speech", "can't speak", "arm weakness", "one side", "numb on one side", "sudden confusion"],
+      "rationale": "Possible stroke (FAST signs)."
+    },
+    {
+      "id": "er-bleed-trauma",
+      "outcome": "EMERGENCY",
+      "matchAny": ["severe bleeding", "won't stop bleeding", "deep cut", "head injury", "broken bone through skin", "seizure", "anaphylaxis", "severe allergic", "throat closing"],
+      "rationale": "Severe trauma or life-threatening reaction."
+    },
+    {
+      "id": "er-self-harm",
+      "outcome": "EMERGENCY",
+      "matchAny": ["suicidal", "kill myself", "end my life", "hurt myself", "overdose"],
+      "rationale": "Acute safety risk. Route to emergency and crisis support; never delay.",
+      "safetyCritical": true
+    },
+    {
+      "id": "urgent-fever-infection",
+      "outcome": "URGENT_CARE",
+      "matchAny": ["high fever", "stiff neck", "persistent vomiting", "can't keep fluids", "dehydrated", "deep wound", "possible fracture", "sprained", "moderate burn", "ear infection", "severe sore throat"],
+      "rationale": "Acute but not immediately life-threatening; same-day in-person assessment."
+    },
+    {
+      "id": "clinician-meds-symptoms",
+      "outcome": "CLINICIAN",
+      "matchAny": ["medication question", "side effect", "reaction to medication", "rash", "worsening symptoms", "post-op", "after surgery", "lab result", "test result", "pregnant", "dizzy", "blood pressure"],
+      "rationale": "Needs clinical judgement but not emergent; route to nurse/clinician."
+    },
+    {
+      "id": "schedule-routine",
+      "outcome": "SCHEDULE",
+      "matchAny": ["appointment", "checkup", "check-up", "physical", "follow up", "follow-up", "refill", "prescription refill", "annual", "wellness", "consultation", "cold", "cough", "mild", "routine"],
+      "rationale": "Routine, non-acute request suitable for scheduling."
+    }
+  ],
+  "default": {
+    "outcome": "CLINICIAN",
+    "rationale": "When intent is unclear or no rule matches confidently, escalate to a human rather than guess."
+  }
+}

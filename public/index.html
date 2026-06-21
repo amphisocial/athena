@@ -1,0 +1,477 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>AthenaBot — White-label healthcare voice AI</title>
+<meta name="description" content="A HIPAA-ready voice agent that answers every call, books appointments, and routes patients to the right level of care. White-label, partner-friendly, built for managed services." />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Spectral:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#0F1C2E; --ink-2:#16273D; --ink-3:#1E3450;
+    --marble:#F7F5F0; --marble-2:#ECE7DC; --card:#FFFFFF;
+    --text:#172230; --muted:#5B6675; --faint:#8A93A0;
+    --line:rgba(15,28,46,.12); --line-strong:rgba(15,28,46,.22);
+    --laurel:#3F6B57; --laurel-2:#557E6B; --bronze:#B0823A; --bronze-2:#C99B4E;
+    --sev-emergency:#C0392B; --sev-urgent:#CF7A1E; --sev-clinician:#2C6E9E; --sev-schedule:#3F6B57;
+    --font-display:'Spectral',Georgia,serif;
+    --font-sans:'IBM Plex Sans',system-ui,-apple-system,sans-serif;
+    --font-mono:'IBM Plex Mono',ui-monospace,monospace;
+    --maxw:1180px;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{
+    margin:0;background:var(--marble);color:var(--text);
+    font-family:var(--font-sans);font-size:17px;line-height:1.6;
+    -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;
+  }
+  a{color:inherit;text-decoration:none}
+  h1,h2,h3{font-family:var(--font-display);font-weight:600;letter-spacing:-.01em;line-height:1.08;margin:0}
+  .wrap{max-width:var(--maxw);margin:0 auto;padding:0 28px}
+  .eyebrow{font-family:var(--font-mono);font-size:12.5px;letter-spacing:.18em;text-transform:uppercase;color:var(--bronze);font-weight:500}
+  .mono{font-family:var(--font-mono)}
+
+  /* ---------- nav ---------- */
+  nav{position:sticky;top:0;z-index:50;background:rgba(247,245,240,.82);backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+  .nav-in{display:flex;align-items:center;justify-content:space-between;height:68px;max-width:var(--maxw);margin:0 auto;padding:0 28px}
+  .brand{display:flex;align-items:center;gap:11px;font-family:var(--font-display);font-weight:600;font-size:20px;letter-spacing:-.01em}
+  .glyph{width:30px;height:30px;flex:0 0 auto}
+  .nav-links{display:flex;gap:30px;align-items:center}
+  .nav-links a{font-size:15px;color:var(--muted);font-weight:500}
+  .nav-links a:hover{color:var(--ink)}
+  .btn{display:inline-flex;align-items:center;gap:8px;font-family:var(--font-sans);font-weight:600;font-size:15px;border-radius:8px;padding:11px 18px;cursor:pointer;border:1px solid transparent;transition:transform .15s ease,background .15s ease,box-shadow .15s ease}
+  .btn-primary{background:var(--ink);color:#fff}
+  .btn-primary:hover{background:var(--ink-3);transform:translateY(-1px)}
+  .btn-ghost{background:transparent;border-color:var(--line-strong);color:var(--ink)}
+  .btn-ghost:hover{background:rgba(15,28,46,.04)}
+  .nav-cta{display:inline-flex}
+  .menu-btn{display:none}
+
+  /* ---------- hero ---------- */
+  .hero{padding:74px 0 64px;position:relative;overflow:hidden}
+  .hero-grid{display:grid;grid-template-columns:1.05fr .95fr;gap:54px;align-items:center}
+  .hero h1{font-size:clamp(38px,5vw,62px);margin:18px 0 0}
+  .hero h1 em{font-style:italic;color:var(--laurel)}
+  .lede{font-size:19px;color:var(--muted);margin:22px 0 30px;max-width:30em}
+  .hero-cta{display:flex;gap:14px;flex-wrap:wrap}
+  .trust{display:flex;gap:22px;flex-wrap:wrap;margin-top:30px;padding-top:22px;border-top:1px solid var(--line)}
+  .trust span{font-family:var(--font-mono);font-size:12.5px;color:var(--muted);display:flex;align-items:center;gap:8px}
+  .trust b{color:var(--laurel);font-weight:700}
+
+  /* ---------- triage router (signature) ---------- */
+  .router{background:var(--ink);border-radius:18px;padding:26px;color:#E8EDF3;box-shadow:0 30px 60px -28px rgba(15,28,46,.55);position:relative}
+  .router-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+  .router-head .lbl{font-family:var(--font-mono);font-size:11.5px;letter-spacing:.16em;text-transform:uppercase;color:#7E8DA0}
+  .live-dot{width:8px;height:8px;border-radius:50%;background:var(--laurel-2);box-shadow:0 0 0 0 rgba(85,126,107,.6);animation:pulse 2s infinite}
+  @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(85,126,107,.55)}70%{box-shadow:0 0 0 9px rgba(85,126,107,0)}100%{box-shadow:0 0 0 0 rgba(85,126,107,0)}}
+  .router svg{width:100%;height:auto;display:block}
+  .router-caption{font-family:var(--font-mono);font-size:11.5px;color:#6E7C8E;margin-top:6px;text-align:center}
+
+  /* ---------- generic section ---------- */
+  section{padding:78px 0}
+  .sec-head{max-width:40em}
+  .sec-head h2{font-size:clamp(28px,3.4vw,40px);margin-top:12px}
+  .sec-head p{color:var(--muted);font-size:18px;margin:16px 0 0}
+
+  /* capabilities */
+  .caps{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--line);border:1px solid var(--line);border-radius:14px;overflow:hidden;margin-top:44px}
+  .cap{background:var(--marble);padding:28px 26px}
+  .cap .n{font-family:var(--font-mono);font-size:12px;color:var(--bronze);letter-spacing:.1em}
+  .cap h3{font-size:19px;margin:12px 0 8px;font-family:var(--font-sans);font-weight:600;letter-spacing:0}
+  .cap p{margin:0;color:var(--muted);font-size:15.5px}
+
+  /* triage section + demo */
+  .triage-wrap{display:grid;grid-template-columns:1fr 1fr;gap:48px;align-items:start;margin-top:46px}
+  .ladder{display:flex;flex-direction:column;gap:12px}
+  .rung{display:flex;gap:16px;align-items:flex-start;padding:16px 18px;background:var(--card);border:1px solid var(--line);border-left:4px solid var(--c);border-radius:10px}
+  .rung .tag{font-family:var(--font-mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--c);font-weight:500;padding-top:2px;white-space:nowrap}
+  .rung h4{margin:0 0 3px;font-size:16px;font-family:var(--font-sans);font-weight:600}
+  .rung p{margin:0;color:var(--muted);font-size:14.5px}
+
+  /* demo widget */
+  .demo{background:var(--ink);border-radius:16px;padding:24px;color:#E8EDF3;position:sticky;top:92px}
+  .demo h3{font-family:var(--font-sans);font-size:16px;font-weight:600;color:#fff;margin:0}
+  .demo .sub{font-family:var(--font-mono);font-size:11px;color:#7E8DA0;letter-spacing:.06em;margin:4px 0 16px;text-transform:uppercase}
+  .chips{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px}
+  .chip{font-size:13px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:#C3CCD8;border-radius:20px;padding:6px 12px;cursor:pointer;transition:background .15s}
+  .chip:hover{background:rgba(255,255,255,.13)}
+  .demo textarea{width:100%;background:#0A1421;border:1px solid rgba(255,255,255,.14);color:#EAF0F6;border-radius:10px;padding:12px 14px;font-family:var(--font-sans);font-size:15px;resize:vertical;min-height:64px}
+  .demo textarea::placeholder{color:#5C6B7D}
+  .demo .run{margin-top:12px;width:100%;justify-content:center}
+  .result{margin-top:16px;border-radius:11px;padding:16px 18px;background:#0A1421;border:1px solid rgba(255,255,255,.1);display:none}
+  .result.show{display:block;animation:rise .35s ease}
+  @keyframes rise{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+  .result .route{display:flex;align-items:center;gap:10px;font-family:var(--font-sans);font-weight:700;font-size:17px}
+  .result .dot{width:11px;height:11px;border-radius:50%}
+  .result .action{color:#AEB9C6;font-size:14.5px;margin-top:8px}
+  .result .why{font-family:var(--font-mono);font-size:11.5px;color:#6E7C8E;margin-top:12px;border-top:1px solid rgba(255,255,255,.08);padding-top:10px}
+  .sev-emergency{color:var(--sev-emergency)} .bg-emergency{background:var(--sev-emergency)}
+  .sev-urgent{color:var(--sev-urgent)} .bg-urgent{background:var(--sev-urgent)}
+  .sev-clinician{color:var(--sev-clinician)} .bg-clinician{background:var(--sev-clinician)}
+  .sev-schedule{color:var(--sev-schedule)} .bg-schedule{background:var(--sev-schedule)}
+  .demo-note{font-size:12px;color:#5C6B7D;margin-top:13px;line-height:1.5}
+
+  /* compliance (dark) */
+  .dark{background:var(--ink);color:#DCE3EB}
+  .dark .eyebrow{color:var(--bronze-2)}
+  .dark .sec-head h2{color:#fff}
+  .dark .sec-head p{color:#9AA6B4}
+  .stack{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-top:42px}
+  .layer{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);border-radius:11px;padding:18px 16px;text-align:center}
+  .layer .ic{font-family:var(--font-mono);font-size:11px;color:var(--bronze-2);letter-spacing:.1em}
+  .layer h4{font-family:var(--font-sans);font-size:15px;font-weight:600;color:#fff;margin:10px 0 6px}
+  .layer p{font-size:12.5px;color:#8B97A6;margin:0}
+  .stack-note{font-family:var(--font-mono);font-size:12.5px;color:#7E8DA0;margin-top:22px;text-align:center}
+
+  /* integrations */
+  .int-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-top:42px}
+  .int{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:22px}
+  .int h4{font-family:var(--font-sans);font-size:15px;font-weight:600;margin:0 0 10px}
+  .int ul{margin:0;padding-left:18px;color:var(--muted);font-size:14px}
+  .int li{margin:4px 0}
+
+  /* partner band */
+  .partner{background:var(--marble-2);border-radius:18px;padding:48px;display:grid;grid-template-columns:1.1fr .9fr;gap:42px;align-items:center;margin-top:10px}
+  .partner h2{font-size:clamp(26px,3vw,36px)}
+  .partner p{color:var(--muted);margin:16px 0 0}
+  .pillars{display:flex;flex-direction:column;gap:14px}
+  .pillar{display:flex;gap:13px;align-items:flex-start}
+  .pillar .k{font-family:var(--font-mono);color:var(--bronze);font-size:13px;margin-top:2px}
+  .pillar b{display:block;font-size:15.5px}
+  .pillar span{color:var(--muted);font-size:14.5px}
+
+  /* cta */
+  .cta-band{text-align:center;padding:30px 0 0}
+  .cta-band h2{font-size:clamp(28px,3.4vw,42px);max-width:16em;margin:0 auto}
+  .cta-band p{color:var(--muted);font-size:18px;margin:18px auto 28px;max-width:32em}
+  .cta-band .btns{display:flex;gap:14px;justify-content:center;flex-wrap:wrap}
+
+  /* footer */
+  footer{background:var(--ink);color:#9AA6B4;padding:54px 0 40px;margin-top:78px;font-size:14px}
+  .foot-top{display:flex;justify-content:space-between;gap:30px;flex-wrap:wrap;align-items:flex-start}
+  .foot-brand{display:flex;align-items:center;gap:11px;color:#fff;font-family:var(--font-display);font-size:20px;font-weight:600}
+  .disclaimer{margin-top:30px;padding-top:22px;border-top:1px solid rgba(255,255,255,.1);font-size:12.5px;color:#6E7C8E;line-height:1.65;max-width:62em}
+  .disclaimer b{color:#94A0AE}
+
+  @media (max-width:920px){
+    .hero-grid,.triage-wrap,.partner{grid-template-columns:1fr}
+    .caps{grid-template-columns:1fr}
+    .stack{grid-template-columns:repeat(2,1fr)}
+    .int-grid{grid-template-columns:repeat(2,1fr)}
+    .nav-links{display:none}
+    .demo{position:static}
+    .partner{padding:34px}
+  }
+  @media (prefers-reduced-motion:reduce){
+    *{animation:none!important;transition:none!important}
+  }
+</style>
+</head>
+<body>
+
+<!-- glyph definition: a laurel-flanked aegis shield with a soundwave -->
+<svg width="0" height="0" style="position:absolute"><defs>
+  <symbol id="athena-glyph" viewBox="0 0 32 32">
+    <path d="M16 2.5l10 3.2v8.4c0 6.7-4.2 11.6-10 14-5.8-2.4-10-7.3-10-14V5.7l10-3.2z" fill="none" stroke="currentColor" stroke-width="1.6"/>
+    <path d="M10.5 16h2l1.5-4 2.5 8 2-5 1.5 1h1" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+  </symbol>
+</defs></svg>
+
+<nav>
+  <div class="nav-in">
+    <a class="brand" href="#top"><svg class="glyph" style="color:var(--laurel)"><use href="#athena-glyph"/></svg>AthenaBot</a>
+    <div class="nav-links">
+      <a href="#capabilities">Platform</a>
+      <a href="#triage">Triage</a>
+      <a href="#compliance">Compliance</a>
+      <a href="#integrations">Integrations</a>
+      <a href="#partner">Partners</a>
+    </div>
+    <a href="#demo" class="btn btn-primary nav-cta">Talk to Athena</a>
+  </div>
+</nav>
+
+<a id="top"></a>
+<header class="hero">
+  <div class="wrap hero-grid">
+    <div>
+      <span class="eyebrow">White-label healthcare voice AI</span>
+      <h1>The front desk that always answers — and always knows <em>where to send the call</em>.</h1>
+      <p class="lede">AthenaBot picks up every patient call, books and reschedules appointments, collects intake, and routes each caller to the right level of care — from a routine booking to a 911 hand-off. Deployed under your brand, on infrastructure you can put a BAA behind.</p>
+      <div class="hero-cta">
+        <a href="#demo" class="btn btn-primary">Try the live triage demo</a>
+        <a href="#capabilities" class="btn btn-ghost">See how it works</a>
+      </div>
+      <div class="trust">
+        <span><b>◆</b> HIPAA-ready architecture</span>
+        <span><b>◆</b> BAA-backed hosting</span>
+        <span><b>◆</b> EHR / FHIR integrated</span>
+      </div>
+    </div>
+
+    <div class="router" aria-label="Live triage routing illustration">
+      <div class="router-head">
+        <span class="lbl">Incoming call · routing</span>
+        <span class="live-dot" aria-hidden="true"></span>
+      </div>
+      <svg viewBox="0 0 360 260" id="routerSvg" role="img">
+        <!-- source node -->
+        <g font-family="IBM Plex Mono" font-size="10">
+          <circle cx="40" cy="130" r="22" fill="#0A1421" stroke="#39506B" stroke-width="1.4"/>
+          <text x="40" y="127" text-anchor="middle" fill="#9FB0C2">call</text>
+          <text x="40" y="139" text-anchor="middle" fill="#5C6B7D">in</text>
+        </g>
+        <!-- paths -->
+        <path id="p0" d="M62 130 C150 130 170 40 250 40" fill="none" stroke="#2A3D54" stroke-width="2"/>
+        <path id="p1" d="M62 130 C150 130 170 100 250 100" fill="none" stroke="#2A3D54" stroke-width="2"/>
+        <path id="p2" d="M62 130 C150 130 170 160 250 160" fill="none" stroke="#2A3D54" stroke-width="2"/>
+        <path id="p3" d="M62 130 C150 130 170 220 250 220" fill="none" stroke="#2A3D54" stroke-width="2"/>
+        <!-- moving pulse -->
+        <circle id="pulse" r="4.5" fill="#fff" opacity="0"/>
+        <!-- outcome nodes -->
+        <g font-family="IBM Plex Sans" font-size="11" font-weight="600">
+          <g id="o0"><rect x="250" y="26" width="100" height="28" rx="7" fill="#0A1421" stroke="#3A2120" stroke-width="1.4"/><text x="266" y="44" fill="#D98a82">Emergency</text></g>
+          <g id="o1"><rect x="250" y="86" width="100" height="28" rx="7" fill="#0A1421" stroke="#3A2E1B" stroke-width="1.4"/><text x="266" y="104" fill="#E0AD6E">Urgent care</text></g>
+          <g id="o2"><rect x="250" y="146" width="100" height="28" rx="7" fill="#0A1421" stroke="#1E3349" stroke-width="1.4"/><text x="266" y="164" fill="#7FB4DA">Clinician</text></g>
+          <g id="o3"><rect x="250" y="206" width="100" height="28" rx="7" fill="#0A1421" stroke="#22382E" stroke-width="1.4"/><text x="266" y="224" fill="#7FB89F">Schedule</text></g>
+        </g>
+      </svg>
+      <div class="router-caption">Every call, assessed and routed in real time</div>
+    </div>
+  </div>
+</header>
+
+<!-- capabilities -->
+<section id="capabilities">
+  <div class="wrap">
+    <div class="sec-head">
+      <span class="eyebrow">What it handles</span>
+      <h2>A complete front desk, on the phone, around the clock</h2>
+      <p>Natural conversation on the surface; a disciplined, auditable workflow underneath.</p>
+    </div>
+    <div class="caps">
+      <div class="cap"><div class="n">01</div><h3>Answers every call</h3><p>Natural, low-latency conversation with no hold music and no missed after-hours calls.</p></div>
+      <div class="cap"><div class="n">02</div><h3>Books & reschedules</h3><p>Reads live availability and confirms, moves, or cancels appointments inside your scheduling system.</p></div>
+      <div class="cap"><div class="n">03</div><h3>Collects intake</h3><p>Captures reason for call, demographics, and the details your staff would otherwise type by hand.</p></div>
+      <div class="cap"><div class="n">04</div><h3>Triages by protocol</h3><p>Applies your clinician-approved decision tree to decide the right next step for each caller.</p></div>
+      <div class="cap"><div class="n">05</div><h3>Escalates cleanly</h3><p>Warm-transfers to staff with the full conversation summary, so callers never repeat themselves.</p></div>
+      <div class="cap"><div class="n">06</div><h3>Integrates where needed</h3><p>Connects to scheduling, CRM, and EMR/EHR systems through standard APIs and FHIR.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- triage + demo -->
+<section id="triage" style="background:linear-gradient(180deg,var(--marble),var(--marble-2))">
+  <div class="wrap">
+    <div class="sec-head">
+      <span class="eyebrow">The decision engine</span>
+      <h2>Measured judgment, not a guessing receptionist</h2>
+      <p>The hard part of a medical call isn't the conversation — it's deciding what happens next. AthenaBot routes against a versioned decision tree your clinicians review and sign off on. Try it.</p>
+    </div>
+    <div class="triage-wrap">
+      <div class="ladder">
+        <div class="rung" style="--c:var(--sev-emergency)"><span class="tag">911</span><div><h4>Seek emergency care now</h4><p>Red-flag symptoms — chest pain, stroke signs, severe bleeding, safety risk — trigger an immediate hand-off and priority staff alert.</p></div></div>
+        <div class="rung" style="--c:var(--sev-urgent)"><span class="tag">Urgent</span><div><h4>Visit urgent care</h4><p>Acute but not life-threatening. Caller is directed to urgent care with the nearest location and a logged follow-up.</p></div></div>
+        <div class="rung" style="--c:var(--sev-clinician)"><span class="tag">Clinician</span><div><h4>Speak with a clinician</h4><p>Medication questions, worsening symptoms, post-op concerns — warm-transferred to the nurse line with the intake summary.</p></div></div>
+        <div class="rung" style="--c:var(--sev-schedule)"><span class="tag">Schedule</span><div><h4>Book an appointment</h4><p>Routine and follow-up requests are booked directly into the calendar, no human needed.</p></div></div>
+      </div>
+
+      <div class="demo" id="demo">
+        <h3>Talk to Athena</h3>
+        <div class="sub">Live triage · calls /api/run-triage</div>
+        <div class="chips" id="chips">
+          <span class="chip" data-t="I've had crushing chest pain and trouble breathing for 20 minutes">Chest pain</span>
+          <span class="chip" data-t="My toddler has a high fever and is throwing up everything">High fever, vomiting</span>
+          <span class="chip" data-t="I have a question about a side effect from my new medication">Medication question</span>
+          <span class="chip" data-t="I'd like to book my annual physical sometime next week">Annual physical</span>
+        </div>
+        <textarea id="intake" placeholder="Describe why you're calling…"></textarea>
+        <button class="btn btn-primary run" id="runBtn">Assess &amp; route</button>
+        <div class="result" id="result" aria-live="polite">
+          <div class="route"><span class="dot" id="rDot"></span><span id="rLabel"></span></div>
+          <div class="action" id="rAction"></div>
+          <div class="why" id="rWhy"></div>
+        </div>
+        <p class="demo-note">Demonstration logic with synthetic routing only. Not medical advice; final triage rules are authored and approved per clinic by a licensed clinician.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- compliance -->
+<section id="compliance" class="dark">
+  <div class="wrap">
+    <div class="sec-head">
+      <span class="eyebrow">Compliance, stated plainly</span>
+      <h2>HIPAA is a property of the whole stack — so we cover the whole stack</h2>
+      <p>A compliant voice deployment needs a BAA at every layer that can touch patient information, not a badge on one vendor's homepage. Here's the chain we sign for.</p>
+    </div>
+    <div class="stack">
+      <div class="layer"><div class="ic">01</div><h4>Telephony</h4><p>Carrier / SIP layer carrying the call audio.</p></div>
+      <div class="layer"><div class="ic">02</div><h4>Speech (STT/TTS)</h4><p>Transcription and voice synthesis providers.</p></div>
+      <div class="layer"><div class="ic">03</div><h4>Language model</h4><p>The reasoning model handling the conversation.</p></div>
+      <div class="layer"><div class="ic">04</div><h4>Voice platform</h4><p>Orchestration, recording, and storage controls.</p></div>
+      <div class="layer"><div class="ic">05</div><h4>Hosting (this layer)</h4><p>Our orchestration + integration tier on BAA-covered cloud.</p></div>
+    </div>
+    <p class="stack-note">PHI minimized at every hop · encrypted in transit and at rest · scheduled recording deletion · audit logging · no PHI in prompts or non-BAA tools</p>
+  </div>
+</section>
+
+<!-- integrations -->
+<section id="integrations">
+  <div class="wrap">
+    <div class="sec-head">
+      <span class="eyebrow">Connects to your systems</span>
+      <h2>It books in the calendar you already use</h2>
+      <p>Adapters keep the voice agent unchanged while we wire it into each client's stack. Integration scope is quoted per engagement.</p>
+    </div>
+    <div class="int-grid">
+      <div class="int"><h4>Scheduling</h4><ul><li>Cal.com</li><li>Practice management calendars</li><li>Custom booking APIs</li></ul></div>
+      <div class="int"><h4>CRM</h4><ul><li>HubSpot</li><li>Salesforce</li><li>Lookup-by-phone records</li></ul></div>
+      <div class="int"><h4>EMR / EHR</h4><ul><li>FHIR R4 read &amp; write</li><li>HL7 interfaces</li><li>Vendor-specific APIs</li></ul></div>
+      <div class="int"><h4>Workflow</h4><ul><li>Warm transfer &amp; paging</li><li>Ticketing / queues</li><li>Webhooks &amp; n8n / Make</li></ul></div>
+    </div>
+  </div>
+</section>
+
+<!-- partner band -->
+<section id="partner">
+  <div class="wrap">
+    <div class="partner">
+      <div>
+        <span class="eyebrow">For systems integrators &amp; MSPs</span>
+        <h2>Sell it as yours. We're the engine you don't have to explain.</h2>
+        <p>AthenaBot is built to disappear behind your brand: your name on the agent, your portal for the clinic, your managed-services relationship. We provide the orchestration, triage, and integration layer — and the on-call engineering behind it.</p>
+      </div>
+      <div class="pillars">
+        <div class="pillar"><span class="k">↳</span><div><b>Fully white-label</b><span>Branded agent, branded client portal, you as the single point of contact.</span></div></div>
+        <div class="pillar"><span class="k">↳</span><div><b>Multi-tenant by design</b><span>One platform, isolated per-client config, triage trees, and branding.</span></div></div>
+        <div class="pillar"><span class="k">↳</span><div><b>Repeatable across verticals</b><span>The same engine routes calls for clinics, dental, home services, and legal intake.</span></div></div>
+        <div class="pillar"><span class="k">↳</span><div><b>Managed, not handed off</b><span>Monitoring, call-quality review, and triage updates as an ongoing service.</span></div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- cta -->
+<section class="cta-band">
+  <div class="wrap">
+    <h2>Put a working agent in front of your client this week.</h2>
+    <p>Spin up a branded demo line, load the clinic's FAQs and a draft triage tree, and let stakeholders call it themselves.</p>
+    <div class="btns">
+      <a href="#demo" class="btn btn-primary">Try the triage demo</a>
+      <a href="mailto:hello@athenabot.ai" class="btn btn-ghost">Talk to us</a>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <div class="foot-top">
+      <div class="foot-brand"><svg class="glyph" style="color:var(--laurel-2)"><use href="#athena-glyph"/></svg>AthenaBot</div>
+      <div style="display:flex;gap:40px;flex-wrap:wrap">
+        <div><div style="color:#fff;font-weight:600;margin-bottom:8px">Platform</div><a href="#capabilities" style="display:block;margin:5px 0">Capabilities</a><a href="#triage" style="display:block;margin:5px 0">Triage engine</a><a href="#integrations" style="display:block;margin:5px 0">Integrations</a></div>
+        <div><div style="color:#fff;font-weight:600;margin-bottom:8px">Company</div><a href="#partner" style="display:block;margin:5px 0">Partners</a><a href="#compliance" style="display:block;margin:5px 0">Compliance</a><a href="mailto:hello@athenabot.ai" style="display:block;margin:5px 0">Contact</a></div>
+      </div>
+    </div>
+    <p class="disclaimer">
+      <b>Important:</b> AthenaBot is automation software for call handling and scheduling. The triage demonstration on this page uses illustrative, non-validated routing logic for showcase purposes only and is <b>not medical advice and not a diagnostic device</b>. In any live deployment, the triage decision tree is authored, reviewed, and approved by a licensed clinician for the specific organization, and a human escalation path is always available. Production deployments that handle Protected Health Information run on HIPAA-eligible infrastructure under signed Business Associate Agreements. © <span id="yr"></span> AthenaBot.
+    </p>
+  </div>
+</footer>
+
+<script>
+  document.getElementById('yr').textContent = new Date().getFullYear();
+
+  /* ---------- client-side triage fallback (mirrors server/config/triage-rules.json) ---------- */
+  var RULES = [
+    {o:'EMERGENCY',m:['chest pain','chest pressure','can\'t breathe','cannot breathe','trouble breathing','shortness of breath','blue lips','passed out','unconscious','unresponsive','face drooping','slurred speech','arm weakness','sudden confusion','severe bleeding','won\'t stop bleeding','head injury','seizure','anaphylaxis','severe allergic','throat closing','suicidal','kill myself','overdose']},
+    {o:'URGENT_CARE',m:['high fever','stiff neck','persistent vomiting','throwing up','can\'t keep fluids','dehydrated','deep wound','possible fracture','sprained','moderate burn','ear infection','severe sore throat']},
+    {o:'CLINICIAN',m:['medication question','side effect','reaction to medication','rash','worsening symptoms','post-op','after surgery','lab result','test result','pregnant','dizzy','blood pressure']},
+    {o:'SCHEDULE',m:['appointment','checkup','check-up','physical','follow up','follow-up','refill','prescription','annual','wellness','consultation','cold','cough','mild','routine','book']}
+  ];
+  var OUT = {
+    EMERGENCY:{label:'Seek emergency care now',color:'emergency',sev:4,action:'Advise the caller to call 911 immediately and raise a priority staff alert.'},
+    URGENT_CARE:{label:'Visit urgent care',color:'urgent',sev:3,action:'Direct the caller to the nearest urgent care and log for clinician follow-up.'},
+    CLINICIAN:{label:'Speak with a clinician',color:'clinician',sev:2,action:'Warm-transfer to the nurse line with the full intake summary.'},
+    SCHEDULE:{label:'Schedule an appointment',color:'schedule',sev:1,action:'Offer the next available slots and book directly in the calendar.'}
+  };
+  function localTriage(text){
+    text=(text||'').toLowerCase();
+    var best=null;
+    RULES.forEach(function(r){
+      var hits=r.m.filter(function(k){return text.indexOf(k)>-1;});
+      if(hits.length){ var sev=OUT[r.o].sev; if(!best||sev>best.sev){best={outcome:r.o,sev:sev,matchedTerms:hits};} }
+    });
+    if(!best) return {outcome:'CLINICIAN',label:OUT.CLINICIAN.label,color:'clinician',action:OUT.CLINICIAN.action,rationale:'No rule matched confidently — defaulting to a human rather than guessing.',matchedTerms:[]};
+    var o=OUT[best.outcome];
+    return {outcome:best.outcome,label:o.label,color:o.color,action:o.action,rationale:'Matched: '+best.matchedTerms.join(', '),matchedTerms:best.matchedTerms};
+  }
+
+  async function runTriage(text){
+    try{
+      var res=await fetch('/api/run-triage',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({intake:text})});
+      if(res.ok) return await res.json();
+    }catch(e){/* fall back */}
+    return localTriage(text);
+  }
+
+  var resultEl=document.getElementById('result');
+  function render(d){
+    document.getElementById('rLabel').textContent=d.label;
+    document.getElementById('rLabel').className='sev-'+d.color;
+    document.getElementById('rDot').className='dot bg-'+d.color;
+    document.getElementById('rAction').textContent=d.action;
+    document.getElementById('rWhy').textContent=(d.rationale||'')+(d.matchedTerms&&d.matchedTerms.length?'  ·  cue: '+d.matchedTerms.join(', '):'');
+    resultEl.classList.add('show');
+  }
+  document.getElementById('runBtn').addEventListener('click',async function(){
+    var t=document.getElementById('intake').value.trim();
+    if(!t){document.getElementById('intake').focus();return;}
+    this.textContent='Assessing…';this.disabled=true;
+    var d=await runTriage(t);
+    render(d);
+    this.textContent='Assess & route';this.disabled=false;
+  });
+  Array.prototype.forEach.call(document.querySelectorAll('.chip'),function(c){
+    c.addEventListener('click',async function(){
+      document.getElementById('intake').value=c.getAttribute('data-t');
+      document.getElementById('runBtn').click();
+    });
+  });
+
+  /* ---------- hero router animation ---------- */
+  (function(){
+    if(window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    var svg=document.getElementById('routerSvg');
+    var pulse=document.getElementById('pulse');
+    var paths=['p0','p1','p2','p3'].map(function(id){return document.getElementById(id);});
+    var nodes=['o0','o1','o2','o3'].map(function(id){return document.getElementById(id);});
+    var colors=['#C0392B','#CF7A1E','#2C6E9E','#3F6B57'];
+    var glow=['#D98a82','#E0AD6E','#7FB4DA','#7FB89F'];
+    var i=0,t=0,active=-1,dur=70;
+    function step(){
+      t++;
+      if(active<0){active=i%4;i++;paths.forEach(function(p,k){p.setAttribute('stroke',k===active?colors[active]:'#2A3D54');p.setAttribute('stroke-width',k===active?'2.6':'2');});pulse.setAttribute('opacity','1');}
+      var prog=Math.min(t/dur,1);
+      var path=paths[active];var len=path.getTotalLength();var pt=path.getPointAtLength(prog*len);
+      pulse.setAttribute('cx',pt.x);pulse.setAttribute('cy',pt.y);
+      pulse.setAttribute('fill',colors[active]);
+      if(prog>=1){
+        var rect=nodes[active].querySelector('rect');rect.setAttribute('stroke',colors[active]);rect.setAttribute('stroke-width','2');
+        pulse.setAttribute('opacity','0');
+        setTimeout(function(){rect.setAttribute('stroke-width','1.4');},650);
+        t=0;active=-1;
+        setTimeout(function(){paths.forEach(function(p){p.setAttribute('stroke','#2A3D54');p.setAttribute('stroke-width','2');});},120);
+        setTimeout(step,900);return;
+      }
+      requestAnimationFrame(step);
+    }
+    setTimeout(step,700);
+  })();
+</script>
+</body>
+</html>
