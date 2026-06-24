@@ -1,0 +1,312 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>AthenaBot — AI Agent Development</title>
+<meta name="description" content="AthenaBot builds autonomous AI agents and AI-driven products: voice agents that answer every call, workflow agents that route the work, and vertical AI software that ships. A studio by AUREVIA LLC." />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#0c0f14; --panel:#13171f; --panel2:#1a212b; --line:#262e3a;
+    --gold:#C8A86A; --gold-2:#E6CF92; --bone:#ECE7DD; --text:#D5D9E0; --muted:#878f9c;
+    --sage:#8a9a76;
+    --display:"Fraunces",Georgia,serif; --sans:"IBM Plex Sans",system-ui,sans-serif; --mono:"IBM Plex Mono",ui-monospace,monospace;
+    --maxw:1140px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth}
+  body{background:var(--ink);color:var(--text);font-family:var(--sans);line-height:1.6;-webkit-font-smoothing:antialiased;overflow-x:hidden}
+  a{color:inherit;text-decoration:none}
+  .wrap{max-width:var(--maxw);margin:0 auto;padding:0 28px}
+  .eyebrow{font-family:var(--mono);font-size:11.5px;letter-spacing:.22em;text-transform:uppercase;color:var(--gold)}
+
+  /* nav */
+  nav{position:sticky;top:0;z-index:50;background:rgba(12,15,20,.78);backdrop-filter:blur(12px);border-bottom:1px solid var(--line)}
+  nav .row{display:flex;align-items:center;justify-content:space-between;height:68px}
+  .brand{display:flex;align-items:center;gap:11px;font-family:var(--display);font-weight:600;font-size:20px;color:var(--bone);letter-spacing:.01em}
+  .brand svg{display:block}
+  .brand b{color:var(--gold);font-weight:600}
+  .navlinks{display:flex;gap:30px;align-items:center;font-size:14px}
+  .navlinks a{color:var(--muted);transition:color .2s}
+  .navlinks a:hover{color:var(--bone)}
+  .navcta{font-family:var(--mono);font-size:12.5px;letter-spacing:.04em;color:var(--ink);background:var(--gold);padding:9px 16px;border-radius:8px;font-weight:500;transition:background .2s}
+  .navcta:hover{background:var(--gold-2)}
+  @media(max-width:760px){.navlinks a:not(.navcta){display:none}}
+
+  /* hero */
+  .hero{position:relative;padding:96px 0 84px;border-bottom:1px solid var(--line);overflow:hidden}
+  .hero::before{content:"";position:absolute;inset:0;background:
+    radial-gradient(900px 460px at 76% -8%, rgba(200,168,106,.14), transparent 60%),
+    radial-gradient(700px 420px at 10% 110%, rgba(138,154,118,.08), transparent 60%);pointer-events:none}
+  .hero .wrap{position:relative;display:grid;grid-template-columns:1.05fr .95fr;gap:54px;align-items:center}
+  @media(max-width:900px){.hero .wrap{grid-template-columns:1fr;gap:40px}}
+  h1{font-family:var(--display);font-weight:600;color:var(--bone);font-size:clamp(38px,5.4vw,62px);line-height:1.04;letter-spacing:-.015em;margin:20px 0 0}
+  h1 em{font-style:italic;color:var(--gold)}
+  .hero p.lead{margin-top:22px;font-size:18px;color:var(--muted);max-width:30em}
+  .herobtns{margin-top:32px;display:flex;gap:14px;flex-wrap:wrap}
+  .btn{font-size:15px;padding:13px 22px;border-radius:9px;font-weight:600;transition:.2s;display:inline-flex;align-items:center;gap:9px}
+  .btn-gold{background:var(--gold);color:var(--ink)}
+  .btn-gold:hover{background:var(--gold-2);transform:translateY(-1px)}
+  .btn-ghost{border:1px solid var(--line);color:var(--text)}
+  .btn-ghost:hover{border-color:var(--gold);color:var(--bone)}
+
+  /* agent feed signature */
+  .feed{background:linear-gradient(180deg,var(--panel),#10141b);border:1px solid var(--line);border-radius:16px;overflow:hidden;box-shadow:0 30px 80px -40px rgba(0,0,0,.8)}
+  .feed-top{display:flex;align-items:center;gap:8px;padding:13px 16px;border-bottom:1px solid var(--line);background:rgba(255,255,255,.015)}
+  .dot{width:10px;height:10px;border-radius:50%}
+  .feed-title{font-family:var(--mono);font-size:11.5px;color:var(--muted);margin-left:8px;letter-spacing:.05em}
+  .pulse{margin-left:auto;display:flex;align-items:center;gap:7px;font-family:var(--mono);font-size:11px;color:var(--sage)}
+  .pulse i{width:7px;height:7px;border-radius:50%;background:var(--sage);animation:blink 1.6s ease-in-out infinite}
+  @keyframes blink{0%,100%{opacity:.25}50%{opacity:1}}
+  .feed-body{padding:8px 4px 14px;font-family:var(--mono);font-size:13px;min-height:268px}
+  .line{padding:9px 16px;display:grid;grid-template-columns:auto 1fr;gap:12px;align-items:start;opacity:0;transform:translateY(6px);animation:rise .5s forwards}
+  @keyframes rise{to{opacity:1;transform:none}}
+  .tag{color:var(--ink);background:var(--gold);padding:1px 7px;border-radius:5px;font-size:10.5px;font-weight:600;white-space:nowrap;letter-spacing:.02em}
+  .tag.v{background:#cBA765;background:var(--gold)}
+  .tag.p{background:var(--sage);color:#0c0f14}
+  .tag.j{background:#9aa6b8;color:#0c0f14}
+  .line .msg{color:var(--text)}
+  .line .msg b{color:var(--bone);font-weight:600}
+  .line .out{color:var(--gold-2)}
+
+  /* sections */
+  section{padding:88px 0}
+  .sec-head{max-width:640px}
+  .sec-head h2{font-family:var(--display);font-weight:600;color:var(--bone);font-size:clamp(28px,3.6vw,40px);line-height:1.1;letter-spacing:-.01em;margin:14px 0 0}
+  .sec-head p{margin-top:14px;color:var(--muted);font-size:16.5px}
+
+  /* products */
+  #products{border-top:1px solid var(--line);background:linear-gradient(180deg,#0c0f14,#0a0d11)}
+  .tiles{margin-top:46px;display:grid;grid-template-columns:repeat(2,1fr);gap:20px}
+  @media(max-width:820px){.tiles{grid-template-columns:1fr}}
+  .tile{position:relative;display:flex;flex-direction:column;background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:28px;transition:.25s;overflow:hidden}
+  .tile::after{content:"";position:absolute;left:0;top:0;height:3px;width:100%;background:linear-gradient(90deg,var(--gold),transparent);opacity:0;transition:opacity .25s}
+  .tile:hover{border-color:#3a4452;transform:translateY(-3px);background:var(--panel2)}
+  .tile:hover::after{opacity:1}
+  .tile .status{position:absolute;top:22px;right:24px;font-family:var(--mono);font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;padding:4px 9px;border-radius:20px;border:1px solid var(--line);color:var(--muted)}
+  .tile .status.live{color:#0c0f14;background:var(--sage);border-color:transparent}
+  .tile .status.beta{color:var(--gold);border-color:rgba(200,168,106,.4)}
+  .tile .kind{font-family:var(--mono);font-size:11.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--gold)}
+  .tile h3{font-family:var(--display);font-weight:600;color:var(--bone);font-size:25px;margin:12px 0 0;letter-spacing:-.01em}
+  .tile .who{font-size:13px;color:var(--muted);margin-top:3px}
+  .tile p.desc{margin-top:15px;color:var(--text);font-size:15px;flex:1}
+  .tile ul{list-style:none;margin:16px 0 0;display:flex;flex-wrap:wrap;gap:7px}
+  .tile li{font-family:var(--mono);font-size:11px;color:var(--muted);border:1px solid var(--line);border-radius:6px;padding:4px 9px}
+  .tile .go{margin-top:22px;font-weight:600;font-size:14.5px;color:var(--gold);display:inline-flex;align-items:center;gap:8px;transition:gap .2s}
+  .tile:hover .go{gap:13px}
+  .tile.soon{align-items:flex-start;justify-content:center;border-style:dashed;background:transparent}
+  .tile.soon h3{color:var(--muted)}
+
+  /* services */
+  #services{border-top:1px solid var(--line)}
+  .svc{margin-top:46px;display:grid;grid-template-columns:repeat(3,1fr);gap:0;border:1px solid var(--line);border-radius:16px;overflow:hidden}
+  @media(max-width:820px){.svc{grid-template-columns:1fr}}
+  .svc>div{padding:32px 28px;border-right:1px solid var(--line)}
+  .svc>div:last-child{border-right:none}
+  @media(max-width:820px){.svc>div{border-right:none;border-bottom:1px solid var(--line)}.svc>div:last-child{border-bottom:none}}
+  .svc .n{font-family:var(--mono);color:var(--gold);font-size:13px}
+  .svc h4{font-family:var(--display);font-weight:600;color:var(--bone);font-size:20px;margin:14px 0 8px}
+  .svc p{color:var(--muted);font-size:14.5px}
+
+  /* contact */
+  #contact{border-top:1px solid var(--line);background:linear-gradient(180deg,#0a0d11,#0c0f14)}
+  .cta-card{margin-top:10px;border:1px solid var(--line);border-radius:20px;padding:54px 44px;text-align:center;background:
+    radial-gradient(600px 300px at 50% -20%, rgba(200,168,106,.12), transparent 70%), var(--panel)}
+  .cta-card h2{font-family:var(--display);font-weight:600;color:var(--bone);font-size:clamp(28px,3.6vw,40px);letter-spacing:-.01em}
+  .cta-card p{color:var(--muted);margin:14px auto 0;max-width:40em;font-size:16.5px}
+  .cta-card .herobtns{justify-content:center}
+
+  footer{border-top:1px solid var(--line);padding:40px 0;color:var(--muted);font-size:13px}
+  footer .row{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap}
+  footer .mono{font-family:var(--mono);font-size:12px}
+  footer a:hover{color:var(--bone)}
+
+  @media(prefers-reduced-motion:reduce){
+    .line{opacity:1;transform:none;animation:none}
+    .pulse i{animation:none}
+    *{scroll-behavior:auto}
+  }
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="wrap row">
+    <a class="brand" href="#top" aria-label="AthenaBot home">
+      <svg width="26" height="26" viewBox="0 0 32 32" fill="none" aria-hidden="true">
+        <circle cx="16" cy="16" r="15" stroke="#C8A86A" stroke-width="1.4"/>
+        <path d="M16 6 L24 22 H8 Z" fill="#C8A86A" opacity="0.9"/>
+        <circle cx="16" cy="17.5" r="3.1" fill="#0c0f14"/>
+      </svg>
+      Athena<b>Bot</b>
+    </a>
+    <div class="navlinks">
+      <a href="#products">Products</a>
+      <a href="#services">Services</a>
+      <a href="#contact">Contact</a>
+      <a class="navcta" href="#contact">Work with us</a>
+    </div>
+  </div>
+</nav>
+
+<header class="hero" id="top">
+  <div class="wrap">
+    <div>
+      <span class="eyebrow">AI Agent Development Studio</span>
+      <h1>Agents that <em>answer</em>, <em>route</em>, and <em>ship</em> the work.</h1>
+      <p class="lead">AthenaBot designs and builds autonomous AI agents — and turns them into products people use every day. Voice agents that pick up every call. Workflow agents that move the work forward. Vertical AI software, launched and running.</p>
+      <div class="herobtns">
+        <a class="btn btn-gold" href="#products">See the products →</a>
+        <a class="btn btn-ghost" href="#services">What we build</a>
+      </div>
+    </div>
+
+    <div class="feed" aria-label="Live agent activity (illustrative)">
+      <div class="feed-top">
+        <span class="dot" style="background:#E0625B"></span>
+        <span class="dot" style="background:#E6B95C"></span>
+        <span class="dot" style="background:#7FB36B"></span>
+        <span class="feed-title">agents · live activity</span>
+        <span class="pulse"><i></i> running</span>
+      </div>
+      <div class="feed-body" id="feed"></div>
+    </div>
+  </div>
+</header>
+
+<section id="products">
+  <div class="wrap">
+    <div class="sec-head">
+      <span class="eyebrow">The Portfolio</span>
+      <h2>Finished products, each powered by an agent.</h2>
+      <p>Independent products under one roof. Open any one — they run on their own, and any of them can be your next door.</p>
+    </div>
+
+    <div class="tiles">
+
+      <a class="tile" href="https://smartjobs.athenabot.ai">
+        <span class="status live">Live</span>
+        <span class="kind">Career Agent</span>
+        <h3>SmartJobs</h3>
+        <div class="who">for job seekers &amp; recruiters</div>
+        <p class="desc">An AI job-search copilot: scores your fit for a role, rewrites your resume to match, tracks every application through the hiring pipeline, and runs a live voice interview that talks back, asks follow-ups, and scores you.</p>
+        <ul><li>fit analysis</li><li>resume rewrite</li><li>live voice interview</li><li>job tracker</li></ul>
+        <span class="go">Open SmartJobs →</span>
+      </a>
+
+      <a class="tile" href="https://voice.athenabot.ai">
+        <span class="status beta">White-label</span>
+        <span class="kind">Voice Agent</span>
+        <h3>Healthcare Voice AI</h3>
+        <div class="who">for clinics &amp; managed-service partners</div>
+        <p class="desc">A HIPAA-ready voice agent that answers every call, books and reschedules appointments, and routes patients to the right level of care — escalating real emergencies to a human. Fully white-label for partners to resell.</p>
+        <ul><li>24/7 call answering</li><li>scheduling</li><li>triage &amp; escalation</li><li>partner-branded</li></ul>
+        <span class="go">See the voice agent →</span>
+      </a>
+
+      <a class="tile" href="https://plm.athenabot.ai">
+        <span class="status beta">In build</span>
+        <span class="kind">Workflow Agent</span>
+        <h3>Lite-PLM with AI</h3>
+        <div class="who">for small &amp; mid-cap manufacturers</div>
+        <p class="desc">Product lifecycle management without the enterprise weight: BOMs, revisions, and a role-based change-order workflow — with an agent that answers “what breaks if I change this part?”, drafts the ECO, and flags affected items in plain English.</p>
+        <ul><li>BOM &amp; revisions</li><li>role-based ECO flow</li><li>vendor master</li><li>API + tokens</li></ul>
+        <span class="go">Explore Lite-PLM →</span>
+      </a>
+
+      <div class="tile soon">
+        <span class="kind">Next</span>
+        <h3>More agents, shipping.</h3>
+        <p class="desc">New verticals are in the works — each one a complete product built on the same agent foundation. Have a workflow that should answer for itself?</p>
+        <span class="go" style="color:var(--muted)">Tell us what to build →</span>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<section id="services">
+  <div class="wrap">
+    <div class="sec-head">
+      <span class="eyebrow">What we do</span>
+      <h2>We build the agent, then the business around it.</h2>
+      <p>From a single voice line to a full vertical SaaS, AthenaBot takes AI agents from prototype to production — design, build, billing, and deployment.</p>
+    </div>
+    <div class="svc">
+      <div>
+        <div class="n">/ 01</div>
+        <h4>Voice &amp; conversational agents</h4>
+        <p>Agents that answer calls and chats, complete tasks, and hand off cleanly to people when it matters. Built for regulated, real-world use.</p>
+      </div>
+      <div>
+        <div class="n">/ 02</div>
+        <h4>Workflow &amp; back-office agents</h4>
+        <p>Agents that route approvals, draft documents, reconcile data, and explain decisions — wired into the systems your team already runs on.</p>
+      </div>
+      <div>
+        <div class="n">/ 03</div>
+        <h4>Vertical AI products</h4>
+        <p>End-to-end SaaS: accounts, subscriptions, dashboards, and an agent at the core — launched on your domain, ready for customers.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="contact">
+  <div class="wrap">
+    <div class="cta-card">
+      <span class="eyebrow">Let's talk</span>
+      <h2>Have a call, a workflow, or an idea that should run itself?</h2>
+      <p>Tell us the job to be done. We'll show you the agent that does it — and the product it could become.</p>
+      <div class="herobtns">
+        <a class="btn btn-gold" href="mailto:hello@athenabot.ai">hello@athenabot.ai</a>
+        <a class="btn btn-ghost" href="#products">Browse the products</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap row">
+    <div class="brand" style="font-size:17px">Athena<b>Bot</b></div>
+    <div class="mono">© <span id="yr"></span> AUREVIA LLC · built on athenabot.ai</div>
+    <div class="mono"><a href="#products">Products</a> · <a href="#services">Services</a> · <a href="#contact">Contact</a></div>
+  </div>
+</footer>
+
+<script>
+  document.getElementById("yr").textContent = new Date().getFullYear();
+
+  // Signature: live agent activity feed — illustrative actions from each product's agent.
+  const LINES = [
+    {c:"v", t:"voice · athena", html:'Incoming call — booked <b>Tue 9:40a</b>, reminder set, intake form sent <span class="out">→ done</span>'},
+    {c:"p", t:"plm · ada",      html:'<b>ECO-2241</b> routed to Quality — 3 affected parts flagged, disposition pending <span class="out">→ routed</span>'},
+    {c:"j", t:"jobs · iris",    html:'Live interview — 5 answers scored, follow-ups asked, feedback delivered <span class="out">→ 8.4/10</span>'},
+    {c:"v", t:"voice · athena", html:'Caller asked for results — verified identity, <b>escalated to nurse line</b> <span class="out">→ handed off</span>'},
+    {c:"j", t:"jobs · iris",    html:'Resume tailored to <b>Sr. Backend</b> JD — 11 keywords aligned, ATS PDF ready <span class="out">→ saved</span>'},
+    {c:"p", t:"plm · ada",      html:'“What breaks if I change <b>part 40-118</b>?” — traced 6 BOMs, named the risks <span class="out">→ answered</span>'},
+    {c:"v", t:"voice · athena", html:'After-hours call — rescheduled appt, no staff involved <span class="out">→ self-served</span>'},
+    {c:"p", t:"plm · ada",      html:'Revision <b>B released</b> — affected items locked, suppliers notified <span class="out">→ released</span>'},
+  ];
+  const feed = document.getElementById("feed");
+  const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const MAX = 6; let i = 0;
+  function add(){
+    const d = LINES[i % LINES.length]; i++;
+    const el = document.createElement("div");
+    el.className = "line";
+    el.innerHTML = '<span class="tag '+d.c+'">'+d.t+'</span><span class="msg">'+d.html+'</span>';
+    feed.appendChild(el);
+    while (feed.children.length > MAX) feed.removeChild(feed.firstChild);
+  }
+  if (reduce){ for (let k=0;k<MAX;k++) add(); }
+  else {
+    for (let k=0;k<4;k++){ setTimeout(add, k*240); }
+    setInterval(add, 2300);
+  }
+</script>
+</body>
+</html>
