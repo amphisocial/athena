@@ -1,0 +1,679 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AthenaBot — We build the agent, then the application around it.</title>
+<meta name="description" content="AthenaBot is an AI agent development studio. We design and ship production-grade, agent-driven applications — voice, workflow, and full vertical products — and can build yours next.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#0E1116;
+    --ink-2:#151A21;
+    --panel:#1A2129;
+    --line: rgba(231,228,220,0.10);
+    --line-strong: rgba(231,228,220,0.20);
+    --bone:#E7E4DC;
+    --bone-dim: rgba(231,228,220,0.62);
+    --bone-faint: rgba(231,228,220,0.38);
+    --brass:#C9A24B;
+    --brass-dim: rgba(201,162,75,0.16);
+    --signal:#5EEAD4;
+    --signal-dim: rgba(94,234,212,0.14);
+    --radius: 3px;
+    --maxw: 1180px;
+    --serif: 'Fraunces', serif;
+    --sans: 'IBM Plex Sans', sans-serif;
+    --mono: 'IBM Plex Mono', monospace;
+  }
+  *{box-sizing:border-box;}
+  html{scroll-behavior:smooth;}
+  body{
+    margin:0;
+    background:var(--ink);
+    color:var(--bone);
+    font-family:var(--sans);
+    font-size:16px;
+    line-height:1.6;
+    -webkit-font-smoothing:antialiased;
+  }
+  a{color:inherit;}
+  img,svg{display:block;max-width:100%;}
+  .wrap{max-width:var(--maxw); margin:0 auto; padding:0 32px;}
+  ::selection{ background:var(--brass); color:var(--ink); }
+
+  /* ---------- eyebrow / mono labels ---------- */
+  .eyebrow{
+    font-family:var(--mono);
+    font-size:12px;
+    letter-spacing:.14em;
+    text-transform:uppercase;
+    color:var(--bone-faint);
+    display:flex;
+    align-items:center;
+    gap:10px;
+  }
+  .eyebrow .dot{
+    width:6px; height:6px; border-radius:50%;
+    background:var(--signal);
+    box-shadow:0 0 0 3px var(--signal-dim);
+  }
+  .tag{
+    font-family:var(--mono);
+    font-size:11px;
+    letter-spacing:.08em;
+    text-transform:uppercase;
+    padding:4px 9px;
+    border:1px solid var(--line-strong);
+    border-radius:2px;
+    color:var(--bone-dim);
+    white-space:nowrap;
+  }
+  .tag.live{ color:var(--signal); border-color:rgba(94,234,212,0.35); }
+  .tag.build{ color:var(--brass); border-color:rgba(201,162,75,0.4); }
+
+  /* ---------- header ---------- */
+  header{
+    position:sticky; top:0; z-index:50;
+    background:rgba(14,17,22,0.86);
+    backdrop-filter:blur(10px);
+    border-bottom:1px solid var(--line);
+  }
+  header .wrap{
+    display:flex; align-items:center; justify-content:space-between;
+    height:72px;
+  }
+  .logo{
+    font-family:var(--serif); font-weight:600; font-size:20px;
+    letter-spacing:.01em; text-decoration:none;
+  }
+  .logo b{ color:var(--brass); font-weight:600; }
+  nav.primary{ display:flex; align-items:center; gap:36px; }
+  nav.primary a{
+    text-decoration:none; font-size:14px; color:var(--bone-dim);
+    transition:color .15s ease;
+  }
+  nav.primary a:hover{ color:var(--bone); }
+  .btn{
+    font-family:var(--sans); font-weight:500; font-size:14px;
+    padding:10px 20px; border-radius:2px; text-decoration:none;
+    display:inline-flex; align-items:center; gap:8px;
+    border:1px solid transparent; cursor:pointer;
+  }
+  .btn-primary{ background:var(--brass); color:#171308; }
+  .btn-primary:hover{ background:#d8b262; }
+  .btn-ghost{ border-color:var(--line-strong); color:var(--bone); }
+  .btn-ghost:hover{ border-color:var(--bone-faint); }
+  .menu-toggle{ display:none; }
+
+  /* ---------- hero ---------- */
+  .hero{
+    padding:96px 0 72px;
+    border-bottom:1px solid var(--line);
+    position:relative;
+    overflow:hidden;
+  }
+  .hero .wrap{
+    display:grid;
+    grid-template-columns:1.05fr 0.95fr;
+    gap:56px;
+    align-items:center;
+  }
+  .hero h1{
+    font-family:var(--serif);
+    font-weight:600;
+    font-size:clamp(34px, 4.4vw, 58px);
+    line-height:1.06;
+    letter-spacing:-0.01em;
+    margin:22px 0 22px;
+  }
+  .hero h1 em{ font-style:italic; color:var(--brass); font-weight:500;}
+  .hero p.lede{
+    font-size:18px; color:var(--bone-dim); max-width:520px; margin:0 0 32px;
+  }
+  .hero-ctas{ display:flex; gap:14px; flex-wrap:wrap; }
+  .hero-diagram-wrap{
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:6px;
+    padding:22px;
+  }
+  .hero-diagram-cap{
+    display:flex; justify-content:space-between; align-items:center;
+    font-family:var(--mono); font-size:11px; color:var(--bone-faint);
+    letter-spacing:.06em; text-transform:uppercase;
+    margin-top:14px; padding-top:14px; border-top:1px solid var(--line);
+  }
+
+  /* diagram styling */
+  .flow-line{ stroke:var(--line-strong); stroke-width:1.4; fill:none; }
+  .flow-pulse{
+    stroke:var(--signal); stroke-width:1.4; fill:none;
+    stroke-dasharray:6 220; stroke-dashoffset:0;
+    animation:pulseflow 3.2s linear infinite;
+    opacity:.9;
+  }
+  .flow-pulse.d2{ animation-delay:.5s; }
+  .flow-pulse.d3{ animation-delay:1s; }
+  @keyframes pulseflow{ to{ stroke-dashoffset:-226; } }
+  .node-core{ fill:var(--ink-2); stroke:var(--brass); stroke-width:1.3; }
+  .node-io{ fill:var(--ink-2); stroke:var(--line-strong); stroke-width:1.2; }
+  .node-label{ font-family:var(--mono); font-size:9.5px; fill:var(--bone-dim); letter-spacing:.03em; }
+  .node-label.core{ fill:var(--brass); font-size:10.5px; }
+  @media (prefers-reduced-motion:reduce){
+    .flow-pulse{ animation:none; opacity:0; }
+  }
+
+  /* ---------- stat strip ---------- */
+  .stripbar{
+    border-bottom:1px solid var(--line);
+    background:var(--ink-2);
+  }
+  .stripbar .wrap{
+    display:flex; flex-wrap:wrap; gap:0;
+    padding:22px 32px;
+  }
+  .stripbar .stat{
+    flex:1; min-width:150px;
+    padding:0 24px;
+    border-left:1px solid var(--line);
+  }
+  .stripbar .stat:first-child{ border-left:none; padding-left:0; }
+  .stripbar .stat .num{ font-family:var(--serif); font-size:26px; color:var(--bone); }
+  .stripbar .stat .lbl{ font-family:var(--mono); font-size:11px; color:var(--bone-faint); letter-spacing:.05em; text-transform:uppercase; margin-top:2px; }
+
+  /* ---------- section shell ---------- */
+  section{ padding:96px 0; border-bottom:1px solid var(--line); }
+  .section-head{ max-width:640px; margin-bottom:52px; }
+  .section-head h2{
+    font-family:var(--serif); font-weight:600;
+    font-size:clamp(26px,3vw,38px); margin:16px 0 14px; letter-spacing:-.01em;
+  }
+  .section-head p{ color:var(--bone-dim); font-size:16.5px; }
+
+  /* ---------- portfolio ---------- */
+  .portfolio-grid{
+    display:grid; grid-template-columns:repeat(2,1fr); gap:1px;
+    background:var(--line); border:1px solid var(--line);
+  }
+  .p-card{
+    background:var(--ink); padding:30px; display:flex; flex-direction:column; gap:16px;
+    transition:background .15s ease;
+  }
+  .p-card:hover{ background:var(--ink-2); }
+  .p-card-top{ display:flex; justify-content:space-between; align-items:flex-start; gap:12px; }
+  .p-card h3{ font-family:var(--serif); font-size:22px; font-weight:600; margin:0; }
+  .p-card .kicker{ font-family:var(--mono); font-size:11px; color:var(--brass); letter-spacing:.08em; text-transform:uppercase; margin-bottom:6px; }
+  .p-card p{ color:var(--bone-dim); font-size:14.5px; margin:0; }
+  .p-card ul{ list-style:none; margin:0; padding:0; display:flex; flex-wrap:wrap; gap:8px; }
+  .p-card ul li{
+    font-family:var(--mono); font-size:11px; color:var(--bone-faint);
+    border:1px solid var(--line); padding:3px 8px; border-radius:2px;
+  }
+  .p-card a.open{
+    margin-top:auto; font-size:14px; font-weight:500; text-decoration:none;
+    color:var(--bone); display:inline-flex; align-items:center; gap:6px;
+    border-top:1px solid var(--line); padding-top:14px;
+  }
+  .p-card a.open .arrow{ transition:transform .15s ease; }
+  .p-card a.open:hover .arrow{ transform:translateX(3px); }
+  .p-card a.open:hover{ color:var(--brass); }
+
+  /* ---------- capabilities (studio pitch) ---------- */
+  .cap-grid{ display:grid; grid-template-columns:repeat(3,1fr); gap:1px; background:var(--line); border:1px solid var(--line); }
+  .cap-card{ background:var(--ink); padding:32px 28px; }
+  .cap-card .tag{ margin-bottom:18px; display:inline-block; }
+  .cap-card h3{ font-family:var(--serif); font-size:20px; font-weight:600; margin:0 0 10px; }
+  .cap-card p{ color:var(--bone-dim); font-size:14.5px; margin:0; }
+
+  /* ---------- process ---------- */
+  .process{ display:grid; grid-template-columns:repeat(4,1fr); gap:24px; }
+  .proc-step{ position:relative; padding-top:28px; border-top:1px solid var(--line-strong); }
+  .proc-step .num{ font-family:var(--mono); font-size:12px; color:var(--brass); letter-spacing:.06em; }
+  .proc-step h4{ font-family:var(--serif); font-size:19px; font-weight:600; margin:10px 0 8px; }
+  .proc-step p{ color:var(--bone-dim); font-size:14px; margin:0; }
+
+  /* ---------- contact ---------- */
+  .contact-wrap{ display:grid; grid-template-columns:0.85fr 1.15fr; gap:64px; }
+  .contact-info .direct{
+    margin-top:28px; padding:18px 20px; background:var(--panel);
+    border:1px solid var(--line); border-radius:4px;
+  }
+  .contact-info .direct .eyebrow{ margin-bottom:8px; }
+  .contact-info .direct a{ font-family:var(--mono); font-size:15px; text-decoration:none; color:var(--signal); }
+  .contact-info ul.notes{ list-style:none; padding:0; margin:28px 0 0; display:flex; flex-direction:column; gap:12px; }
+  .contact-info ul.notes li{ font-size:14px; color:var(--bone-dim); padding-left:18px; position:relative; }
+  .contact-info ul.notes li::before{ content:'—'; position:absolute; left:0; color:var(--brass); }
+
+  form.inquiry{ background:var(--panel); border:1px solid var(--line); border-radius:6px; padding:36px; }
+  .form-row{ display:grid; grid-template-columns:1fr 1fr; gap:18px; }
+  .field{ margin-bottom:20px; }
+  .field label{
+    display:block; font-family:var(--mono); font-size:11.5px; letter-spacing:.06em;
+    text-transform:uppercase; color:var(--bone-faint); margin-bottom:8px;
+  }
+  .field input, .field select, .field textarea{
+    width:100%; background:var(--ink); border:1px solid var(--line-strong);
+    border-radius:2px; padding:12px 13px; color:var(--bone); font-family:var(--sans);
+    font-size:14.5px; outline:none; transition:border-color .15s ease;
+  }
+  .field textarea{ resize:vertical; min-height:110px; }
+  .field input:focus, .field select:focus, .field textarea:focus{ border-color:var(--brass); }
+  .field select{ appearance:none;
+    background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='%23C9A24B'><path d='M5.8 7.5l4.2 4.2 4.2-4.2 1.3 1.3-5.5 5.5-5.5-5.5z'/></svg>");
+    background-repeat:no-repeat; background-position:right 12px center; background-size:14px;
+  }
+  form.inquiry .submit-row{ display:flex; align-items:center; gap:16px; margin-top:8px; }
+  form.inquiry .submit-note{ font-size:12.5px; color:var(--bone-faint); }
+  .honey{ position:absolute; left:-9999px; }
+
+  .success-banner{
+    display:none; align-items:center; gap:10px; margin-bottom:22px;
+    background:var(--signal-dim); border:1px solid rgba(94,234,212,0.35);
+    color:var(--signal); font-size:14px; padding:12px 16px; border-radius:4px;
+    font-family:var(--mono);
+  }
+  .success-banner.show{ display:flex; }
+  .error-banner{
+    display:none; align-items:center; gap:10px; margin-bottom:22px;
+    background:rgba(217,110,90,0.14); border:1px solid rgba(217,110,90,0.4);
+    color:#e08a78; font-size:14px; padding:12px 16px; border-radius:4px;
+    font-family:var(--mono);
+  }
+  .error-banner.show{ display:flex; }
+  .btn:disabled{ opacity:.55; cursor:not-allowed; }
+
+  /* ---------- footer ---------- */
+  footer{ padding:40px 0; }
+  footer .wrap{ display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; }
+  footer .fnote{ font-size:13px; color:var(--bone-faint); }
+  footer nav a{ font-size:13px; color:var(--bone-dim); text-decoration:none; margin-left:22px; }
+
+  /* ---------- responsive ---------- */
+  @media (max-width:920px){
+    nav.primary{ display:none; }
+    .hero .wrap{ grid-template-columns:1fr; }
+    .portfolio-grid{ grid-template-columns:1fr; }
+    .cap-grid{ grid-template-columns:1fr; }
+    .process{ grid-template-columns:1fr 1fr; }
+    .contact-wrap{ grid-template-columns:1fr; }
+    .form-row{ grid-template-columns:1fr; }
+    .stripbar .wrap{ flex-direction:column; }
+    .stripbar .stat{ border-left:none; border-top:1px solid var(--line); padding:14px 0 0; margin-top:14px; }
+    .stripbar .stat:first-child{ border-top:none; margin-top:0; padding-top:0;}
+  }
+  @media (max-width:560px){
+    .process{ grid-template-columns:1fr; }
+    .wrap{ padding:0 20px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap">
+    <a href="#top" class="logo">Athena<b>Bot</b></a>
+    <nav class="primary">
+      <a href="#work">Work</a>
+      <a href="#build">What we build</a>
+      <a href="#process">Process</a>
+      <a href="#contact">Contact</a>
+    </nav>
+    <a href="#contact" class="btn btn-primary">Start a project</a>
+  </div>
+</header>
+
+<main id="top">
+
+  <!-- HERO -->
+  <section class="hero" style="border-bottom:1px solid var(--line); padding-bottom:0;">
+    <div class="wrap">
+      <div>
+        <div class="eyebrow"><span class="dot"></span> AI Agent Development Studio</div>
+        <h1>We build the agent — then the <em>application</em> around it.</h1>
+        <p class="lede">AthenaBot designs and ships production-grade, agent-driven software: voice lines that never miss a call, workflows that route themselves, and full vertical products built on top. If you have a process that should think for itself, this is who builds it.</p>
+        <div class="hero-ctas">
+          <a href="#contact" class="btn btn-primary">Tell us what to build →</a>
+          <a href="#work" class="btn btn-ghost">See the work</a>
+        </div>
+      </div>
+
+      <div class="hero-diagram-wrap">
+        <svg viewBox="0 0 480 300" width="100%" role="img" aria-label="Diagram showing inputs such as calls, forms, and documents feeding into a central Athena agent core, which routes out to voice, workflow, and vertical product outputs.">
+          <!-- input nodes -->
+          <rect class="node-io" x="14" y="30" width="108" height="34" rx="3"/>
+          <text class="node-label" x="24" y="51">CALLS / CHAT</text>
+
+          <rect class="node-io" x="14" y="88" width="108" height="34" rx="3"/>
+          <text class="node-label" x="24" y="109">DOCUMENTS</text>
+
+          <rect class="node-io" x="14" y="146" width="108" height="34" rx="3"/>
+          <text class="node-label" x="24" y="167">SYSTEM DATA</text>
+
+          <rect class="node-io" x="14" y="204" width="108" height="34" rx="3"/>
+          <text class="node-label" x="24" y="225">USER INTENT</text>
+
+          <!-- lines into core -->
+          <path class="flow-line" d="M122,47 C 170,47 170,130 208,130"/>
+          <path class="flow-pulse" d="M122,47 C 170,47 170,130 208,130"/>
+          <path class="flow-line" d="M122,105 C 170,105 170,130 208,130"/>
+          <path class="flow-pulse d2" d="M122,105 C 170,105 170,130 208,130"/>
+          <path class="flow-line" d="M122,163 C 170,163 170,150 208,150"/>
+          <path class="flow-pulse d3" d="M122,163 C 170,163 170,150 208,150"/>
+          <path class="flow-line" d="M122,221 C 170,221 170,150 208,150"/>
+          <path class="flow-pulse" d="M122,221 C 170,221 170,150 208,150"/>
+
+          <!-- core -->
+          <circle class="node-core" cx="240" cy="140" r="42"/>
+          <text class="node-label core" x="215" y="136">ATHENA</text>
+          <text class="node-label core" x="212" y="150">AGENT CORE</text>
+
+          <!-- lines out -->
+          <path class="flow-line" d="M282,124 C 330,100 330,60 366,45"/>
+          <path class="flow-pulse" d="M282,124 C 330,100 330,60 366,45"/>
+          <path class="flow-line" d="M282,140 C 330,140 330,140 366,140"/>
+          <path class="flow-pulse d2" d="M282,140 C 330,140 330,140 366,140"/>
+          <path class="flow-line" d="M282,156 C 330,180 330,225 366,238"/>
+          <path class="flow-pulse d3" d="M282,156 C 330,180 330,225 366,238"/>
+
+          <!-- output nodes -->
+          <rect class="node-io" x="366" y="28" width="100" height="34" rx="3"/>
+          <text class="node-label" x="378" y="49">VOICE</text>
+
+          <rect class="node-io" x="366" y="123" width="100" height="34" rx="3"/>
+          <text class="node-label" x="378" y="144">WORKFLOW</text>
+
+          <rect class="node-io" x="366" y="221" width="100" height="34" rx="3"/>
+          <text class="node-label" x="378" y="242">VERTICAL APP</text>
+        </svg>
+        <div class="hero-diagram-cap">
+          <span>Inputs</span><span>Agent core</span><span>Shipped output</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- STAT STRIP -->
+  <div class="stripbar">
+    <div class="wrap">
+      <div class="stat"><div class="num">4</div><div class="lbl">Agents in production</div></div>
+      <div class="stat"><div class="num">24/7</div><div class="lbl">Live call & chat coverage</div></div>
+      <div class="stat"><div class="num">1</div><div class="lbl">Team, from prototype to billing</div></div>
+      <div class="stat"><div class="num">100%</div><div class="lbl">Custom-built, no template SaaS</div></div>
+    </div>
+  </div>
+
+  <!-- PORTFOLIO -->
+  <section id="work">
+    <div class="wrap">
+      <div class="section-head">
+        <div class="eyebrow"><span class="dot"></span> Proof of work</div>
+        <h2>Four agents, shipped and running.</h2>
+        <p>Not mockups — live products with real users, each one built the same way we'd build yours: agent first, application around it.</p>
+      </div>
+
+      <div class="portfolio-grid">
+
+        <div class="p-card">
+          <div class="p-card-top">
+            <div>
+              <div class="kicker">Career Agent</div>
+              <h3>SmartJobs</h3>
+            </div>
+            <span class="tag live">Live</span>
+          </div>
+          <p>An AI job-search copilot for seekers and recruiters: scores fit against a role, rewrites the resume to match, tracks every application through the pipeline, and runs a live voice interview that talks back and scores you.</p>
+          <ul><li>Fit analysis</li><li>Resume rewrite</li><li>Voice interview</li><li>Application tracker</li></ul>
+          <a class="open" href="https://smartjobs.athenabot.ai" target="_blank" rel="noopener">Open SmartJobs <span class="arrow">→</span></a>
+        </div>
+
+        <div class="p-card">
+          <div class="p-card-top">
+            <div>
+              <div class="kicker">White-label Voice Agent</div>
+              <h3>Clinic Voice AI</h3>
+            </div>
+            <span class="tag live">Live</span>
+          </div>
+          <p>A HIPAA-ready voice agent for clinics and managed-service partners: answers every call, books and reschedules appointments, triages to the right level of care, and escalates real emergencies to a human — fully white-label for resale.</p>
+          <ul><li>24/7 call answering</li><li>Scheduling</li><li>Triage & escalation</li><li>Partner-branded</li></ul>
+          <a class="open" href="https://voice.athenabot.ai" target="_blank" rel="noopener">See the voice agent <span class="arrow">→</span></a>
+        </div>
+
+        <div class="p-card">
+          <div class="p-card-top">
+            <div>
+              <div class="kicker">Workflow Agent</div>
+              <h3>Lite-PLM</h3>
+            </div>
+            <span class="tag build">In build</span>
+          </div>
+          <p>Product lifecycle management without the enterprise weight: BOMs, revisions, and a role-based change-order workflow, with an agent that answers "what breaks if I change this part?", drafts the ECO, and flags affected items in plain English.</p>
+          <ul><li>BOM & revisions</li><li>Role-based ECO flow</li><li>Vendor master</li><li>API + tokens</li></ul>
+          <a class="open" href="https://plm.athenabot.ai" target="_blank" rel="noopener">Explore Lite-PLM <span class="arrow">→</span></a>
+        </div>
+
+        <div class="p-card">
+          <div class="p-card-top">
+            <div>
+              <div class="kicker">Study Agent</div>
+              <h3>Athena Flashcards</h3>
+            </div>
+            <span class="tag live">Live</span>
+          </div>
+          <p>Turns any document, pasted notes, or a guided chat into a clean AI-generated study set — flip cards, quiz mode, library storage, and invite-based sharing for teams and classrooms.</p>
+          <ul><li>Document → study set</li><li>Guided AI coach</li><li>Quiz + flashcard modes</li><li>Team sharing</li></ul>
+          <a class="open" href="https://flashcards.athenabot.ai" target="_blank" rel="noopener">Open Flashcards <span class="arrow">→</span></a>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- WHAT WE BUILD (studio pitch) -->
+  <section id="build">
+    <div class="wrap">
+      <div class="section-head">
+        <div class="eyebrow"><span class="dot"></span> For founders & operators</div>
+        <h2>Have a process that should run itself? That's what we do.</h2>
+        <p>The products above are what we build for ourselves. The same team and the same method are available to build a high-end, agent-driven application for your business — from a single voice line to a full vertical SaaS.</p>
+      </div>
+
+      <div class="cap-grid">
+        <div class="cap-card">
+          <span class="tag">Voice</span>
+          <h3>Voice & conversational agents</h3>
+          <p>Agents that answer calls and chats, complete real tasks, and hand off cleanly to a person when it matters. Built for regulated, real-world use — not a demo script.</p>
+        </div>
+        <div class="cap-card">
+          <span class="tag">Workflow</span>
+          <h3>Workflow & back-office agents</h3>
+          <p>Agents that route approvals, draft documents, reconcile data, and explain their own decisions in plain English — wired into the systems your team already runs on.</p>
+        </div>
+        <div class="cap-card">
+          <span class="tag">Vertical</span>
+          <h3>Full vertical AI products</h3>
+          <p>End-to-end SaaS: accounts, subscriptions, dashboards, and an agent at the core — launched on your domain, billed, and ready for customers on day one.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- PROCESS -->
+  <section id="process">
+    <div class="wrap">
+      <div class="section-head">
+        <div class="eyebrow"><span class="dot"></span> How an engagement runs</div>
+        <h2>Prototype to production, one team the whole way.</h2>
+      </div>
+      <div class="process">
+        <div class="proc-step">
+          <div class="num">01 / Scope</div>
+          <h4>Name the job</h4>
+          <p>We find the exact task the agent needs to own — the call, the approval, the form — and what "done" looks like for it.</p>
+        </div>
+        <div class="proc-step">
+          <div class="num">02 / Build</div>
+          <h4>Build the agent</h4>
+          <p>We design and build the agent against real data and real edge cases, not a scripted demo.</p>
+        </div>
+        <div class="proc-step">
+          <div class="num">03 / Ship</div>
+          <h4>Wrap the product</h4>
+          <p>Accounts, billing, dashboards, and integrations go around the agent so it's a product your customers or team can actually use.</p>
+        </div>
+        <div class="proc-step">
+          <div class="num">04 / Run</div>
+          <h4>Operate it live</h4>
+          <p>We stay on to monitor, tune, and extend the agent as real usage teaches us more than any spec could.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CONTACT -->
+  <section id="contact" style="border-bottom:none;">
+    <div class="wrap">
+      <div class="section-head" style="margin-bottom:52px;">
+        <div class="eyebrow"><span class="dot"></span> Start a project</div>
+        <h2>Tell us the job to be done.</h2>
+        <p>We'll show you the agent that does it, and the application it can become. Every inquiry gets a reply from the team — no sales queue.</p>
+      </div>
+
+      <div class="contact-wrap">
+        <div class="contact-info">
+          <div class="direct">
+            <div class="eyebrow"><span class="dot"></span> Direct line</div>
+            <a href="mailto:anu@threadwire.ai">anu@threadwire.ai</a>
+          </div>
+          <ul class="notes">
+            <li>Best for: custom voice agents, internal workflow automation, or a full vertical AI product you want to launch.</li>
+            <li>Include what the agent should replace or assist — a call, a form, a spreadsheet, a decision — and we'll scope from there.</li>
+            <li>Typical first response within one business day.</li>
+          </ul>
+        </div>
+
+        <form class="inquiry" id="inquiryForm" novalidate>
+          <!-- honeypot: hidden from real users, bots tend to fill every field -->
+          <input type="text" name="company_website" class="honey" tabindex="-1" autocomplete="off">
+
+          <div class="success-banner" id="successBanner"><span class="dot" style="width:6px;height:6px;border-radius:50%;background:var(--signal);display:inline-block;"></span> Message sent — we'll be in touch shortly.</div>
+          <div class="error-banner" id="errorBanner"></div>
+
+          <div class="form-row">
+            <div class="field">
+              <label for="name">Name</label>
+              <input id="name" name="name" type="text" required>
+            </div>
+            <div class="field">
+              <label for="email">Email</label>
+              <input id="email" name="email" type="email" required>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="field">
+              <label for="company">Company</label>
+              <input id="company" name="company" type="text">
+            </div>
+            <div class="field">
+              <label for="project_type">Project type</label>
+              <select id="project_type" name="project_type">
+                <option>Voice agent</option>
+                <option>Workflow / back-office agent</option>
+                <option>Full vertical AI product</option>
+                <option>Not sure yet</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="field">
+            <label for="budget">Estimated budget</label>
+            <select id="budget" name="budget">
+              <option>Under $10k</option>
+              <option>$10k – $30k</option>
+              <option>$30k – $75k</option>
+              <option>$75k+</option>
+              <option>Let's discuss</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label for="message">What should the agent do?</label>
+            <textarea id="message" name="message" required placeholder="Tell us the call, form, or workflow you want handled — and for whom."></textarea>
+          </div>
+
+          <div class="submit-row">
+            <button type="submit" class="btn btn-primary" id="submitBtn">Send inquiry →</button>
+            <span class="submit-note" id="submitNote">Goes straight to the team. No spam, no newsletter.</span>
+          </div>
+        </form>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer>
+  <div class="wrap">
+    <div class="fnote">Athena<b style="color:var(--brass);">Bot</b> · © AUREVIA LLC · built on athenabot.ai</div>
+    <nav><a href="#work">Work</a><a href="#build">What we build</a><a href="#contact">Contact</a></nav>
+  </div>
+</footer>
+
+<script>
+  (function () {
+    var form = document.getElementById('inquiryForm');
+    var successBanner = document.getElementById('successBanner');
+    var errorBanner = document.getElementById('errorBanner');
+    var submitBtn = document.getElementById('submitBtn');
+    var submitNote = document.getElementById('submitNote');
+    if (!form) return;
+
+    var defaultNote = submitNote ? submitNote.textContent : '';
+
+    form.addEventListener('submit', function (e) {
+      e.preventDefault();
+      successBanner.classList.remove('show');
+      errorBanner.classList.remove('show');
+
+      var data = Object.fromEntries(new FormData(form).entries());
+
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Sending…';
+      if (submitNote) submitNote.textContent = 'One moment…';
+
+      fetch('/api/contact', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      })
+        .then(function (res) {
+          return res.json().then(function (json) { return { ok: res.ok, json: json }; });
+        })
+        .then(function (result) {
+          if (result.ok && result.json.ok) {
+            successBanner.classList.add('show');
+            form.reset();
+          } else {
+            errorBanner.textContent = (result.json && result.json.error) || 'Something went wrong. Please try again.';
+            errorBanner.classList.add('show');
+          }
+        })
+        .catch(function () {
+          errorBanner.textContent = 'Could not reach the server. Please try again in a moment.';
+          errorBanner.classList.add('show');
+        })
+        .finally(function () {
+          submitBtn.disabled = false;
+          submitBtn.textContent = 'Send inquiry →';
+          if (submitNote) submitNote.textContent = defaultNote;
+        });
+    });
+  })();
+</script>
+
+</body>
+</html>

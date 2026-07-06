@@ -1,0 +1,22 @@
+# /etc/systemd/system/athenabot.service
+# Keeps the orchestrator running, restarts on crash and on reboot.
+
+[Unit]
+Description=AthenaBot orchestrator
+After=network.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/opt/athenabot
+EnvironmentFile=/opt/athenabot/.env
+ExecStart=/usr/bin/node server/server.js
+Restart=always
+RestartSec=3
+# Hardening
+NoNewPrivileges=true
+ProtectSystem=full
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
