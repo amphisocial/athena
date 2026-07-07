@@ -1,16 +1,19 @@
+const path = require('path');
+
+const appRoot = path.resolve(__dirname, '..');
+
 module.exports = {
   apps: [
     {
       name: 'athenabot',
       script: './server.js',
-      cwd: __dirname,
+      cwd: appRoot,
       instances: 1,
       exec_mode: 'fork',
       env: {
         NODE_ENV: 'production',
       },
-      // .env is loaded by dotenv inside server.js itself — PM2 doesn't need
-      // to know the SMTP values, it just needs to keep the process alive.
+      // .env is loaded by dotenv from the app root by server.js.
       max_memory_restart: '200M',
       autorestart: true,
       watch: false,

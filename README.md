@@ -1,78 +1,121 @@
-# AthenaBot site + contact form (SMTP backend)
+# AthenaBot website + contact form
 
-A small Express server that serves the site (`public/index.html`) and a
-`POST /api/contact` endpoint that sends the contact form as a real email
-via SMTP, using credentials from a `.env` file (nothing hardcoded, nothing
-committed).
+This is the production-ready AthenaBot root site for `https://athenabot.ai`.
 
-## 1. Install
+The site positions AthenaBot as an AI application development and agentic workflow studio, with links to the current product portfolio:
+
+- SmartJobs: `https://smartjobs.athenabot.ai`
+- AI Flashcards: `https://flashcards.athenabot.ai`
+- Lite‑PLM: `https://plm.athenabot.ai`
+- White-label Voice Agent: `https://voice.athenabot.ai`
+
+It includes a real Contact Us form that posts to `POST /api/contact` and sends email to `anu@threadwire.ai` through SMTP.
+
+## Files
+
+```text
+package.json
+server.js
+.env.example
+public/index.html
+deploy/ecosystem.config.js
+deploy/nginx-athenabot.conf
+deploy/DEPLOY-EC2.md
+.gitignore
+```
+
+## Local setup
 
 ```bash
 npm install
-```
-
-## 2. Configure SMTP
-
-```bash
 cp .env.example .env
+nano .env
+npm start
 ```
 
-Edit `.env` and fill in real values:
+Open:
 
-- `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASS` — from
-  whichever mailbox or transactional-email provider you're sending through
-  (Google Workspace, Microsoft 365, SendGrid, Postmark, Mailgun, Amazon SES,
-  etc). See the comments in `.env.example` for common presets.
-- `CONTACT_TO_EMAIL` — defaults to `anu@threadwire.ai`.
-- `CONTACT_FROM_EMAIL` — the "from" address on outgoing mail. Many providers
-  require this to match the authenticated SMTP user or a verified sending
-  domain, or the message will bounce/spam-flag.
-- `SITE_ORIGIN` — set to `https://athenabot.ai` in production so only your
-  own site can call the API (CORS).
+```text
+http://localhost:3000
+```
 
-**Never commit `.env`** — it's already listed below for `.gitignore`.
-
-## 3. Run
+Health check:
 
 ```bash
-npm start        # production
-npm run dev       # auto-restarts on file changes
+curl -s http://localhost:3000/api/health
+# {"ok":true,"service":"athenabot"}
 ```
 
-On boot, the server verifies the SMTP connection immediately and logs
-whether it succeeded — so a bad password or wrong host shows up in your
-logs right away, not the first time a customer submits the form.
+## Environment variables
 
-The site is served at `http://localhost:3000` (or your configured `PORT`),
-with the form posting to `/api/contact` on the same origin.
+Set these in `.env` on the server. Do not commit `.env`.
 
-## 4. Deploy (EC2)
-
-If you're deploying this on the same EC2 instance already running
-smartjobs/flashcards/plm/voice, see **`deploy/DEPLOY-EC2.md`** for the exact
-steps — copying the code over, setting up `.env` on the box, running it
-under PM2 so it survives reboots, and adding the Nginx server block +
-SSL for the `athenabot.ai` domain. `deploy/ecosystem.config.js` and
-`deploy/nginx-athenabot.conf` are ready to use as-is (just double check the
-port doesn't collide with your other apps).
-
-For any other Node host (Render, Railway, Fly.io), the general idea is the
-same: set the same environment variables from `.env` in that host's
-environment settings — don't upload the `.env` file itself.
-
-## What's included
-
-- `server.js` — Express app: serves `public/`, exposes `POST /api/contact`
-  and `GET /api/health`, validates input, has a honeypot field for basic
-  bot filtering, and rate-limits the contact endpoint (8 requests / 15 min
-  per IP).
-- `public/index.html` — the AthenaBot site, with the contact form
-  submitting via `fetch` (no page reload) and inline success/error states.
-- `.env.example` — documents every required variable.
-
-## .gitignore suggestion
-
+```bash
+SMTP_HOST=smtp.yourprovider.com
+SMTP_PORT=587
+SMTP_SECURE=false
+SMTP_USER=your-smtp-username
+SMTP_PASS=your-smtp-password
+CONTACT_TO_EMAIL=anu@threadwire.ai
+CONTACT_FROM_EMAIL=your-smtp-username
+SITE_ORIGIN=https://athenabot.ai,https://www.athenabot.ai
+PORT=3000
 ```
-node_modules/
-.env
+
+### SMTP notes
+
+For Google Workspace, use:
+
+```bash
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_SECURE=false
+SMTP_USER=your-google-workspace-email
+SMTP_PASS=your-google-app-password
 ```
+
+Use an App Password, not the normal Google login password.
+
+For SendGrid:
+
+```bash
+SMTP_HOST=smtp.sendgrid.net
+SMTP_PORT=587
+SMTP_SECURE=false
+SMTP_USER=apikey
+SMTP_PASS=your-sendgrid-api-key
+```
+
+## Deployment
+
+See `deploy/DEPLOY-EC2.md` for the full EC2 + PM2 + Nginx + Certbot instructions.
+
+## Contact endpoint behavior
+
+`POST /api/contact` accepts:
+
+```json
+{
+  "name": "Jane Doe",
+  "email": "jane@company.com",
+  "company": "Company Inc.",
+  "project_type": "Custom AI application",
+  "timeline": "Next 30 days",
+  "budget": "$30k – $75k",
+  "message": "We want an AI workflow agent that..."
+}
+```
+
+The endpoint includes:
+
+- required field validation
+- email format validation
+- 5,000-character message limit
+- honeypot spam field
+- rate limit: 8 requests per 15 minutes per IP
+- HTML escaping before email rendering
+- SMTP verification at boot
+
+## GitHub update note
+
+If replacing an existing repo, copy these files into the repo root and deploy from there.

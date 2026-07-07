@@ -1,14 +1,20 @@
 {
   "name": "athenabot-server",
-  "version": "1.0.0",
-  "description": "",
+  "version": "1.1.0",
+  "description": "AthenaBot AI application and agentic workflow studio website with SMTP-backed contact form.",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
     "dev": "node --watch server.js"
   },
-  "keywords": [],
-  "author": "",
+  "keywords": [
+    "ai-agents",
+    "agentic-workflows",
+    "ai-applications",
+    "voice-agents",
+    "workflow-automation"
+  ],
+  "author": "AthenaBot",
   "license": "ISC",
   "dependencies": {
     "cors": "^2.8.6",

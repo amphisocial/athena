@@ -1,6 +1,6 @@
-require('dotenv').config();
-
 const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, '.env') });
+
 const express = require('express');
 const cors = require('cors');
 const nodemailer = require('nodemailer');
@@ -8,15 +8,15 @@ const rateLimit = require('express-rate-limit');
 
 const app = express();
 
-// ---- basic config from environment ----
 const PORT = process.env.PORT || 3000;
 const CONTACT_TO = process.env.CONTACT_TO_EMAIL || 'anu@threadwire.ai';
 const CONTACT_FROM = process.env.CONTACT_FROM_EMAIL || process.env.SMTP_USER;
-const SITE_ORIGIN = process.env.SITE_ORIGIN || '*'; // e.g. https://athenabot.ai
+const SITE_ORIGIN = process.env.SITE_ORIGIN || 'https://athenabot.ai';
+const allowedOrigins = SITE_ORIGIN.split(',').map((origin) => origin.trim()).filter(Boolean);
 
-// ---- required SMTP env vars ----
 const required = ['SMTP_HOST', 'SMTP_PORT', 'SMTP_USER', 'SMTP_PASS'];
-const missing = required.filter((k) => !process.env[k]);
+const missing = required.filter((key) => !process.env[key]);
+
 if (missing.length) {
   console.error(
     `Missing required environment variables: ${missing.join(', ')}.\n` +
@@ -25,42 +25,46 @@ if (missing.length) {
   process.exit(1);
 }
 
-// ---- mail transport ----
 const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST,
   port: Number(process.env.SMTP_PORT),
-  secure: process.env.SMTP_SECURE === 'true', // true for port 465, false for 587/25
+  secure: process.env.SMTP_SECURE === 'true',
   auth: {
     user: process.env.SMTP_USER,
     pass: process.env.SMTP_PASS,
   },
 });
 
-// verify connection once at boot so misconfiguration fails loudly, not silently on first submit
 transporter.verify((err) => {
   if (err) {
     console.error('SMTP connection failed:', err.message);
   } else {
-    console.log('SMTP connection verified — ready to send mail.');
+    console.log('SMTP connection verified — AthenaBot contact form is ready.');
   }
 });
 
-// ---- middleware ----
-app.use(cors({ origin: SITE_ORIGIN }));
+app.use(cors({
+  origin(origin, callback) {
+    // Allow direct browser navigation, same-origin requests, health checks, and configured origins.
+    if (!origin || allowedOrigins.includes('*') || allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+    return callback(new Error('Not allowed by CORS'));
+  },
+}));
 app.use(express.json({ limit: '100kb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
-// throttle the contact endpoint to blunt spam / abuse
 const contactLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
+  windowMs: 15 * 60 * 1000,
   max: 8,
   standardHeaders: true,
   legacyHeaders: false,
   message: { ok: false, error: 'Too many requests. Please try again later.' },
 });
 
-function escapeHtml(str = '') {
-  return String(str)
+function escapeHtml(value = '') {
+  return String(value)
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
@@ -68,56 +72,70 @@ function escapeHtml(str = '') {
     .replace(/'/g, '&#39;');
 }
 
-// ---- contact form endpoint ----
+function clean(value = '') {
+  return String(value).trim();
+}
+
 app.post('/api/contact', contactLimiter, async (req, res) => {
   try {
     const body = req.body || {};
 
-    // honeypot: real users never fill this hidden field in
+    // Honeypot field. Real users will never see or fill this.
     if (body.company_website) {
-      return res.json({ ok: true }); // pretend success, drop silently
+      return res.json({ ok: true });
     }
 
-    const name = (body.name || '').trim();
-    const email = (body.email || '').trim();
-    const company = (body.company || '').trim();
-    const projectType = (body.project_type || '').trim();
-    const budget = (body.budget || '').trim();
-    const message = (body.message || '').trim();
+    const name = clean(body.name);
+    const email = clean(body.email);
+    const company = clean(body.company);
+    const projectType = clean(body.project_type);
+    const timeline = clean(body.timeline);
+    const budget = clean(body.budget);
+    const message = clean(body.message);
 
     if (!name || !email || !message) {
-      return res.status(400).json({ ok: false, error: 'Name, email, and message are required.' });
+      return res.status(400).json({ ok: false, error: 'Name, email, and project details are required.' });
     }
+
     const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailPattern.test(email)) {
       return res.status(400).json({ ok: false, error: 'Please enter a valid email address.' });
     }
+
     if (message.length > 5000) {
-      return res.status(400).json({ ok: false, error: 'Message is too long.' });
+      return res.status(400).json({ ok: false, error: 'Message is too long. Please keep it under 5,000 characters.' });
     }
 
-    const subject = `New project inquiry — ${name}${company ? ` (${company})` : ''}`;
+    const subject = `AthenaBot inquiry — ${projectType || 'AI application'} — ${name}${company ? ` (${company})` : ''}`;
 
     const text = [
+      'New AthenaBot project inquiry',
+      '',
       `Name: ${name}`,
       `Email: ${email}`,
       `Company: ${company || '—'}`,
       `Project type: ${projectType || '—'}`,
+      `Timeline: ${timeline || '—'}`,
       `Budget: ${budget || '—'}`,
       '',
-      'Message:',
+      'Project details:',
       message,
     ].join('\n');
 
     const html = `
-      <table style="font-family:sans-serif;font-size:14px;border-collapse:collapse;">
-        <tr><td style="padding:4px 12px 4px 0;color:#666;">Name</td><td>${escapeHtml(name)}</td></tr>
-        <tr><td style="padding:4px 12px 4px 0;color:#666;">Email</td><td>${escapeHtml(email)}</td></tr>
-        <tr><td style="padding:4px 12px 4px 0;color:#666;">Company</td><td>${escapeHtml(company) || '—'}</td></tr>
-        <tr><td style="padding:4px 12px 4px 0;color:#666;">Project type</td><td>${escapeHtml(projectType) || '—'}</td></tr>
-        <tr><td style="padding:4px 12px 4px 0;color:#666;">Budget</td><td>${escapeHtml(budget) || '—'}</td></tr>
-      </table>
-      <p style="font-family:sans-serif;font-size:14px;white-space:pre-wrap;margin-top:16px;">${escapeHtml(message)}</p>
+      <div style="font-family:Arial,sans-serif;font-size:14px;line-height:1.5;color:#111827;">
+        <h2 style="margin:0 0 16px;">New AthenaBot project inquiry</h2>
+        <table style="border-collapse:collapse;">
+          <tr><td style="padding:4px 16px 4px 0;color:#6b7280;">Name</td><td>${escapeHtml(name)}</td></tr>
+          <tr><td style="padding:4px 16px 4px 0;color:#6b7280;">Email</td><td>${escapeHtml(email)}</td></tr>
+          <tr><td style="padding:4px 16px 4px 0;color:#6b7280;">Company</td><td>${escapeHtml(company) || '—'}</td></tr>
+          <tr><td style="padding:4px 16px 4px 0;color:#6b7280;">Project type</td><td>${escapeHtml(projectType) || '—'}</td></tr>
+          <tr><td style="padding:4px 16px 4px 0;color:#6b7280;">Timeline</td><td>${escapeHtml(timeline) || '—'}</td></tr>
+          <tr><td style="padding:4px 16px 4px 0;color:#6b7280;">Budget</td><td>${escapeHtml(budget) || '—'}</td></tr>
+        </table>
+        <h3 style="margin:20px 0 8px;">Project details</h3>
+        <p style="white-space:pre-wrap;margin:0;">${escapeHtml(message)}</p>
+      </div>
     `;
 
     await transporter.sendMail({
@@ -136,7 +154,7 @@ app.post('/api/contact', contactLimiter, async (req, res) => {
   }
 });
 
-app.get('/api/health', (req, res) => res.json({ ok: true }));
+app.get('/api/health', (req, res) => res.json({ ok: true, service: 'athenabot' }));
 
 app.listen(PORT, () => {
   console.log(`AthenaBot server listening on port ${PORT}`);
