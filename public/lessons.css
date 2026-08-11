@@ -60,3 +60,36 @@
 .study-item .sc-opts { margin: 6px 0 0; padding-left: 18px; }
 .study-rate { display: flex; align-items: center; gap: 10px; padding: 16px; border-top: 1px solid var(--line, #dce6f5); margin-top: 10px; }
 .pl-rate-label { font-weight: 600; color: var(--ink, #0f1e35); }
+
+/* ===== One-line filters (works on Library too; overrides global width:100%) ===== */
+.pl-filters, .library-filter-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 18px; }
+.pl-filters input[type="search"], .library-filter-row input[type="search"] { flex: 1 1 240px; width: auto !important; min-width: 200px; }
+.pl-filters select, .library-filter-row select { width: auto !important; flex: 0 0 auto; min-width: 130px; padding: 9px 12px !important; border-radius: 10px !important; }
+.library-filter-row input[type="search"] { padding: 9px 12px !important; border-radius: 10px !important; }
+@media (max-width: 620px) { .pl-filters, .library-filter-row { flex-direction: column; align-items: stretch; } .pl-filters input, .pl-filters select, .library-filter-row input, .library-filter-row select { width: 100% !important; } }
+
+/* ===== Dense metadata list (both Public Lessons and Library) ===== */
+.row-list { border: 1px solid var(--line, #dce6f5); border-radius: 12px; overflow: hidden; background: #fff; }
+.list-row {
+  display: flex; align-items: center; gap: 14px;
+  padding: 10px 14px; border-bottom: 1px solid var(--line, #eef2fa);
+}
+.list-row:last-child { border-bottom: 0; }
+.list-row:hover { background: #f7faff; }
+.lr-main { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 2px; }
+.lr-titleline { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.lr-title { font-weight: 700; font-size: 0.94rem; color: var(--ink, #0f1e35); text-decoration: none; }
+.lr-title:hover { color: var(--brand, #2563ff); }
+.lr-meta { font-size: 0.78rem; color: var(--muted, #5a6b85); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lr-rate { flex: 0 0 auto; }
+.lr-actions { flex: 0 0 auto; display: flex; align-items: center; gap: 6px; }
+
+/* Extra-small buttons for dense rows */
+.btn.xs { padding: 5px 10px !important; font-size: 0.78rem !important; border-radius: 8px !important; line-height: 1.1; }
+
+/* Compact badges/pills inside rows */
+.list-row .type-badge { font-size: 0.6rem; padding: 1px 6px; }
+.list-row .subj-badge, .list-row .pub-pill { font-size: 0.64rem; padding: 1px 7px; }
+.list-row .pl-stars .pl-star { font-size: 0.92rem; }
+.list-row .pl-rating-count { font-size: 0.72rem; }
+.list-empty { padding: 16px; color: var(--muted, #5a6b85); }

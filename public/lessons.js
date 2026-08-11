@@ -12,7 +12,7 @@
     : s === 'science' ? '<span class="subj-badge science">Science</span>' : '';
   const typeBadge = (t) => t === 'whiteboard'
     ? '<span class="type-badge board">Whiteboard</span>' : '<span class="type-badge lesson">Lesson</span>';
-  const gradeLabel = (g) => g ? `Grade ${g}` : '';
+  const gradeLabel = (g) => g ? (/^grade/i.test(String(g)) ? String(g) : `Grade ${g}`) : '';
   const fmtDate = (iso) => { try { return new Date(iso).toLocaleDateString(); } catch (_) { return ''; } };
 
   function starWidget(it) {
@@ -31,6 +31,11 @@
     const on = bookmarks.has(it.type + ':' + it.id);
     return `<button class="btn ghost small pl-bm" data-type="${it.type}" data-id="${it.id}">${on ? '★ Bookmarked' : '☆ Bookmark'}</button>`;
   }
+  function bookmarkBtnXs(it) {
+    if (!user) return '';
+    const on = bookmarks.has(it.type + ':' + it.id);
+    return `<button class="btn ghost xs pl-bm" data-type="${it.type}" data-id="${it.id}" title="${on ? 'Bookmarked' : 'Bookmark'}">${on ? '★' : '☆'}</button>`;
+  }
 
   function render() {
     const q = ($('#plSearch').value || '').trim().toLowerCase();
@@ -43,19 +48,21 @@
       return true;
     });
     const grid = $('#plGrid');
-    if (!list.length) { grid.innerHTML = '<p class="pl-empty">No public lessons match — try clearing filters.</p>'; return; }
-    grid.innerHTML = list.map((it) => `
-      <article class="pl-card">
-        <div class="pl-card-top">${typeBadge(it.type)} ${subjBadge(it.subject)}</div>
-        <h3>${escapeHtml(it.title)}</h3>
-        <p class="pl-meta">${escapeHtml([gradeLabel(it.grade), it.topic].filter(Boolean).join(' • ')) || '—'}</p>
-        <p class="pl-by">by ${escapeHtml(it.creator || 'A teacher')} • ${fmtDate(it.updatedAt)}</p>
-        ${starWidget(it)}
-        <div class="pl-actions">
-          <a class="btn primary small" href="${it.openUrl}">Open</a>
-          ${bookmarkBtn(it)}
+    if (!list.length) { grid.innerHTML = '<div class="list-empty">No public lessons match — try clearing filters.</div>'; return; }
+    grid.innerHTML = '<div class="row-list">' + list.map((it) => `
+      <div class="list-row">
+        <div class="lr-main">
+          <div class="lr-titleline">
+            ${typeBadge(it.type)} <a class="lr-title" href="${it.openUrl}">${escapeHtml(it.title)}</a> ${subjBadge(it.subject)}
+          </div>
+          <div class="lr-meta">${escapeHtml([gradeLabel(it.grade), it.topic, 'by ' + (it.creator || 'a teacher'), fmtDate(it.updatedAt)].filter(Boolean).join(' · '))}</div>
         </div>
-      </article>`).join('');
+        <div class="lr-rate">${starWidget(it)}</div>
+        <div class="lr-actions">
+          <a class="btn primary xs" href="${it.openUrl}">Open</a>
+          ${bookmarkBtnXs(it)}
+        </div>
+      </div>`).join('') + '</div>';
 
     grid.querySelectorAll('.pl-star').forEach((b) => b.addEventListener('click', () => rate(b)));
     grid.querySelectorAll('.pl-bm').forEach((b) => b.addEventListener('click', () => toggleBookmark(b)));

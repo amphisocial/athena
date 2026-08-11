@@ -8,7 +8,7 @@
   let scope = 'mine';
 
   const fmtDate = (iso) => { try { return new Date(iso).toLocaleDateString(); } catch (_) { return ''; } };
-  const gradeLabel = (g) => g ? `Grade ${g}` : '';
+  const gradeLabel = (g) => g ? (/^grade/i.test(String(g)) ? String(g) : `Grade ${g}`) : '';
   const subjBadge = (s) => s === 'math' ? '<span class="subj-badge math">Math</span>'
     : s === 'science' ? '<span class="subj-badge science">Science</span>' : '';
   const typeBadge = (t) => t === 'whiteboard'
@@ -87,26 +87,26 @@
         ? 'No bookmarks yet. Open <a href="/lessons">Public Lessons</a> and bookmark the ones you like.'
         : scope === 'shared' ? 'Nothing shared with you yet.'
         : 'Nothing here yet — use “New whiteboard” or “New lesson” above.';
-      list.innerHTML = `<p class="set-meta">${msg}</p>`;
+      list.innerHTML = `<div class="list-empty">${msg}</div>`;
       return;
     }
-    list.innerHTML = items.map((it) => `
-      <div class="set-item lib-item" data-id="${it.id}" data-type="${it.type}">
-        <div class="lib-main">
-          <span class="set-title">${typeBadge(it.type)} ${escapeHtml(it.title)} ${subjBadge(it.subject)}
-            ${it.public ? '<span class="pub-pill public">Public</span>' : (it.readOnly ? '' : '<span class="pub-pill">Private</span>')}</span>
-          <span class="set-meta">${escapeHtml([gradeLabel(it.grade), it.topic].filter(Boolean).join(' • ')) || 'No topic set'}
-            ${it.owner ? '• by ' + escapeHtml(it.owner) : ''}
-            • created ${fmtDate(it.createdAt)} • updated ${fmtDate(it.updatedAt)} • ${stars(it.rating)}</span>
+    list.innerHTML = '<div class="row-list">' + items.map((it) => `
+      <div class="list-row" data-id="${it.id}" data-type="${it.type}">
+        <div class="lr-main">
+          <div class="lr-titleline">
+            ${typeBadge(it.type)} <a class="lr-title" href="${it.openUrl}">${escapeHtml(it.title)}</a> ${subjBadge(it.subject)}
+            ${it.public ? '<span class="pub-pill public">Public</span>' : (it.readOnly ? '' : '<span class="pub-pill">Private</span>')}
+          </div>
+          <div class="lr-meta">${escapeHtml([gradeLabel(it.grade), it.topic, it.owner ? 'by ' + it.owner : '', 'updated ' + fmtDate(it.updatedAt)].filter(Boolean).join(' · '))}${it.rating && it.rating.count ? ' · ★' + (it.rating.sum / it.rating.count).toFixed(1) + ' (' + it.rating.count + ')' : ''}</div>
         </div>
-        <div class="set-actions">
-          <a class="btn primary" href="${it.openUrl}">Enter</a>
+        <div class="lr-actions">
+          <a class="btn primary xs" href="${it.openUrl}">Enter</a>
           ${it.readOnly ? '' : `
-            <a class="btn soft" href="${it.type === 'whiteboard' ? `/board/${it.id}?share=1` : `/app?set=${it.id}`}">Share</a>
-            <button class="btn soft pub-toggle" data-id="${it.id}" data-type="${it.type}" data-public="${it.public}">${it.public ? 'Make private' : 'Make public'}</button>
-            <button class="btn ghost del-item" data-id="${it.id}" data-type="${it.type}">Delete</button>`}
+            <a class="btn ghost xs" href="${it.type === 'whiteboard' ? `/board/${it.id}?share=1` : `/app?set=${it.id}`}">Share</a>
+            <button class="btn ghost xs pub-toggle" data-id="${it.id}" data-type="${it.type}" data-public="${it.public}" title="${it.public ? 'Make private' : 'Make public'}">${it.public ? 'Unpublish' : 'Publish'}</button>
+            <button class="btn ghost xs del-item" data-id="${it.id}" data-type="${it.type}" title="Delete">✕</button>`}
         </div>
-      </div>`).join('');
+      </div>`).join('') + '</div>';
 
     list.querySelectorAll('.pub-toggle').forEach((b) => b.addEventListener('click', () =>
       togglePublic(b.dataset.type, b.dataset.id, b.dataset.public === 'true')));
