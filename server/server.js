@@ -1,5 +1,5 @@
 /*
- * Athena Flashcards
+ * Boardsy
  * Simple Express app for AI-generated flashcards, quizzes, and slide study sets.
  * Stores users, sessions, usage, study sets and share invites in data/store.json.
  * (The store.json key "quizlets" is retained for backward compatibility with existing data.)
@@ -51,8 +51,8 @@ function notifyTeamOfShare({ store, owner, title, url, kind }) {
   if (!recipients.length) return;
   const who = teacherDisplayName(owner);
   const subject = `${who} shared a ${kind} with you`;
-  const text = `${who} shared "${title}" with you on Athena Flashcards.\n\nOpen it here: ${url}`;
-  const html = `<p><strong>${who}</strong> shared "${title}" with you on Athena Flashcards.</p><p><a href="${url}">Open it here</a></p>`;
+  const text = `${who} shared "${title}" with you on Boardsy.\n\nOpen it here: ${url}`;
+  const html = `<p><strong>${who}</strong> shared "${title}" with you on Boardsy.</p><p><a href="${url}">Open it here</a></p>`;
   recipients.forEach((to) => {
     Promise.resolve()
       .then(() => sendMail({ to, subject, text, html }))
@@ -100,9 +100,9 @@ function notifyAdminOfReward({ founderEmail, referredEmail }) {
 
 // Send a referral invitation email on behalf of a member.
 function sendReferralInvite({ fromName, toEmail, link }) {
-  const subject = `${fromName} invited you to AthenaBoard`;
-  const text = `${fromName} thinks you'd like AthenaBoard — the AI whiteboard that turns your explanation into a live simulation.\n\nGet started: ${link}`;
-  const html = `<p><strong>${fromName}</strong> thinks you'd like AthenaBoard — the AI whiteboard that turns your explanation into a live simulation.</p><p><a href="${link}">Get started</a></p>`;
+  const subject = `${fromName} invited you to Boardsy`;
+  const text = `${fromName} thinks you'd like Boardsy — the AI whiteboard that turns your explanation into a live simulation.\n\nGet started: ${link}`;
+  const html = `<p><strong>${fromName}</strong> thinks you'd like Boardsy — the AI whiteboard that turns your explanation into a live simulation.</p><p><a href="${link}">Get started</a></p>`;
   return sendMail({ to: toEmail, subject, text, html })
     .catch((e) => { console.warn('Referral invite email failed:', e.message); return { sent: false }; });
 }
@@ -1103,7 +1103,7 @@ app.post('/api/founding/apply', async (req, res) => {
 // ---------------------------------------------------------------------------
 
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', app: 'athena-flashcards', time: nowIso() });
+  res.json({ status: 'ok', app: 'boardsy', time: nowIso() });
 });
 
 app.get('/api/me', (req, res) => {
@@ -2069,7 +2069,7 @@ attachBoardWebSocket(httpServer, {
 db.init()
   .then(() => {
     httpServer.listen(PORT, () => {
-      console.log(`AthenaBoard running on ${PORT} (Postgres-backed)`);
+      console.log(`Boardsy running on ${PORT} (Postgres-backed)`);
     });
   })
   .catch((err) => {

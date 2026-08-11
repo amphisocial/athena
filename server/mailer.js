@@ -28,7 +28,7 @@ async function sendMail({ to, subject, text, html }) {
   const t = getTransporter();
   if (!t) return { sent: false, reason: 'SMTP is not configured (set SMTP_HOST in .env).' };
   const fromEmail = process.env.SMTP_FROM_EMAIL || process.env.SMTP_USER;
-  const fromName = process.env.SMTP_FROM_NAME || 'Athena Flashcards';
+  const fromName = process.env.SMTP_FROM_NAME || 'Boardsy';
   await t.sendMail({ from: `"${fromName}" <${fromEmail}>`, to, subject, text, html });
   return { sent: true };
 }

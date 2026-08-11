@@ -192,7 +192,7 @@
     const note = $('#weakTopicsNote');
     if (weak.length) {
       note.style.display = 'block';
-      note.textContent = `Athena will focus extra questions on what you've been missing: ${weak.slice(0, 3).join(', ')}.`;
+      note.textContent = `Boardsy will focus extra questions on what you've been missing: ${weak.slice(0, 3).join(', ')}.`;
     } else note.style.display = 'none';
     $('#quizSetup').style.display = 'block';
     $('#quizRun').style.display = 'none';

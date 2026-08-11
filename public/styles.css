@@ -49,7 +49,7 @@ textarea { resize: vertical; }
   width: 38px;
   height: 38px;
   border-radius: 11px;
-  background-image: url('/img/athenaboard-logo.svg');
+  background-image: url('/img/boardsy-logo.svg');
   background-size: cover;
   background-position: center;
   box-shadow: 0 10px 24px rgba(26,49,69,0.4);
@@ -697,10 +697,10 @@ body.no-scroll { overflow: hidden; }
   .panel.maximized { inset: 8px; }
 }
 
-/* AthenaBoard wordmark: 'Athena' bold, 'Board' in warm accent */
+/* Boardsy wordmark: 'Board' + 'sy' accent */
 .brand > span:last-child { color: var(--text); font-weight: 700; }
 .brand > span:last-child strong { font-weight: 800; }
-.brand-suffix { color: #f5a94e; font-weight: 800; }
+.brand-suffix { color: #4d8cff; font-weight: 800; }
 
 /* ===================================================================
    v26 — boards page: Yours/Shared toggle, New Board template picker

@@ -104,9 +104,9 @@ function attachTeamRoutes(app, deps) {
         // eslint-disable-next-line no-await-in-loop
         emailResult = await sendMail({
           to: email,
-          subject: `${teacherName} invited you to their Athena Flashcards team`,
-          text: `${teacherName} invited you to join their team on Athena Flashcards.\n\nJoin here: ${joinUrl}\n\nThis link works once and expires in ${JOIN_TOKEN_VALID_DAYS} days.`,
-          html: `<p><strong>${teacherName}</strong> invited you to join their team on Athena Flashcards.</p><p><a href="${joinUrl}">Click here to join</a></p><p style="color:#888;font-size:0.85em">This link works once and expires in ${JOIN_TOKEN_VALID_DAYS} days.</p>`
+          subject: `${teacherName} invited you to their Boardsy team`,
+          text: `${teacherName} invited you to join their team on Boardsy.\n\nJoin here: ${joinUrl}\n\nThis link works once and expires in ${JOIN_TOKEN_VALID_DAYS} days.`,
+          html: `<p><strong>${teacherName}</strong> invited you to join their team on Boardsy.</p><p><a href="${joinUrl}">Click here to join</a></p><p style="color:#888;font-size:0.85em">This link works once and expires in ${JOIN_TOKEN_VALID_DAYS} days.</p>`
         });
       } catch (error) {
         emailResult = { sent: false, reason: error.message };
