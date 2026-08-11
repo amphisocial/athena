@@ -3,14 +3,15 @@
 <head>
   <meta charset="utf-8" />
   <link rel="icon" type="image/png" href="/favicon.png" />
-  <link rel="apple-touch-icon" href="/img/boardsy-logo.png?v=boardsy4" />
+  <link rel="apple-touch-icon" href="/img/boardsy-logo.png?v=boardsy5" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>AI Workbench | Boardsy</title>
   <meta name="robots" content="noindex" />
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/styles.css?v=boardsy4" />
+  <link rel="stylesheet" href="/styles.css?v=boardsy5" />
+  <link rel="stylesheet" href="/theme-light.css?v=boardsy5" />
 </head>
 <body data-page="library">
   <div class="shell">
@@ -38,18 +39,18 @@
             <h2>Your boards &amp; lessons</h2>
           </div>
           <div class="boards-controls">
-            <a class="btn primary" href="/boards?new=1">+ New whiteboard</a>
+            <button class="btn primary" id="newWhiteboardBtn">+ New whiteboard</button>
             <a class="btn soft" href="/app">+ New lesson</a>
           </div>
         </div>
         <p class="boards-hint">Everything you've made — whiteboards and lessons — newest first. Filter by type, subject, grade or topic.</p>
 
-        <div class="library-filters">
-          <div class="seg-toggle" id="scopeToggle" role="tablist" aria-label="Which items">
-            <button class="seg-btn active" data-scope="mine" role="tab">Yours</button>
-            <button class="seg-btn" data-scope="shared" role="tab">Shared with you</button>
-            <button class="seg-btn" data-scope="bookmarked" role="tab">Bookmarked</button>
-          </div>
+        <div class="seg-toggle library-scope" id="scopeToggle" role="tablist" aria-label="Which items">
+          <button class="seg-btn active" data-scope="mine" role="tab">Yours</button>
+          <button class="seg-btn" data-scope="shared" role="tab">Shared with you</button>
+          <button class="seg-btn" data-scope="bookmarked" role="tab">Bookmarked</button>
+        </div>
+        <div class="library-filter-row">
           <input type="search" id="filterSearch" placeholder="Search topic or title…" />
           <select id="filterType">
             <option value="">All types</option>
@@ -78,7 +79,53 @@
 
   <div class="toast" id="toast"></div>
 
-  <script src="/common.js?v=boardsy4"></script>
-  <script src="/library.js?v=boardsy4"></script>
+  <dialog id="templateDialog" class="modal template-modal">
+      <div class="modal-card template-card">
+        <button class="modal-close" id="templateClose" aria-label="Close">×</button>
+        <h2>Start a new board</h2>
+        <label class="board-name-label">Board name
+          <input id="newBoardName" placeholder="e.g. Algebra II — Period 3" />
+        </label>
+        <div class="board-meta-row">
+          <label>Subject
+            <select id="newBoardSubject">
+              <option value="">—</option>
+              <option value="math">Math</option>
+              <option value="science">Science</option>
+            </select>
+          </label>
+          <label>Grade level
+            <select id="newBoardGrade">
+              <option value="">—</option>
+              <option value="4">Grade 4</option>
+              <option value="5">Grade 5</option>
+              <option value="6">Grade 6</option>
+              <option value="7">Grade 7</option>
+              <option value="8">Grade 8</option>
+              <option value="9">Grade 9</option>
+              <option value="10">Grade 10</option>
+              <option value="11">Grade 11</option>
+              <option value="12">Grade 12</option>
+            </select>
+          </label>
+        </div>
+        <label class="board-name-label">Topic / lesson
+          <input id="newBoardTopic" placeholder="e.g. Solving quadratics" />
+        </label>
+        <label class="board-public-row">
+          <input type="checkbox" id="newBoardPublic" />
+          <span>List on <strong>Public Lessons</strong> (anyone can find &amp; open it). You can change this anytime. Default is private — shared only by your link/QR.</span>
+        </label>
+        <p class="template-help">Pick a starting point. A template drops the equation or prompt on the board with a note telling you what to Analyze — or start blank.</p>
+        <div class="template-groups" id="templateGroups"></div>
+        <div class="template-actions">
+          <button class="btn primary" id="createBoardBtn">Create board</button>
+        </div>
+      </div>
+    </dialog>
+
+  <script src="/board-templates.js?v=boardsy5"></script>
+  <script src="/common.js?v=boardsy5"></script>
+  <script src="/library.js?v=boardsy5"></script>
 </body>
 </html>

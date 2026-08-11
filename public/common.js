@@ -175,9 +175,8 @@ window.AppCommon = (() => {
   // Students mostly consume what's shared with them, so Library is a better
   // landing spot than the create-a-set page.
   function homePathFor(user) {
-    // Whiteboard is the product's starting point: every signed-in user lands
-    // on their boards list. AI Workbench (study/notes) is a secondary area.
-    return '/boards';
+    // Everyone lands on the unified Library after signing in.
+    return '/library';
   }
 
   function openAuth(mode) {

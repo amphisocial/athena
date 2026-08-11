@@ -146,6 +146,65 @@
     ['#filterSearch', '#filterType', '#filterSubject', '#filterGrade'].forEach((sel) => {
       const el = $(sel); if (el) el.addEventListener('input', applyFilters);
     });
+    // New whiteboard: create dialog lives here now (the old /boards page is gone).
+    const nb = $('#newWhiteboardBtn');
+    if (nb) {
+      const canCreate = Boolean(state.user.limits && state.user.limits.whiteboard);
+      if (!canCreate) nb.style.display = 'none';
+      else {
+        nb.addEventListener('click', openNewBoard);
+        $('#createBoardBtn')?.addEventListener('click', createBoard);
+        $('#templateClose')?.addEventListener('click', () => $('#templateDialog').close());
+        $('#newBoardName')?.addEventListener('keydown', (e) => { if (e.key === 'Enter') createBoard(); });
+      }
+    }
     loadScope();
   })();
+
+  // ---- New whiteboard dialog (ported from the retired /boards page) ----
+  let getSelectedTemplate = null;
+  function buildTemplatePicker() {
+    const groups = {};
+    (window.BOARD_TEMPLATES || []).forEach((t) => { (groups[t.subject] ||= []).push(t); });
+    const order = ['Math', 'Science', 'Freeform'];
+    const html = order.filter((s) => groups[s]).map((subject) => `
+      <div class="template-group"><h4>${escapeHtml(subject)}</h4>
+        <div class="template-grid">
+          ${groups[subject].map((t) => `
+            <button class="template-tile${t.id === 'blank' ? ' blank' : ''}" data-id="${t.id}">
+              <strong>${escapeHtml(t.name)}</strong><span>${escapeHtml(t.blurb || '')}</span>
+              ${t.standard ? `<em>${escapeHtml(t.standard)}</em>` : ''}
+            </button>`).join('')}
+        </div></div>`).join('');
+    const box = $('#templateGroups'); if (box) box.innerHTML = html;
+    let selected = 'blank';
+    const tiles = box ? box.querySelectorAll('.template-tile') : [];
+    const mark = (id) => { selected = id; tiles.forEach((el) => el.classList.toggle('selected', el.dataset.id === id)); };
+    mark('blank');
+    tiles.forEach((el) => el.addEventListener('click', () => mark(el.dataset.id)));
+    return () => selected;
+  }
+  function openNewBoard() {
+    if (!getSelectedTemplate) getSelectedTemplate = buildTemplatePicker();
+    if ($('#newBoardName')) $('#newBoardName').value = '';
+    $('#templateDialog').showModal();
+    setTimeout(() => $('#newBoardName')?.focus(), 50);
+  }
+  async function createBoard() {
+    const title = $('#newBoardName').value.trim();
+    const template = getSelectedTemplate ? getSelectedTemplate() : 'blank';
+    const subject = $('#newBoardSubject') ? $('#newBoardSubject').value : '';
+    const grade = $('#newBoardGrade') ? $('#newBoardGrade').value.trim() : '';
+    const topic = $('#newBoardTopic') ? $('#newBoardTopic').value.trim() : '';
+    const isPublic = $('#newBoardPublic') ? $('#newBoardPublic').checked : false;
+    $('#createBoardBtn').disabled = true;
+    try {
+      const data = await api('/api/board/mine/new', { method: 'POST',
+        body: JSON.stringify({ title, template, subject, grade, topic, public: isPublic }) });
+      window.location.href = `/board/${data.board.id}`;
+    } catch (error) {
+      setStatus(error.message, 'error');
+      $('#createBoardBtn').disabled = false;
+    }
+  }
 })();

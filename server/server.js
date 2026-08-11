@@ -1703,8 +1703,7 @@ const shareToggleSet = (req, res) => {
   const store = readStore();
   const set = store.quizlets.find((candidate) => candidate.id === req.params.id);
   if (!set || set.ownerId !== req.user.id) return res.status(404).json({ error: 'Study set not found.' });
-  const plan = req.user.plan || 'free';
-  const seatLimit = PLAN_LIMITS[plan]?.shareSeats || 0;
+  const seatLimit = membership.effectiveLimits(req.user).shareSeats || 0;
   if (seatLimit < 1) return res.status(403).json({ error: 'Sharing requires the Teams plan.' });
   const wasShared = Boolean(set.shared);
   set.shared = Boolean(req.body.shared);
@@ -1728,8 +1727,7 @@ const shareSet = (req, res) => {
   const store = readStore();
   const set = store.quizlets.find((candidate) => candidate.id === req.params.id);
   if (!set || set.ownerId !== req.user.id) return res.status(404).json({ error: 'Study set not found.' });
-  const plan = req.user.plan || 'free';
-  const seatLimit = PLAN_LIMITS[plan]?.shareSeats || 0;
+  const seatLimit = membership.effectiveLimits(req.user).shareSeats || 0;
   if (seatLimit < 1) return res.status(403).json({ error: 'Sharing requires the Teams plan.' });
 
   const incoming = Array.isArray(req.body.emails) ? req.body.emails : String(req.body.emails || '').split(/[\s,;]+/);
@@ -2101,6 +2099,7 @@ attachTeamRoutes(app, {
   createSession,
   publicUser,
   PLAN_LIMITS,
+  effectiveLimits: (user) => membership.effectiveLimits(user),
   sendMail,
   APP_BASE_URL
 });
@@ -2171,16 +2170,15 @@ attachBoardRoutes(app, {
 // Board picker: teachers see their saved boards + New/Go Live controls;
 // everyone else sees which of their teachers currently have a live, shared
 // board they can join. One page, branches client-side on plan/role.
-app.get('/boards', requirePageUser, (req, res) => {
-  res.sendFile(path.join(PUBLIC_DIR, 'board-list.html'));
-});
+// The old Whiteboard list page is retired — the unified Library replaces it.
+app.get('/boards', (req, res) => res.redirect('/library'));
 
-// The "Whiteboard" nav link. Lands the teacher straight on a usable canvas
-// (their most recent board, creating one if they have none) rather than an
-// empty list; /boards remains available for managing several boards.
+// The "open my current board" entry — lands the teacher on their most recent
+// board (creating one if needed). Falls back to the Library if they have no
+// whiteboard access.
 app.get('/board', requirePageUser, (req, res) => {
   const user = getCurrentUser(req);
-  if (!userHasWhiteboardAccess(user)) return res.redirect('/boards');
+  if (!userHasWhiteboardAccess(user)) return res.redirect('/library');
   const currentId = getOrCreateCurrentBoardId(user.id);
   return res.redirect(`/board/${currentId}`);
 });

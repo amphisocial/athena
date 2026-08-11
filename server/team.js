@@ -39,12 +39,13 @@ function emailOnRoster(store, teacherId, email) {
 function attachTeamRoutes(app, deps) {
   const {
     requireUser, readStore, writeStore, id, nowIso, normalizeEmail,
-    hashPassword, createSession, publicUser, PLAN_LIMITS, sendMail, APP_BASE_URL
+    hashPassword, createSession, publicUser, PLAN_LIMITS, effectiveLimits, sendMail, APP_BASE_URL
   } = deps;
 
   function requireTeamPlan(req, res) {
-    const plan = req.user.plan || 'free';
-    const seatLimit = PLAN_LIMITS[plan]?.shareSeats || 0;
+    // Effective limits honour privilege — founders and admins get Teams-level
+    // access without a paid subscription.
+    const seatLimit = (effectiveLimits ? effectiveLimits(req.user).shareSeats : (PLAN_LIMITS[req.user.plan || 'free']?.shareSeats || 0)) || 0;
     if (seatLimit < 1) {
       res.status(403).json({ error: 'The Team roster is available on the Teams plan. Start a free 7-day Teams trial to try it.' });
       return null;

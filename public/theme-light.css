@@ -1,0 +1,100 @@
+/* theme-light.css — flips the shared app chrome (topbar, panels, lists, forms,
+ * pricing, team) to the same white/blue look as the Public Lessons page.
+ * Loaded AFTER styles.css so it overrides the dark defaults. */
+:root {
+  --bg: #ffffff; --bg-2: #f3f7ff;
+  --panel: #ffffff; --panel-strong: #f3f7ff;
+  --text: #0f1e35; --muted: #5a6b85; --line: #dce6f5;
+  --brand: #2563ff; --brand-2: #12b5a6; --accent: #ffb020; --danger: #d64545;
+  --shadow: 0 18px 44px rgba(15,30,53,0.10);
+}
+
+body {
+  background-color: #ffffff;
+  background-image:
+    linear-gradient(rgba(37,99,255,0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(37,99,255,0.05) 1px, transparent 1px);
+  background-size: 26px 26px;
+  color: var(--text);
+}
+
+/* Top bar / nav */
+.topbar { background: #ffffff !important; border-bottom: 1px solid var(--line); }
+.nav-links a { color: var(--muted); }
+.nav-links a.active { color: var(--brand); }
+.user-chip { color: var(--muted); }
+.brand, .brand > span:last-child { color: var(--text) !important; }
+
+/* Cards / panels */
+.panel, .library-panel, .status-card, .upgrade-card, .promo-card, .admin-section {
+  background: #ffffff !important; border: 1px solid var(--line) !important;
+  box-shadow: var(--shadow);
+}
+.set-item, .lib-item {
+  background: #ffffff !important; border: 1px solid var(--line) !important;
+}
+.set-item:hover, .lib-item:hover { border-color: rgba(37,99,255,0.4) !important; }
+.set-meta { color: var(--muted); }
+
+/* Forms */
+input, select, textarea,
+.library-filters input, .library-filters select,
+.board-meta-row select, .board-meta-row input,
+.board-name-label input, .board-public-row {
+  background: #f3f7ff !important; border: 1px solid var(--line) !important; color: var(--text) !important;
+}
+input::placeholder, textarea::placeholder { color: #93a4bf; }
+input:focus, select:focus, textarea:focus {
+  border-color: var(--brand) !important; box-shadow: 0 0 0 3px rgba(37,99,255,0.14) !important;
+}
+
+/* Segmented toggle (Yours / Shared / Bookmarked) */
+.seg-toggle { background: #eef2fa !important; border: 1px solid var(--line) !important; }
+.seg-btn { color: var(--muted); }
+.seg-btn.active { background: linear-gradient(135deg, var(--brand), var(--brand-2)) !important; color: #fff !important; }
+
+/* Buttons — keep primary blue, soft/ghost readable on light */
+.btn.soft { background: #eef2fa !important; color: var(--text) !important; border: 1px solid var(--line) !important; }
+.btn.ghost { background: transparent !important; color: var(--text) !important; border: 1px solid var(--line) !important; }
+.btn.primary { color: #fff !important; }
+
+/* Modals */
+.modal-card, dialog.modal .modal-card, .template-card, .study-card {
+  background: #ffffff !important; color: var(--text) !important; border: 1px solid var(--line) !important;
+}
+dialog.modal::backdrop { background: rgba(15,30,53,0.45); }
+
+/* Pricing plan cards + feature matrix (were dark rgba) */
+.plan-card { background: #ffffff !important; border: 1px solid var(--line) !important; }
+.plan-card.founding { border-color: rgba(255,176,32,0.6) !important; }
+.plan-card p, .plan-lead, .plan-note { color: var(--muted) !important; }
+.plan-price { color: var(--text) !important; }
+.plan-price small { color: var(--muted) !important; }
+.feature-matrix > * { border-color: var(--line) !important; }
+.feature-row, .feature-matrix .row, .feature-matrix > div {
+  background: #f7faff; border-bottom: 1px solid var(--line);
+}
+
+/* Toast stays dark for contrast */
+.toast { background: #0f1e35 !important; color: #fff !important; }
+
+/* Kickers / section labels */
+.section-kicker { color: var(--brand); }
+
+/* Badges already defined for light in styles.css additions; ensure readable */
+.subj-badge.math { background: rgba(37,99,255,0.12); color: #2563ff; }
+.subj-badge.science { background: rgba(18,181,166,0.14); color: #0f9c8f; }
+.type-badge.board { background: rgba(37,99,255,0.12); color: #2563ff; }
+.type-badge.lesson { background: rgba(147,112,255,0.14); color: #6d4fd6; }
+.pub-pill { background: #eef2fa; color: var(--muted); }
+.pub-pill.public { background: rgba(18,181,166,0.14); color: #0f9c8f; }
+
+/* Library: scope tabs on one row, filters on a single line (like Public Lessons) */
+.library-scope { margin: 4px 0 14px; }
+.library-filter-row { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 20px; }
+.library-filter-row input[type="search"] { flex: 1; min-width: 220px; }
+.library-filter-row input, .library-filter-row select {
+  padding: 9px 12px; border-radius: 10px; border: 1px solid var(--line);
+  background: #f3f7ff; color: var(--text); font: inherit;
+}
+@media (max-width: 640px) { .library-filter-row { flex-direction: column; } }
