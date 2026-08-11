@@ -377,3 +377,31 @@ body.viz3d-pseudo-lock { overflow: hidden; }
 .phys-presets button:hover { background: rgba(20,217,196,0.25); }
 
 .viz3d-holder-tall { height: 340px !important; }
+
+/* ===== Guest (no-login /sandbox) mode ===== */
+/* Hide save / share / collaborate and any control that needs an account. */
+body.guest #studySetBtn,
+body.guest #exportBtn,
+body.guest #shareToggleBtn,
+body.guest #liveToggleBtn,
+body.guest #viewersBtn,
+body.guest #questionsBtn,
+body.guest #lostPill,
+body.guest #bgImportBtn,
+body.guest #bgClearBtn,
+body.guest #addPageBtn,
+body.guest #delPageBtn,
+body.guest #eraseNotesBtn,
+body.guest .tool-section-body label.size-label:has(#templateSelect) {
+  display: none !important;
+}
+#guestSignin { margin-right: 6px; }
+
+/* Sign-in upsell shown in the AI Notes panel after the free AI cap. */
+.guest-upsell { padding: 4px 2px; }
+.guest-upsell h3 { margin: 0 0 8px; font-size: 1.02rem; }
+.guest-upsell p { margin: 0 0 10px; color: var(--muted, #5a6b85); font-size: 0.9rem; line-height: 1.45; }
+.guest-upsell ul { margin: 0 0 14px; padding-left: 18px; font-size: 0.9rem; line-height: 1.5; }
+.guest-upsell li { margin-bottom: 4px; }
+.guest-upsell-actions { display: flex; flex-direction: column; gap: 8px; }
+.guest-upsell-actions .btn { width: 100%; justify-content: center; text-decoration: none; }

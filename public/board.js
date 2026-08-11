@@ -12,6 +12,10 @@
   const { $, $$, escapeHtml, setStatus, api, refreshMe } = window.AppCommon;
 
   const boardIdValue = window.location.pathname.split('/').pop();
+  // No-login sandbox: /sandbox serves this same board in guest mode — a blank
+  // local board, no saved-board fetch, no live socket, AI capped per IP.
+  const GUEST = boardIdValue === 'sandbox' || !!window.BOARDSY_GUEST;
+  let guestAiLeft = null;
   const canvas = $('#boardCanvas');
   const ctx = canvas.getContext('2d');
   const laserCanvas = $('#laserCanvas');
@@ -1323,17 +1327,63 @@
     updateEraseBtn();
   }
 
+  // Guest boards analyze via a rate-limited, no-login endpoint; signed-in
+  // boards use the board-scoped one. On the free cap we show a sign-in upsell.
+  async function postAnalyze(snapshot) {
+    if (!GUEST) {
+      return api(`/api/board/${boardIdValue}/analyze`, { method: 'POST', body: JSON.stringify({ snapshot }) });
+    }
+    const res = await fetch('/api/guest/analyze', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ snapshot })
+    });
+    const out = await res.json().catch(() => ({}));
+    if (res.status === 429 || out.capReached) {
+      showGuestUpsell();
+      const e = new Error('cap'); e.cap = true; throw e;
+    }
+    if (!res.ok) throw new Error(out.error || 'Could not analyze the board.');
+    if (typeof out.remaining === 'number') {
+      guestAiLeft = out.remaining;
+      if (out.remaining <= 1) setStatus(`${out.remaining} free AI analysis left — sign in for unlimited.`, '');
+    }
+    return out;
+  }
+
+  // Shown in the AI Notes panel once a guest hits the free AI cap. Signing in
+  // is free via the 7-day trial or the Founding-30 program.
+  function showGuestUpsell() {
+    openInfoPanel();
+    const body = $('#infoBody');
+    if (!body) return;
+    body.innerHTML = `
+      <div class="guest-upsell">
+        <h3>You've used your free AI analyses</h3>
+        <p>Signing in is <strong>free</strong> — keep analyzing, save your boards,
+           and bring your students in live.</p>
+        <ul>
+          <li>Start a <strong>7-day free trial</strong> — no charge to begin.</li>
+          <li>Or apply to join our <strong>Founding 30</strong> teachers (free for early founders).</li>
+        </ul>
+        <div class="guest-upsell-actions">
+          <a class="btn primary" href="/pricing">Start 7-day free trial</a>
+          <a class="btn soft" href="/#founding">Join the Founding 30</a>
+          <a class="btn ghost" href="/?login=1">Sign in</a>
+        </div>
+      </div>`;
+  }
+
   async function analyzeBoard() {
     if (!isOwner) return;
     const btn = $('#analyzeBtn');
     btn.disabled = true; const label = btn.textContent; btn.textContent = 'Analyzing…';
     try {
       const snapshot = snapshotPage(pageIndex);
-      const data = await api(`/api/board/${boardIdValue}/analyze`, { method: 'POST', body: JSON.stringify({ snapshot }) });
+      const data = await postAnalyze(snapshot);
       lastAnalysis = data.analysis;
       renderInsight(data.analysis);
     } catch (error) {
-      setStatus(error.message, 'error');
+      if (!error.cap) setStatus(error.message, 'error');
     } finally {
       btn.disabled = false; btn.textContent = label;
     }
@@ -1349,7 +1399,7 @@
     btn.disabled = true; const label = btn.textContent; btn.textContent = 'Analyzing…';
     try {
       const snapshot = snapshotPage(pageIndex);
-      const data = await api(`/api/board/${boardIdValue}/analyze`, { method: 'POST', body: JSON.stringify({ snapshot }) });
+      const data = await postAnalyze(snapshot);
       // Mark as the student's own so renderInsight shows it without owner-only
       // controls, and tag the card so they can tell it apart from teacher notes.
       renderInsight(data.analysis, { fromTeacher: true, ownAnalysis: true });
@@ -1955,7 +2005,7 @@
       liveAnalyzeBusy = true;
       try {
         const snapshot = snapshotPage(pageIndex);
-        const data = await api(`/api/board/${boardIdValue}/analyze`, { method: 'POST', body: JSON.stringify({ snapshot }) });
+        const data = await postAnalyze(snapshot);
         lastAnalysis = data.analysis;
         renderInsight(data.analysis);
         // Auto-plot any functions the analysis surfaced, next to the work.
@@ -2232,20 +2282,42 @@
   // ---- Boot ---------------------------------------------------------------
   async function init() {
     await refreshMe();
-    try {
-      const data = await api(`/api/board/${boardIdValue}`);
-      board = data.board; isOwner = Boolean(data.isOwner);
-      $('#boardTitle').textContent = isOwner ? board.title : `${data.teacher.name}'s whiteboard`;
-      // Load the archived AI Notes for this board so they persist across the
-      // teacher going offline and are visible to students on open.
-      if (Array.isArray(board.insights) && board.insights.length) {
-        board.insights.forEach((a) => renderInsight(a, { fromTeacher: true, archived: true }));
+    if (GUEST) {
+      // Blank, local, unsaved board — same shape the server would send.
+      board = {
+        id: 'sandbox', title: 'Sandbox', shared: false, isLive: false,
+        pages: [{ id: 'pg_sandbox_1', template: 'blank', background: null, strokes: [], objects: [] }],
+        insights: []
+      };
+      isOwner = true;
+      document.body.classList.add('guest');
+      $('#boardTitle').textContent = 'Sandbox · not saved';
+      // Point the top-bar links home, and offer sign-in / plans up front.
+      $('#brandLink')?.setAttribute('href', '/');
+      $('#exitLink')?.setAttribute('href', '/');
+      const exit = $('#exitLink');
+      if (exit && !$('#guestSignin')) {
+        const a = document.createElement('a');
+        a.id = 'guestSignin'; a.className = 'btn primary small'; a.href = '/pricing';
+        a.textContent = 'Sign in / Plans';
+        exit.insertAdjacentElement('beforebegin', a);
       }
-    } catch (error) {
-      setStatus(error.message, 'error');
-      $('#boardTitle').textContent = 'Whiteboard unavailable';
-      setPill('Unavailable', 'error');
-      return;
+    } else {
+      try {
+        const data = await api(`/api/board/${boardIdValue}`);
+        board = data.board; isOwner = Boolean(data.isOwner);
+        $('#boardTitle').textContent = isOwner ? board.title : `${data.teacher.name}'s whiteboard`;
+        // Load the archived AI Notes for this board so they persist across the
+        // teacher going offline and are visible to students on open.
+        if (Array.isArray(board.insights) && board.insights.length) {
+          board.insights.forEach((a) => renderInsight(a, { fromTeacher: true, archived: true }));
+        }
+      } catch (error) {
+        setStatus(error.message, 'error');
+        $('#boardTitle').textContent = 'Whiteboard unavailable';
+        setPill('Unavailable', 'error');
+        return;
+      }
     }
     applyPanelState();
     applyRole();
@@ -2255,7 +2327,7 @@
     updateZoomLabel();
     updateUndoButtons();
     resizeCanvas();
-    connect();
+    if (!GUEST) connect();
   }
 
   init();

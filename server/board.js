@@ -463,6 +463,36 @@ function attachBoardRoutes(app, deps) {
     }
   });
 
+  // ---- Guest (no-login sandbox) analyze --------------------------------
+  // The /sandbox board has no account, so it can't use the board-scoped
+  // analyze above. This endpoint reuses the same vision model but caps usage
+  // per IP so anonymous traffic can't run up the AI bill. Only successful
+  // analyses count toward the cap.
+  const GUEST_ANALYZE_MAX = Number(process.env.GUEST_ANALYZE_MAX || 3);
+  const GUEST_ANALYZE_WINDOW_MS = 24 * 60 * 60 * 1000;
+  const guestAnalyzeHits = new Map();
+  app.post('/api/guest/analyze', async (req, res) => {
+    const ip = String(req.headers['x-forwarded-for'] || '').split(',')[0].trim()
+      || req.socket.remoteAddress || 'unknown';
+    const now = Date.now();
+    const hits = (guestAnalyzeHits.get(ip) || []).filter((t) => now - t < GUEST_ANALYZE_WINDOW_MS);
+    if (hits.length >= GUEST_ANALYZE_MAX) {
+      return res.status(429).json({ error: 'Free AI limit reached.', capReached: true, remaining: 0 });
+    }
+    if (!req.body.snapshot) return res.status(400).json({ error: 'No board snapshot provided.' });
+    try {
+      const raw = await askVisionAI({ instructions: ANALYZE_INSTRUCTIONS, imageDataUrl: req.body.snapshot });
+      const analysis = parseAnalysis(raw);
+      analysis.id = boardId('an');
+      analysis.createdAt = nowIso();
+      hits.push(now);
+      guestAnalyzeHits.set(ip, hits);
+      res.json({ analysis, remaining: Math.max(0, GUEST_ANALYZE_MAX - hits.length) });
+    } catch (error) {
+      res.status(502).json({ error: error.message || 'Could not analyze the board.' });
+    }
+  });
+
   // ---- Board -> study set ----------------------------------------------
   // Reads every page with the vision model, then hands the extracted text to
   // the same generator the rest of the app uses, so a lesson on the board

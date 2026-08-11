@@ -1042,10 +1042,13 @@ app.get('/config.js', (req, res) => {
   res.type('application/javascript').send('window.BOARDSY_APP_BASE="";\n');
 });
 
-// The no-login sandbox board: full drawing + live simulations, no account,
-// no save/collaborate. The real, auth-gated collaborative board stays at /board.
+// The no-login sandbox: the real board (board.html) running in guest mode —
+// board.js detects the /sandbox path, starts a blank local board, skips the
+// saved-board fetch and the live socket, and routes Analyze to the rate-limited
+// guest endpoint. Save / Share / Go-live are hidden. The real, auth-gated
+// collaborative board stays at /board.
 app.get('/sandbox', (req, res) => {
-  res.sendFile(path.join(PUBLIC_DIR, 'sandbox.html'));
+  res.sendFile(path.join(PUBLIC_DIR, 'board.html'));
 });
 
 // Public Founding-30 application from the homepage (no account required).
