@@ -124,9 +124,11 @@ const PUBLIC_DIR = path.join(__dirname, '..', 'public');
 const stripe = process.env.STRIPE_SECRET_KEY ? Stripe(process.env.STRIPE_SECRET_KEY) : null;
 
 const PLAN_LIMITS = {
-  free: { label: 'Free', setsPerDay: 5, shareSeats: 0, whiteboard: false },
-  starter: { label: 'Starter', setsPerDay: 10, shareSeats: 0, whiteboard: false },
-  team: { label: 'Teams', setsPerDay: 20, shareSeats: 30, whiteboard: true }
+  // whiteboard      = can create & share boards (static share links)
+  // whiteboardLive  = can go live / take questions / collaborate in real time
+  free:    { label: 'Free',    setsPerDay: 5,  shareSeats: 0,  whiteboard: false, whiteboardLive: false },
+  starter: { label: 'Pro',     setsPerDay: 10, shareSeats: 0,  whiteboard: true,  whiteboardLive: false },
+  team:    { label: 'Teams',   setsPerDay: 20, shareSeats: 30, whiteboard: true,  whiteboardLive: true }
 };
 
 // Plans a user may self-serve trial without paying. 7 days each, one trial
@@ -392,6 +394,11 @@ const membership = attachMembership(db, {
 
 function userHasWhiteboardAccess(user) {
   return membership.hasWhiteboard(user);
+}
+
+// Live collaboration (go-live, questions, real-time viewers) is Teams-only.
+function userHasLiveAccess(user) {
+  return Boolean(membership.effectiveLimits(user).whiteboardLive);
 }
 
 function compactText(text, maxLength = 16000) {
@@ -1049,6 +1056,26 @@ app.get('/config.js', (req, res) => {
 // collaborative board stays at /board.
 app.get('/sandbox', (req, res) => {
   res.sendFile(path.join(PUBLIC_DIR, 'board.html'));
+});
+
+// Public, no-login shared board: anyone with the link opens a read-only copy
+// (board.js detects the /s/ path and loads it via /api/public/board/:token).
+app.get('/s/:token', (req, res) => {
+  res.sendFile(path.join(PUBLIC_DIR, 'board.html'));
+});
+
+// QR image for a share link (used in the Share dialog and share emails).
+const QRCode = require('qrcode');
+app.get('/qr', async (req, res) => {
+  const data = String(req.query.d || '').slice(0, 2000);
+  if (!data) return res.status(400).send('missing d');
+  try {
+    const png = await QRCode.toBuffer(data, { type: 'png', width: 320, margin: 1,
+      color: { dark: '#0f1e35', light: '#ffffff' } });
+    res.type('png').set('Cache-Control', 'public, max-age=86400').send(png);
+  } catch (e) {
+    res.status(500).send('qr error');
+  }
 });
 
 // Public Founding-30 application from the homepage (no account required).
@@ -1951,12 +1978,14 @@ attachBoardRoutes(app, {
   emailOnRoster,
   canViewTeachersContent,
   userHasWhiteboardAccess,
+  userHasLiveAccess,
   notifyTeamOfShare,
   APP_BASE_URL,
   askVisionAI: ({ instructions, imageDataUrl }) => askVisionAI({ instructions, imageDataUrl }),
   generateWithProvider,
   saveGeneratedSet,
   canCreateSet,
+  sendShareEmail: ({ to, subject, text, html }) => sendMail({ to, subject, text, html }),
   onContentCreated: (user) => { membership.onReferredContentCreated(user).catch(() => {}); }
 });
 

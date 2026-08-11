@@ -15,6 +15,11 @@
   // No-login sandbox: /sandbox serves this same board in guest mode — a blank
   // local board, no saved-board fetch, no live socket, AI capped per IP.
   const GUEST = boardIdValue === 'sandbox' || !!window.BOARDSY_GUEST;
+  // Public share: /s/:token opens a read-only copy of a teacher's shared board
+  // for anyone, no login — view, export PDF, and make flashcards/quiz to study.
+  const PUBLIC = window.location.pathname.startsWith('/s/');
+  const PUBLIC_TOKEN = PUBLIC ? boardIdValue : null;
+  const NOLOGIN = GUEST || PUBLIC;
   let guestAiLeft = null;
   const canvas = $('#boardCanvas');
   const ctx = canvas.getContext('2d');
@@ -1330,7 +1335,7 @@
   // Guest boards analyze via a rate-limited, no-login endpoint; signed-in
   // boards use the board-scoped one. On the free cap we show a sign-in upsell.
   async function postAnalyze(snapshot) {
-    if (!GUEST) {
+    if (!NOLOGIN) {
       return api(`/api/board/${boardIdValue}/analyze`, { method: 'POST', body: JSON.stringify({ snapshot }) });
     }
     const res = await fetch('/api/guest/analyze', {
@@ -1938,7 +1943,7 @@
     if (board.isLive) { b.textContent = 'Live'; b.className = 'board-badge is-live'; }
     else if (board.shared) { b.textContent = 'Shared'; b.className = 'board-badge is-shared'; }
     else { b.textContent = 'Private'; b.className = 'board-badge'; }
-    $('#shareToggleBtn').textContent = board.shared ? 'Unshare' : 'Share';
+    $('#shareToggleBtn').textContent = 'Share';
     $('#liveToggleBtn').textContent = board.isLive ? 'Stop live' : 'Go live';
   }
 
@@ -2251,12 +2256,7 @@
     $('#questionsClose')?.addEventListener('click', () => { $('#questionsPanel').style.display = 'none'; });
     $('#graphCtrlClose')?.addEventListener('click', () => { $('#graphControls').style.display = 'none'; activeGraph = null; });
 
-    $('#shareToggleBtn').addEventListener('click', async () => {
-      try {
-        const d = await api(`/api/board/${boardIdValue}/share-toggle`, { method: 'POST', body: JSON.stringify({ shared: !board.shared }) });
-        board.shared = d.board.shared; updateBadge();
-      } catch (e) { setStatus(e.message, 'error'); }
-    });
+    $('#shareToggleBtn').addEventListener('click', () => { openShareDialog(); });
     $('#liveToggleBtn').addEventListener('click', async () => {
       try {
         const d = await api(`/api/board/${boardIdValue}/${board.isLive ? 'stop-live' : 'go-live'}`, { method: 'POST', body: JSON.stringify({}) });
@@ -2302,6 +2302,14 @@
         a.textContent = 'Sign in / Plans';
         exit.insertAdjacentElement('beforebegin', a);
       }
+    } else if (PUBLIC) {
+      const ok = await loadPublicBoard();
+      if (!ok) return;
+      isOwner = false;
+      document.body.classList.add('guest', 'public-view');
+      $('#brandLink')?.setAttribute('href', '/');
+      $('#exitLink')?.setAttribute('href', '/');
+      buildStudentTools();
     } else {
       try {
         const data = await api(`/api/board/${boardIdValue}`);
@@ -2327,7 +2335,178 @@
     updateZoomLabel();
     updateUndoButtons();
     resizeCanvas();
-    if (!GUEST) connect();
+    if (!NOLOGIN) connect();
+  }
+
+  // ---- Public (no-login) shared board -------------------------------------
+  async function loadPublicBoard() {
+    try {
+      const res = await fetch(`/api/public/board/${encodeURIComponent(PUBLIC_TOKEN)}`);
+      if (!res.ok) throw new Error('This board link is no longer available.');
+      const data = await res.json();
+      board = data.board;
+      board.shared = true; board.isLive = data.mode === 'live';
+      if (pageIndex >= board.pages.length) pageIndex = 0;
+      $('#boardTitle').textContent = board.title || 'Shared whiteboard';
+      setPill(board.isLive ? 'Live' : 'Snapshot', board.isLive ? 'live' : 'shared');
+      if (Array.isArray(board.insights)) {
+        board.insights.forEach((a) => renderInsight(a, { fromTeacher: true, archived: true }));
+      }
+      return true;
+    } catch (error) {
+      $('#boardTitle').textContent = 'Whiteboard unavailable';
+      setPill('Unavailable', 'error');
+      setStatus(error.message, 'error');
+      return false;
+    }
+  }
+
+  async function refreshPublicBoard() {
+    const ok = await loadPublicBoard();
+    if (ok) { redraw(); updatePageBar(); setStatus('Updated to the latest shared version.', 'success'); }
+  }
+
+  // Student toolbar: export PDF and make flashcards/quiz/slides — no login.
+  function buildStudentTools() {
+    const bar = document.createElement('div');
+    bar.className = 'student-tools';
+    bar.innerHTML = `
+      <span class="st-label">Study this board:</span>
+      <button class="btn soft small" data-st="flashcard">🃏 Flashcards</button>
+      <button class="btn soft small" data-st="quiz">📝 Quiz</button>
+      <button class="btn soft small" data-st="slides">📊 Slides</button>
+      <button class="btn ghost small" id="stPdf">⬇ PDF</button>
+      <button class="btn ghost small" id="stAnalyze">🔍 Explain</button>
+      ${board.isLive ? '' : '<button class="btn ghost small" id="stRefresh">↻ Refresh</button>'}
+      <a class="btn primary small" href="/pricing">Sign in / Plans</a>`;
+    const topbar = document.querySelector('.board-topbar');
+    if (topbar) topbar.insertAdjacentElement('afterend', bar);
+    else document.body.insertBefore(bar, document.body.firstChild);
+    bar.querySelectorAll('[data-st]').forEach((b) =>
+      b.addEventListener('click', () => publicStudySet(b.dataset.st)));
+    $('#stPdf')?.addEventListener('click', exportPdf);
+    $('#stAnalyze')?.addEventListener('click', studentAnalyze);
+    $('#stRefresh')?.addEventListener('click', refreshPublicBoard);
+  }
+
+  async function publicStudySet(format) {
+    openStudyModal('Reading the board and building your ' +
+      (format === 'flashcard' ? 'flashcards' : format === 'quiz' ? 'quiz' : 'slides') + '…', null);
+    try {
+      const snapshots = board.pages.map((_, i) => snapshotPage(i));
+      const res = await fetch('/api/public/to-study-set', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ snapshots, format, cardCount: 10 })
+      });
+      const out = await res.json().catch(() => ({}));
+      if (res.status === 429 || out.capReached) { renderStudyUpsell(); return; }
+      if (!res.ok) throw new Error(out.error || 'Could not build a study set.');
+      renderStudySet(out.set);
+    } catch (error) {
+      openStudyModal(null, `<p class="study-err">${escapeHtml(error.message)}</p>`);
+    }
+  }
+
+  function studyModalEl() {
+    let m = document.getElementById('studyModal');
+    if (!m) {
+      m = document.createElement('div');
+      m.id = 'studyModal'; m.className = 'study-modal';
+      m.innerHTML = `<div class="study-card"><button class="study-close" aria-label="Close">×</button>
+        <div class="study-body" id="studyBody"></div></div>`;
+      document.body.appendChild(m);
+      m.addEventListener('click', (e) => { if (e.target === m || e.target.classList.contains('study-close')) m.classList.remove('open'); });
+    }
+    return m;
+  }
+  function openStudyModal(title, html) {
+    const m = studyModalEl(); m.classList.add('open');
+    const body = $('#studyBody');
+    if (html != null) body.innerHTML = html;
+    else body.innerHTML = `<div class="study-loading"><div class="spin"></div><p>${escapeHtml(title || '')}</p></div>`;
+  }
+  function renderStudyUpsell() {
+    openStudyModal(null, `<div class="guest-upsell">
+      <h3>You've used your free study sets</h3>
+      <p>Signing in is <strong>free</strong> — make unlimited flashcards, quizzes and slides, and save them.</p>
+      <ul><li>Start a <strong>7-day free trial</strong>.</li>
+      <li>Or apply to join our <strong>Founding 30</strong> teachers.</li></ul>
+      <div class="guest-upsell-actions">
+        <a class="btn primary" href="/pricing">Start 7-day free trial</a>
+        <a class="btn soft" href="/#founding">Join the Founding 30</a>
+        <a class="btn ghost" href="/?login=1">Sign in</a></div></div>`);
+  }
+  function renderStudySet(set) {
+    const cards = Array.isArray(set && set.cards) ? set.cards : [];
+    if (!cards.length) { openStudyModal(null, '<p class="study-err">No study items were generated. Try a board with more written on it.</p>'); return; }
+    const esc = escapeHtml;
+    const items = cards.map((c, i) => {
+      // Render whatever fields the generator produced, defensively.
+      if (c.options || c.choices) {
+        const opts = (c.options || c.choices || []).map((o) => `<li>${esc(String(o))}</li>`).join('');
+        const ans = c.answer != null ? `<div class="sc-ans">Answer: ${esc(String(c.answer))}</div>` : '';
+        return `<div class="study-item"><div class="sc-q">${i + 1}. ${esc(String(c.question || c.prompt || c.front || ''))}</div><ul class="sc-opts">${opts}</ul>${ans}</div>`;
+      }
+      if (c.bullets || c.points) {
+        const b = (c.bullets || c.points || []).map((x) => `<li>${esc(String(x))}</li>`).join('');
+        return `<div class="study-item"><div class="sc-title">${esc(String(c.title || c.heading || `Slide ${i + 1}`))}</div><ul>${b}</ul></div>`;
+      }
+      const front = c.term || c.front || c.question || c.prompt || '';
+      const back = c.definition || c.back || c.answer || c.explanation || '';
+      return `<div class="study-item flip"><div class="sc-front">${esc(String(front))}</div><div class="sc-back">${esc(String(back))}</div></div>`;
+    }).join('');
+    openStudyModal(null, `<div class="study-head"><h3>${esc(set.title || 'Study set')}</h3>
+      <span class="study-sub">${cards.length} item${cards.length === 1 ? '' : 's'} · not saved — sign in to keep it</span></div>
+      <div class="study-list">${items}</div>
+      <div class="guest-upsell-actions"><a class="btn primary" href="/pricing">Sign in to save</a></div>`);
+  }
+
+  // ---- Owner: Share dialog (link + QR + email) ----------------------------
+  async function openShareDialog() {
+    // Make sure it's shared and we have a public token.
+    try {
+      if (!board.shared || !board.publicToken) {
+        const d = await api(`/api/board/${boardIdValue}/share-toggle`, { method: 'POST', body: JSON.stringify({ shared: true }) });
+        board.shared = d.board.shared; board.publicToken = d.board.publicToken; updateBadge();
+      }
+    } catch (e) { setStatus(e.message, 'error'); return; }
+    const url = `${window.location.origin}/s/${board.publicToken}`;
+    let m = document.getElementById('shareModal');
+    if (!m) {
+      m = document.createElement('div');
+      m.id = 'shareModal'; m.className = 'study-modal';
+      document.body.appendChild(m);
+      m.addEventListener('click', (e) => { if (e.target === m || e.target.classList.contains('study-close')) m.classList.remove('open'); });
+    }
+    m.innerHTML = `<div class="study-card share-card"><button class="study-close" aria-label="Close">×</button>
+      <h3>Share this whiteboard</h3>
+      <p class="share-sub">Anyone with the link can open it — no login. They can view it, export a PDF, and make flashcards or a quiz to study. ${board.isLive ? '' : 'This is a snapshot — click <strong>Share</strong> again after you change the board, and students hit <strong>Refresh</strong> to see the update.'}</p>
+      <div class="share-linkrow"><input id="shareUrl" readonly value="${url}" /><button class="btn primary small" id="shareCopy">Copy</button></div>
+      <div class="share-qr"><img src="/qr?d=${encodeURIComponent(url)}" alt="QR code" width="160" height="160" /><span>Scan or project this in class</span></div>
+      <div class="share-email">
+        <label>Email it to your class<textarea id="shareEmails" placeholder="student1@school.edu, student2@school.edu"></textarea></label>
+        <label>Note (optional)<input id="shareNote" placeholder="Here's today's board — make flashcards to revise." /></label>
+        <button class="btn primary" id="shareSend">Send links</button>
+        <div class="form-status" id="shareStatus"></div>
+      </div></div>`;
+    m.classList.add('open');
+    $('#shareCopy').addEventListener('click', () => {
+      const inp = $('#shareUrl'); inp.select();
+      navigator.clipboard?.writeText(inp.value).then(() => { $('#shareCopy').textContent = 'Copied'; }).catch(() => {});
+    });
+    $('#shareSend').addEventListener('click', async () => {
+      const emails = $('#shareEmails').value.trim();
+      const note = $('#shareNote').value.trim();
+      const st = $('#shareStatus'); const btn = $('#shareSend');
+      if (!emails) { st.className = 'form-status err'; st.textContent = 'Add at least one email.'; return; }
+      btn.disabled = true; btn.textContent = 'Sending…';
+      try {
+        const d = await api(`/api/board/${boardIdValue}/share-email`, { method: 'POST', body: JSON.stringify({ emails, note }) });
+        st.className = 'form-status ok';
+        st.textContent = d.sent ? `Sent to ${d.sent} of ${d.total}.` : 'Links prepared. (Email is not configured on the server, so nothing was sent.)';
+      } catch (e) { st.className = 'form-status err'; st.textContent = e.message; }
+      finally { btn.disabled = false; btn.textContent = 'Send links'; }
+    });
   }
 
   init();

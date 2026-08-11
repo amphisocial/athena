@@ -405,3 +405,68 @@ body.guest .tool-section-body label.size-label:has(#templateSelect) {
 .guest-upsell li { margin-bottom: 4px; }
 .guest-upsell-actions { display: flex; flex-direction: column; gap: 8px; }
 .guest-upsell-actions .btn { width: 100%; justify-content: center; text-decoration: none; }
+
+/* ===== Public shared board: student tools ===== */
+body.public-view #boardToolbar,
+body.public-view #ownerActions { display: none !important; }
+.student-tools {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  padding: 6px 10px; background: var(--panel, #f3f7ff);
+  border-bottom: 1px solid var(--line, #dce6f5);
+}
+.student-tools .st-label { font-weight: 600; color: var(--muted, #5a6b85); font-size: 0.85rem; }
+
+/* ===== Study-set modal + share dialog (injected) ===== */
+.study-modal {
+  position: fixed; inset: 0; z-index: 9998; display: none;
+  align-items: center; justify-content: center; padding: 20px;
+  background: rgba(15, 30, 53, 0.5);
+}
+.study-modal.open { display: flex; }
+.study-card {
+  position: relative; background: #fff; color: var(--ink, #0f1e35);
+  border-radius: 16px; padding: 22px; width: min(94vw, 640px);
+  max-height: 86vh; overflow: auto; box-shadow: 0 24px 60px rgba(15, 30, 53, 0.3);
+}
+.study-close {
+  position: absolute; top: 10px; right: 14px; border: 0; background: none;
+  font-size: 24px; line-height: 1; cursor: pointer; color: var(--muted, #5a6b85);
+}
+.study-head h3, .share-card h3 { margin: 0 0 4px; }
+.study-sub, .share-sub { color: var(--muted, #5a6b85); font-size: 0.85rem; }
+.study-loading { text-align: center; padding: 30px 0; color: var(--muted, #5a6b85); }
+.study-loading .spin {
+  width: 30px; height: 30px; margin: 0 auto 12px; border-radius: 50%;
+  border: 3px solid var(--line, #dce6f5); border-top-color: var(--brand, #2563ff);
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.study-list { display: grid; gap: 10px; margin: 14px 0; }
+.study-item {
+  border: 1px solid var(--line, #dce6f5); border-radius: 10px; padding: 12px 14px;
+  background: var(--panel, #f3f7ff);
+}
+.study-item .sc-front, .study-item .sc-q, .study-item .sc-title { font-weight: 700; margin-bottom: 6px; }
+.study-item .sc-back, .study-item .sc-ans { color: #1f3a5f; }
+.study-item .sc-opts { margin: 6px 0; padding-left: 18px; }
+.study-err { color: #d64545; }
+
+/* Share dialog specifics */
+.share-linkrow { display: flex; gap: 8px; margin: 14px 0; }
+.share-linkrow input {
+  flex: 1; padding: 10px 12px; border: 1px solid var(--line, #dce6f5);
+  border-radius: 8px; font: inherit; background: var(--panel, #f3f7ff);
+}
+.share-qr { display: flex; flex-direction: column; align-items: center; gap: 6px; margin: 8px 0 16px; }
+.share-qr img { border: 1px solid var(--line, #dce6f5); border-radius: 12px; }
+.share-qr span { color: var(--muted, #5a6b85); font-size: 0.82rem; }
+.share-email { display: grid; gap: 10px; border-top: 1px solid var(--line, #dce6f5); padding-top: 14px; }
+.share-email label { display: flex; flex-direction: column; gap: 6px; font-weight: 600; font-size: 0.85rem; color: var(--muted, #5a6b85); }
+.share-email textarea, .share-email input {
+  font: inherit; padding: 10px 12px; border: 1px solid var(--line, #dce6f5);
+  border-radius: 8px; background: var(--panel, #f3f7ff); color: var(--ink, #0f1e35); min-height: 44px;
+}
+.share-email textarea { min-height: 68px; resize: vertical; }
+.form-status { font-size: 0.85rem; min-height: 18px; }
+.form-status.ok { color: var(--teal, #12b5a6); }
+.form-status.err { color: #d64545; }

@@ -140,6 +140,7 @@ function boardSummary(board) {
     updatedAt: board.updatedAt,
     shared: Boolean(board.shared),
     isLive: Boolean(board.isLive),
+    publicToken: board.publicToken || null,
     pageCount: board.pages.length,
     strokeCount: board.pages.reduce((n, p) => n + p.strokes.length, 0)
   };
@@ -163,7 +164,7 @@ function isSafeExpression(text) {
 // REST routes
 // ---------------------------------------------------------------------
 function attachBoardRoutes(app, deps) {
-  const { requireUser, readStore, emailOnRoster, canViewTeachersContent, userHasWhiteboardAccess, notifyTeamOfShare, APP_BASE_URL, askVisionAI, generateWithProvider, saveGeneratedSet, canCreateSet } = deps;
+  const { requireUser, readStore, emailOnRoster, canViewTeachersContent, userHasWhiteboardAccess, userHasLiveAccess, notifyTeamOfShare, APP_BASE_URL, askVisionAI, generateWithProvider, saveGeneratedSet, canCreateSet } = deps;
   // canViewTeachersContent = on the team roster OR invited under the older
   // per-study-set model. Whiteboard access used to be granted purely by the
   // latter, so checking only the roster silently cut off every student who
@@ -172,10 +173,26 @@ function attachBoardRoutes(app, deps) {
 
   function requireWhiteboardPlan(req, res) {
     if (!userHasWhiteboardAccess(req.user)) {
-      res.status(403).json({ error: 'The whiteboard is available on the Teams plan. Start a free 7-day Teams trial to try it.' });
+      res.status(403).json({ error: 'Whiteboards are on the Pro and Teams plans. Start a free 7-day trial to try them.' });
       return false;
     }
     return true;
+  }
+
+  // Live collaboration (go live, questions, real-time viewers) is Teams-only.
+  function requireLivePlan(req, res) {
+    if (!(userHasLiveAccess && userHasLiveAccess(req.user))) {
+      res.status(403).json({ error: 'Live classrooms are on the Teams plan. Pro can still share a static board link. Start a free 7-day Teams trial to go live.' });
+      return false;
+    }
+    return true;
+  }
+
+  // Every shared board gets a stable public token so anyone with the link can
+  // open a no-login, read-only copy (and study from it). Idempotent.
+  function ensurePublicToken(board) {
+    if (!board.publicToken) board.publicToken = boardId('pub').replace('pub_', 'pub');
+    return board.publicToken;
   }
 
   function findBoard(store, boardIdParam) {
@@ -248,6 +265,7 @@ function attachBoardRoutes(app, deps) {
     if (!board || board.teacherId !== req.user.id) return res.status(404).json({ error: 'Board not found.' });
     const wasShared = Boolean(board.shared);
     board.shared = Boolean(req.body.shared);
+    if (board.shared) ensurePublicToken(board);
     board.updatedAt = nowIso();
     writeBoardStore(store);
     if (board.shared && !wasShared && notifyTeamOfShare) {
@@ -265,7 +283,7 @@ function attachBoardRoutes(app, deps) {
   // Going live on one board automatically takes any other board this
   // teacher owns off live — a teacher can only ever broadcast one board.
   app.post('/api/board/:boardId/go-live', requireUser, (req, res) => {
-    if (!requireWhiteboardPlan(req, res)) return;
+    if (!requireLivePlan(req, res)) return;
     const store = readBoardStore();
     const board = findBoard(store, req.params.boardId);
     if (!board || board.teacherId !== req.user.id) return res.status(404).json({ error: 'Board not found.' });
@@ -275,6 +293,7 @@ function attachBoardRoutes(app, deps) {
     // Going live on a board nobody can see is never what's intended, so
     // going live also shares it. Unshare/stop-live remain separate.
     board.shared = true;
+    ensurePublicToken(board);
     board.updatedAt = nowIso();
     writeBoardStore(store);
     if (!wasShared && notifyTeamOfShare) {
@@ -492,6 +511,118 @@ function attachBoardRoutes(app, deps) {
       res.status(502).json({ error: error.message || 'Could not analyze the board.' });
     }
   });
+
+  // ---- Public (no-login) shared board ----------------------------------
+  // Anyone with the share link opens a read-only copy of the board — Pro
+  // shares are a static snapshot (viewer refreshes to get the latest), Teams
+  // shares can also be joined live (that path is handled by the socket). No
+  // account is ever required, and students never pay.
+  function findByPublicToken(store, token) {
+    if (!token) return null;
+    return store.boards.find((b) => b.publicToken === token && b.shared);
+  }
+
+  app.get('/api/public/board/:token', (req, res) => {
+    const store = readBoardStore();
+    const board = findByPublicToken(store, req.params.token);
+    if (!board) return res.status(404).json({ error: 'This board link is no longer available.' });
+    // Read-only projection — pages/strokes/objects only, no owner internals.
+    res.json({
+      board: {
+        id: board.id,
+        title: board.title,
+        pages: board.pages,
+        insights: Array.isArray(board.insights) ? board.insights : []
+      },
+      mode: board.isLive ? 'live' : 'snapshot',
+      updatedAt: board.updatedAt
+    });
+  });
+
+  // Students turn the shared board into flashcards / quiz / slides to study —
+  // no login, no account, generated in-session and returned (never saved to a
+  // teacher's library). Rate-limited per IP so it can't run up the AI bill.
+  const PUBLIC_SET_MAX = Number(process.env.PUBLIC_SET_MAX || 4);
+  const PUBLIC_SET_WINDOW_MS = 24 * 60 * 60 * 1000;
+  const publicSetHits = new Map();
+  app.post('/api/public/to-study-set', async (req, res) => {
+    const ip = String(req.headers['x-forwarded-for'] || '').split(',')[0].trim()
+      || req.socket.remoteAddress || 'unknown';
+    const now = Date.now();
+    const hits = (publicSetHits.get(ip) || []).filter((t) => now - t < PUBLIC_SET_WINDOW_MS);
+    if (hits.length >= PUBLIC_SET_MAX) {
+      return res.status(429).json({ error: 'Free study-set limit reached. Sign in (free) to keep going.', capReached: true });
+    }
+    const snapshots = Array.isArray(req.body.snapshots) ? req.body.snapshots.slice(0, MAX_PAGES_PER_BOARD) : [];
+    if (!snapshots.length) return res.status(400).json({ error: 'No board pages were captured.' });
+    try {
+      const extracted = [];
+      for (let i = 0; i < snapshots.length; i += 1) {
+        // eslint-disable-next-line no-await-in-loop
+        const text = await askVisionAI({
+          instructions: 'Transcribe and describe everything on this whiteboard page as plain study material: equations, definitions, diagrams, labels, worked steps. Write it as clean prose and lists a student could revise from. No preamble.',
+          imageDataUrl: snapshots[i]
+        });
+        if (text && text.trim()) extracted.push(`--- Page ${i + 1} ---\n${text.trim()}`);
+      }
+      const content = extracted.join('\n\n');
+      if (content.trim().length < 20) return res.status(400).json({ error: 'There was not enough on the board to build a study set.' });
+      const format = ['flashcard', 'quiz', 'mixed', 'slides'].includes(req.body.format) ? req.body.format : 'mixed';
+      const cardCount = Math.max(1, Math.min(40, Number(req.body.cardCount || 10)));
+      const generated = await generateWithProvider({ content, cardCount, format, subject: req.body.subject || 'Study set' });
+      hits.push(now); publicSetHits.set(ip, hits);
+      // Returned only — not saved to any account.
+      res.json({ set: { title: generated.title || 'Study set', cards: generated.cards, format } });
+    } catch (error) {
+      console.error('Public to-study-set failed:', error.message);
+      res.status(500).json({ error: error.message || 'Could not build a study set from this board.' });
+    }
+  });
+
+  // Teacher emails the share link (+ QR) to their class. Owner-only.
+  app.post('/api/board/:boardId/share-email', requireUser, async (req, res) => {
+    if (!requireWhiteboardPlan(req, res)) return;
+    const store = readBoardStore();
+    const board = findBoard(store, req.params.boardId);
+    if (!board || board.teacherId !== req.user.id) return res.status(404).json({ error: 'Board not found.' });
+    if (!board.shared) { board.shared = true; }
+    ensurePublicToken(board);
+    writeBoardStore(store);
+
+    const emails = String(req.body.emails || '')
+      .split(/[\s,;]+/).map((e) => e.trim()).filter((e) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e));
+    if (!emails.length) return res.status(400).json({ error: 'Add at least one valid email address.' });
+    if (emails.length > 60) return res.status(400).json({ error: 'Please send to at most 60 addresses at a time.' });
+
+    const url = `${APP_BASE_URL}/s/${board.publicToken}`;
+    const qr = `${APP_BASE_URL}/qr?d=${encodeURIComponent(url)}`;
+    const teacher = [req.user.firstName, req.user.lastName].filter(Boolean).join(' ') || 'Your teacher';
+    const note = String(req.body.note || '').slice(0, 500);
+    const subject = `${teacher} shared a Boardsy whiteboard: ${board.title}`;
+    const text = `${teacher} shared a whiteboard with you on Boardsy.\n\n${board.title}\nOpen it: ${url}\n\n${note}\n\nNo login needed — you can view it, export a PDF, and make flashcards or a quiz to study.`;
+    const html = `<div style="font-family:Arial,sans-serif;color:#0f1e35">
+      <p><strong>${escapeHtmlSafe(teacher)}</strong> shared a whiteboard with you on Boardsy.</p>
+      <p style="font-size:18px;margin:12px 0"><strong>${escapeHtmlSafe(board.title)}</strong></p>
+      <p><a href="${url}" style="background:#2563ff;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none">Open the whiteboard</a></p>
+      <p style="margin:16px 0"><img src="${qr}" alt="QR code" width="160" height="160" style="border:1px solid #dce6f5;border-radius:10px" /><br><span style="color:#5a6b85;font-size:13px">Scan to open on a phone</span></p>
+      ${note ? `<p style="white-space:pre-wrap">${escapeHtmlSafe(note)}</p>` : ''}
+      <p style="color:#5a6b85;font-size:13px">No login needed — view it, export a PDF, and make flashcards or a quiz to study.</p>
+    </div>`;
+
+    let sent = 0;
+    for (const to of emails) {
+      // eslint-disable-next-line no-await-in-loop
+      const r = deps.sendShareEmail
+        ? await deps.sendShareEmail({ to, subject, text, html }).catch(() => ({ sent: false }))
+        : { sent: false };
+      if (r && r.sent) sent += 1;
+    }
+    res.json({ ok: true, url, sent, total: emails.length });
+  });
+
+  function escapeHtmlSafe(v) {
+    return String(v || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
 
   // ---- Board -> study set ----------------------------------------------
   // Reads every page with the vision model, then hands the extracted text to
