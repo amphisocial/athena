@@ -470,3 +470,10 @@ body.public-view #ownerActions { display: none !important; }
 .form-status { font-size: 0.85rem; min-height: 18px; }
 .form-status.ok { color: var(--teal, #12b5a6); }
 .form-status.err { color: #d64545; }
+
+/* Public board viewer: inline rating + bookmark in the student toolbar */
+.st-rate { display: inline-flex; align-items: center; gap: 1px; }
+.st-star { border: 0; background: none; cursor: pointer; font-size: 1.05rem; color: #4a5a74; padding: 0 1px; }
+.st-star.on { color: #ffb020; }
+.st-star:hover { color: #ffcf6b; }
+.st-rate small { margin-left: 6px; color: var(--muted, #9fb2d0); font-size: 0.78rem; }

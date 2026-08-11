@@ -2349,6 +2349,7 @@
       const data = await res.json();
       board = data.board;
       board.shared = true; board.isLive = data.mode === 'live';
+      board.public = Boolean(data.public); board.rating = data.rating || { sum: 0, count: 0 };
       if (pageIndex >= board.pages.length) pageIndex = 0;
       $('#boardTitle').textContent = board.title || 'Shared whiteboard';
       setPill(board.isLive ? 'Live' : 'Snapshot', board.isLive ? 'live' : 'shared');
@@ -2381,6 +2382,8 @@
       <button class="btn ghost small" id="stPdf">⬇ PDF</button>
       <button class="btn ghost small" id="stAnalyze">🔍 Explain</button>
       ${board.isLive ? '' : '<button class="btn ghost small" id="stRefresh">↻ Refresh</button>'}
+      ${board.public ? '<span class="st-rate" id="stRate"></span>' : ''}
+      ${board.public && window.AppCommon.state.user ? '<button class="btn ghost small" id="stBookmark">☆ Bookmark</button>' : ''}
       <a class="btn primary small" href="/pricing">Sign in / Plans</a>`;
     const topbar = document.querySelector('.board-topbar');
     if (topbar) topbar.insertAdjacentElement('afterend', bar);
@@ -2390,6 +2393,29 @@
     $('#stPdf')?.addEventListener('click', exportPdf);
     $('#stAnalyze')?.addEventListener('click', studentAnalyze);
     $('#stRefresh')?.addEventListener('click', refreshPublicBoard);
+    if (board.public) renderBoardRating();
+    $('#stBookmark')?.addEventListener('click', async (e) => {
+      try {
+        const d = await window.AppCommon.api('/api/bookmarks/toggle', { method: 'POST', body: JSON.stringify({ type: 'whiteboard', id: board.id }) });
+        e.target.textContent = d.bookmarked ? '★ Bookmarked' : '☆ Bookmark';
+      } catch (_) {}
+    });
+  }
+
+  function renderBoardRating() {
+    const el = $('#stRate'); if (!el) return;
+    const avg = board.rating && board.rating.count ? board.rating.sum / board.rating.count : 0;
+    const count = board.rating ? board.rating.count : 0;
+    let html = '';
+    for (let n = 1; n <= 5; n += 1) html += `<button class="st-star${n <= Math.round(avg) ? ' on' : ''}" data-stars="${n}">★</button>`;
+    html += `<small>${count ? avg.toFixed(1) + ' (' + count + ')' : 'Rate'}</small>`;
+    el.innerHTML = html;
+    el.querySelectorAll('.st-star').forEach((b) => b.addEventListener('click', async () => {
+      try {
+        const d = await window.AppCommon.api('/api/public/rate', { method: 'POST', body: JSON.stringify({ type: 'whiteboard', id: board.id, stars: Number(b.dataset.stars) }) });
+        if (d.rating) { board.rating = d.rating; renderBoardRating(); }
+      } catch (_) {}
+    }));
   }
 
   async function publicStudySet(format) {

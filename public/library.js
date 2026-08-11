@@ -30,8 +30,9 @@
       } else if (scope === 'shared') {
         allItems = await loadShared();
       } else {
-        // Bookmarked — populated once the public Lessons directory ships.
-        allItems = [];
+        // Bookmarked public lessons the teacher saved.
+        try { const d = await api('/api/bookmarks'); allItems = d.items || []; }
+        catch (_) { allItems = []; }
       }
     } catch (e) {
       list.innerHTML = `<p class="set-meta">${escapeHtml(e.message)}</p>`;
@@ -83,7 +84,7 @@
     const list = $('#libraryList');
     if (!items.length) {
       const msg = scope === 'bookmarked'
-        ? 'No bookmarks yet. Bookmark public lessons from the Public Lessons directory (coming soon).'
+        ? 'No bookmarks yet. Open <a href="/lessons">Public Lessons</a> and bookmark the ones you like.'
         : scope === 'shared' ? 'Nothing shared with you yet.'
         : 'Nothing here yet — use “New whiteboard” or “New lesson” above.';
       list.innerHTML = `<p class="set-meta">${msg}</p>`;

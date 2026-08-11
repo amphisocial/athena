@@ -1,0 +1,62 @@
+/* Public Lessons directory + study viewer — white/blue theme (boardsy-home.css tokens). */
+.pl-nav {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 24px; border-bottom: 1px solid var(--line, #dce6f5); background: #fff;
+  position: sticky; top: 0; z-index: 10;
+}
+.pl-nav .brand { display: inline-flex; align-items: center; gap: 8px; font-weight: 800; color: var(--ink, #0f1e35); text-decoration: none; font-size: 1.15rem; }
+.pl-nav .brand img { width: 30px; height: 30px; }
+.pl-nav-links { display: flex; align-items: center; gap: 16px; }
+.pl-nav-links > a:not(.btn) { color: var(--muted, #5a6b85); text-decoration: none; font-weight: 600; font-size: 0.92rem; }
+.pl-nav-links > a.active { color: var(--brand, #2563ff); }
+
+.pl-main { max-width: 1100px; margin: 0 auto; padding: 34px 24px 60px; }
+.pl-head .eyebrow { color: var(--brand, #2563ff); font-weight: 700; font-size: 0.8rem; letter-spacing: 0.06em; text-transform: uppercase; }
+.pl-head h1 { font-family: 'Space Grotesk', Inter, sans-serif; font-size: 2rem; margin: 6px 0 8px; color: var(--ink, #0f1e35); }
+.pl-lede { color: var(--muted, #5a6b85); max-width: 640px; margin: 0 0 22px; }
+
+.pl-filters { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 22px; }
+.pl-filters input, .pl-filters select {
+  font: inherit; padding: 9px 12px; border: 1px solid var(--line, #dce6f5);
+  border-radius: 10px; background: var(--panel, #f3f7ff); color: var(--ink, #0f1e35);
+}
+.pl-filters input[type="search"] { flex: 1; min-width: 220px; }
+
+.pl-grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
+.pl-empty { color: var(--muted, #5a6b85); grid-column: 1 / -1; }
+.pl-card {
+  background: #fff; border: 1px solid var(--line, #dce6f5); border-radius: 16px;
+  padding: 18px; display: flex; flex-direction: column; gap: 8px;
+  box-shadow: 0 6px 18px rgba(15,30,53,0.05);
+}
+.pl-card-top { display: flex; gap: 6px; }
+.pl-card h3 { margin: 2px 0; font-size: 1.08rem; color: var(--ink, #0f1e35); font-family: 'Space Grotesk', Inter, sans-serif; }
+.pl-meta { color: var(--ink, #1f3a5f); font-size: 0.88rem; margin: 0; }
+.pl-by { color: var(--muted, #5a6b85); font-size: 0.8rem; margin: 0; }
+.pl-actions { display: flex; gap: 8px; margin-top: auto; padding-top: 8px; align-items: center; flex-wrap: wrap; }
+
+.subj-badge { display: inline-block; font-size: 0.68rem; font-weight: 700; padding: 2px 8px; border-radius: 999px; }
+.subj-badge.math { background: rgba(37,99,255,0.12); color: #2563ff; }
+.subj-badge.science { background: rgba(18,181,166,0.14); color: #0f9c8f; }
+.type-badge { display: inline-block; font-size: 0.64rem; font-weight: 800; letter-spacing: 0.03em; text-transform: uppercase; padding: 2px 8px; border-radius: 6px; }
+.type-badge.board { background: rgba(37,99,255,0.12); color: #2563ff; }
+.type-badge.lesson { background: rgba(147,112,255,0.14); color: #6d4fd6; }
+
+.pl-stars { display: inline-flex; align-items: center; gap: 1px; }
+.pl-star { border: 0; background: none; cursor: pointer; font-size: 1.05rem; line-height: 1; color: #d7deea; padding: 0 1px; }
+.pl-star.on { color: #ffb020; }
+.pl-star:hover { color: #ffcf6b; }
+.pl-rating-count { margin-left: 8px; font-size: 0.78rem; color: var(--muted, #5a6b85); }
+.pl-stars.big .pl-star { font-size: 1.6rem; }
+
+/* Study viewer */
+.study-main { max-width: 820px; }
+.study-head-pub .eyebrow { color: var(--brand, #2563ff); font-weight: 700; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.06em; }
+.study-head-pub h1 { font-family: 'Space Grotesk', Inter, sans-serif; margin: 6px 0; color: var(--ink, #0f1e35); }
+.study-cards { display: grid; gap: 12px; margin: 18px 0; }
+.study-item { border: 1px solid var(--line, #dce6f5); border-radius: 12px; padding: 14px 16px; background: #fff; }
+.study-item .sc-front, .study-item .sc-q, .study-item .sc-title { font-weight: 700; margin-bottom: 6px; color: var(--ink, #0f1e35); }
+.study-item .sc-back, .study-item .sc-ans { color: #1f3a5f; }
+.study-item .sc-opts { margin: 6px 0 0; padding-left: 18px; }
+.study-rate { display: flex; align-items: center; gap: 10px; padding: 16px; border-top: 1px solid var(--line, #dce6f5); margin-top: 10px; }
+.pl-rate-label { font-weight: 600; color: var(--ink, #0f1e35); }

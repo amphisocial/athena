@@ -1764,8 +1764,7 @@ app.post(['/api/sets/:id/meta', '/api/quizlets/:id/meta'], requireUser, (req, re
 
 // Unified Library: the teacher's boards + study sets in one list, each tagged
 // with a type so the client can render and filter them together.
-app.get('/api/library', requireUser, (req, res) => {
-  const store = readStore();
+app.get('/api/library', requireUser, (req, res) => {  const store = readStore();
   let boards = [];
   try { boards = (require('./board').readBoardStore().boards || []); } catch (_) { boards = []; }
   const boardItems = boards
@@ -1793,6 +1792,135 @@ app.get('/api/library', requireUser, (req, res) => {
     .sort((a, b) => String(b.updatedAt).localeCompare(String(a.updatedAt)));
   res.json({ items });
 });
+
+// ===================== Public Lessons directory (Slice 3) =====================
+const board = require('./board');
+function creatorName(store, userId) {
+  const u = store.users.find((x) => x.id === userId);
+  return u ? ([u.firstName, u.lastName].filter(Boolean).join(' ') || u.email) : 'A teacher';
+}
+function ratingSummary(item) {
+  const raters = item.raters || {};
+  const vals = Object.values(raters);
+  const count = vals.length;
+  const sum = vals.reduce((n, v) => n + Number(v || 0), 0);
+  return { sum, count, avg: count ? sum / count : 0 };
+}
+function ipHash(req) {
+  const ip = String(req.headers['x-forwarded-for'] || '').split(',')[0].trim() || req.socket.remoteAddress || 'x';
+  return crypto.createHash('sha256').update(ip).digest('hex').slice(0, 16);
+}
+
+// Everything a teacher has marked Public, for anyone to browse — no login.
+app.get('/api/public/lessons', (req, res) => {
+  const store = readStore();
+  let boards = [];
+  try { boards = board.readBoardStore().boards || []; } catch (_) { boards = []; }
+  const boardItems = boards.filter((b) => b.public).map((b) => ({
+    type: 'whiteboard', id: b.id, title: b.title,
+    subject: b.subject || '', grade: b.grade || '', topic: b.topic || '',
+    creator: creatorName(store, b.teacherId),
+    createdAt: b.createdAt, updatedAt: b.updatedAt || b.createdAt,
+    rating: ratingSummary(b),
+    openUrl: b.publicToken ? `/s/${b.publicToken}` : `/board/${b.id}`
+  }));
+  const setItems = store.quizlets.filter((s) => s.public).map((s) => ({
+    type: 'lesson', id: s.id, title: s.title,
+    subject: s.subject || s.category || '', grade: s.grade || '', topic: s.topic || '',
+    creator: creatorName(store, s.ownerId),
+    format: s.format, cardCount: (s.cards || []).length,
+    createdAt: s.createdAt, updatedAt: s.updatedAt || s.createdAt,
+    rating: ratingSummary(s),
+    openUrl: `/l/${s.id}`
+  }));
+  const items = [...boardItems, ...setItems]
+    .sort((a, b) => String(b.updatedAt).localeCompare(String(a.updatedAt)))
+    .slice(0, 400);
+  res.json({ items });
+});
+
+// A public study set, for the no-login study viewer at /l/:id.
+app.get('/api/public/lesson/:id', (req, res) => {
+  const store = readStore();
+  const s = store.quizlets.find((x) => x.id === req.params.id && x.public);
+  if (!s) return res.status(404).json({ error: 'This lesson is not available.' });
+  res.json({
+    set: { id: s.id, title: s.title, cards: s.cards || [], format: s.format,
+      subject: s.subject || '', grade: s.grade || '', topic: s.topic || '',
+      creator: creatorName(store, s.ownerId), rating: ratingSummary(s) }
+  });
+});
+
+// Rate a public item 1–5. One rating per IP per item (re-rating updates it).
+app.post('/api/public/rate', (req, res) => {
+  const type = String(req.body.type || '');
+  const stars = Math.max(1, Math.min(5, Math.round(Number(req.body.stars || 0))));
+  if (!stars) return res.status(400).json({ error: 'Pick 1 to 5 stars.' });
+  const h = ipHash(req);
+  if (type === 'whiteboard') {
+    let bstore; try { bstore = board.readBoardStore(); } catch (_) { return res.status(500).json({ error: 'Unavailable.' }); }
+    const b = (bstore.boards || []).find((x) => x.id === req.body.id && x.public);
+    if (!b) return res.status(404).json({ error: 'Not found.' });
+    b.raters = b.raters || {}; b.raters[h] = stars;
+    b.rating = { sum: Object.values(b.raters).reduce((n, v) => n + v, 0), count: Object.keys(b.raters).length };
+    board.writeBoardStore(bstore);
+    return res.json({ rating: ratingSummary(b) });
+  }
+  const store = readStore();
+  const s = store.quizlets.find((x) => x.id === req.body.id && x.public);
+  if (!s) return res.status(404).json({ error: 'Not found.' });
+  s.raters = s.raters || {}; s.raters[h] = stars;
+  s.rating = { sum: Object.values(s.raters).reduce((n, v) => n + v, 0), count: Object.keys(s.raters).length };
+  writeStore(store);
+  res.json({ rating: ratingSummary(s) });
+});
+
+// ---- Bookmarks (logged-in teachers) ----
+app.post('/api/bookmarks/toggle', requireUser, (req, res) => {
+  const type = String(req.body.type || '');
+  const itemId = String(req.body.id || '');
+  if (!['whiteboard', 'lesson'].includes(type) || !itemId) return res.status(400).json({ error: 'Bad request.' });
+  const store = readStore();
+  const user = store.users.find((u) => u.id === req.user.id);
+  if (!user) return res.status(404).json({ error: 'Account not found.' });
+  user.bookmarks = user.bookmarks || [];
+  const idx = user.bookmarks.findIndex((b) => b.type === type && b.id === itemId);
+  let bookmarked;
+  if (idx >= 0) { user.bookmarks.splice(idx, 1); bookmarked = false; }
+  else { user.bookmarks.push({ type, id: itemId, at: nowIso() }); bookmarked = true; }
+  writeStore(store);
+  res.json({ bookmarked });
+});
+
+app.get('/api/bookmarks', requireUser, (req, res) => {
+  const store = readStore();
+  const user = store.users.find((u) => u.id === req.user.id);
+  const marks = (user && user.bookmarks) || [];
+  let boards = [];
+  try { boards = board.readBoardStore().boards || []; } catch (_) { boards = []; }
+  const items = marks.map((m) => {
+    if (m.type === 'whiteboard') {
+      const b = boards.find((x) => x.id === m.id);
+      if (!b || !b.public) return null;
+      return { type: 'whiteboard', id: b.id, title: b.title, subject: b.subject || '', grade: b.grade || '',
+        topic: b.topic || '', public: true, rating: ratingSummary(b), owner: creatorName(store, b.teacherId),
+        createdAt: b.createdAt, updatedAt: b.updatedAt || b.createdAt,
+        openUrl: b.publicToken ? `/s/${b.publicToken}` : `/board/${b.id}`, readOnly: true, bookmarked: true };
+    }
+    const s = store.quizlets.find((x) => x.id === m.id);
+    if (!s || !s.public) return null;
+    return { type: 'lesson', id: s.id, title: s.title, subject: s.subject || s.category || '', grade: s.grade || '',
+      topic: s.topic || '', public: true, rating: ratingSummary(s), owner: creatorName(store, s.ownerId),
+      format: s.format, cardCount: (s.cards || []).length, createdAt: s.createdAt, updatedAt: s.updatedAt || s.createdAt,
+      openUrl: `/l/${s.id}`, readOnly: true, bookmarked: true };
+  }).filter(Boolean);
+  res.json({ items });
+});
+
+// Public pages (no auth).
+app.get('/lessons', (req, res) => res.sendFile(path.join(PUBLIC_DIR, 'lessons.html')));
+app.get('/l/:id', (req, res) => res.sendFile(path.join(PUBLIC_DIR, 'study.html')));
+// ============================================================================
 
 
 app.post('/api/billing/checkout', requireUser, async (req, res) => {

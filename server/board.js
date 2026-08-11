@@ -570,6 +570,8 @@ function attachBoardRoutes(app, deps) {
         insights: Array.isArray(board.insights) ? board.insights : []
       },
       mode: board.isLive ? 'live' : 'snapshot',
+      public: Boolean(board.public),
+      rating: board.rating || { sum: 0, count: 0 },
       updatedAt: board.updatedAt
     });
   });
@@ -1083,4 +1085,4 @@ function getOrCreateCurrentBoardId(teacherId) {
   return board.id;
 }
 
-module.exports = { attachBoardRoutes, attachBoardWebSocket, getOrCreateCurrentBoardId, readBoardStore };
+module.exports = { attachBoardRoutes, attachBoardWebSocket, getOrCreateCurrentBoardId, readBoardStore, writeBoardStore };

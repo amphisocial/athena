@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <link rel="icon" type="image/png" href="/favicon.png" />
+  <link rel="apple-touch-icon" href="/img/boardsy-logo.png?v=boardsy4" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Public Lessons | Boardsy</title>
+  <meta name="description" content="Browse public whiteboards and lessons shared by teachers on Boardsy — Math and Science for middle & high school. No login needed to open, study, or export." />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/boardsy-home.css?v=boardsy4" />
+  <link rel="stylesheet" href="/lessons.css?v=boardsy4" />
+</head>
+<body data-page="landing">
+  <header class="pl-nav">
+    <a class="brand" href="/" aria-label="Boardsy home"><img src="/img/boardsy-logo.svg?v=boardsy4" alt="" /> <span>Board<span class="brand-suffix">sy</span></span></a>
+    <nav class="pl-nav-links">
+      <a href="/sandbox">Try a board</a>
+      <a href="/lessons" class="active">Public Lessons</a>
+      <a class="btn ghost small" href="/?login=1" id="plSignin">Sign in</a>
+      <a class="btn primary small" href="/sandbox">Enter Boardsy</a>
+    </nav>
+  </header>
+
+  <main class="pl-main">
+    <div class="pl-head">
+      <span class="eyebrow">Public Lessons</span>
+      <h1>Boards &amp; lessons teachers made public</h1>
+      <p class="pl-lede">Open any of them free — no login. View the board, export a PDF, or make flashcards and a quiz to study. Rate what helps you.</p>
+    </div>
+
+    <div class="pl-filters">
+      <input type="search" id="plSearch" placeholder="Search topic or title…" />
+      <select id="plType"><option value="">All types</option><option value="whiteboard">Whiteboards</option><option value="lesson">Lessons</option></select>
+      <select id="plSubject"><option value="">All subjects</option><option value="math">Math</option><option value="science">Science</option></select>
+      <select id="plGrade">
+        <option value="">All grades</option>
+        <option value="4">Grade 4</option><option value="5">Grade 5</option><option value="6">Grade 6</option>
+        <option value="7">Grade 7</option><option value="8">Grade 8</option><option value="9">Grade 9</option>
+        <option value="10">Grade 10</option><option value="11">Grade 11</option><option value="12">Grade 12</option>
+      </select>
+    </div>
+
+    <div class="pl-grid" id="plGrid"><p class="pl-empty">Loading…</p></div>
+  </main>
+
+  <script src="/common.js?v=boardsy4"></script>
+  <script src="/lessons.js?v=boardsy4"></script>
+</body>
+</html>
