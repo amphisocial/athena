@@ -164,3 +164,4 @@
   .plans-grid { grid-template-columns: 1fr; }
   .bt-title { display: none; }
 }
+[hidden]{display:none!important}
