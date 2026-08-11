@@ -2,30 +2,49 @@
   const { state, $, escapeHtml, setStatus, api, initCommon, setButtonLoading } = window.AppCommon;
 
   function fmtTime(iso) { return new Date(iso).toLocaleString(); }
+  function fmtDate(iso) { try { return new Date(iso).toLocaleDateString(); } catch (_) { return ''; } }
 
   async function loadTeacherBoards() {
     try {
       const data = await api('/api/board/mine/list');
+      const liveAllowed = Boolean(state.user && state.user.limits && state.user.limits.whiteboardLive);
       if (!data.boards.length) {
         $('#teacherBoardList').innerHTML = '<p class="set-meta">No boards yet — create one to get started.</p>';
         return;
       }
+      const subjectBadge = (s) => s === 'math' ? '<span class="subj-badge math">Math</span>'
+        : s === 'science' ? '<span class="subj-badge science">Science</span>' : '';
       $('#teacherBoardList').innerHTML = data.boards.map((b) => `
-        <div class="set-item" data-id="${b.id}">
-          <span class="set-title">${escapeHtml(b.title)} ${b.isLive ? '<span style="color:#14d9c4; font-size:0.75rem; font-weight:700;">● LIVE</span>' : ''}</span>
-          <span class="set-meta">${b.pageCount || 1} page(s) • ${b.strokeCount} strokes • ${b.shared ? 'Shared with team' : 'Private'} • updated ${fmtTime(b.updatedAt)}</span>
+        <div class="set-item lib-item" data-id="${b.id}">
+          <div class="lib-main">
+            <span class="set-title">${escapeHtml(b.title)} ${subjectBadge(b.subject)}
+              ${b.public ? '<span class="pub-pill public">Public</span>' : '<span class="pub-pill">Private</span>'}
+              ${b.isLive ? '<span class="live-pill">● LIVE</span>' : ''}</span>
+            <span class="set-meta">${escapeHtml([b.grade, b.topic].filter(Boolean).join(' • ')) || 'No topic set'} • ${b.pageCount || 1} page(s) • created ${fmtDate(b.createdAt)} • updated ${fmtDate(b.updatedAt)}</span>
+          </div>
           <div class="set-actions">
-            <a class="btn primary" href="/board/${b.id}">Open</a>
-            <button class="btn soft live-toggle" data-id="${b.id}" data-live="${b.isLive}">${b.isLive ? 'Stop live' : 'Go live'}</button>
-            <button class="btn soft share-toggle" data-id="${b.id}" data-shared="${b.shared}">${b.shared ? 'Unshare' : 'Share with team'}</button>
+            <a class="btn primary" href="/board/${b.id}">Enter</a>
+            <a class="btn soft" href="/board/${b.id}?share=1">Share</a>
+            <button class="btn soft public-toggle" data-id="${b.id}" data-public="${b.public}">${b.public ? 'Make private' : 'Make public'}</button>
+            ${liveAllowed ? `<button class="btn soft live-toggle" data-id="${b.id}" data-live="${b.isLive}">${b.isLive ? 'Stop live' : 'Go live'}</button>` : ''}
             <button class="btn ghost delete-board" data-id="${b.id}">Delete</button>
           </div>
         </div>
       `).join('');
 
       $('#teacherBoardList').querySelectorAll('.live-toggle').forEach((btn) => btn.addEventListener('click', () => toggleLive(btn.dataset.id, btn.dataset.live === 'true')));
-      $('#teacherBoardList').querySelectorAll('.share-toggle').forEach((btn) => btn.addEventListener('click', () => toggleShare(btn.dataset.id, btn.dataset.shared === 'true')));
+      $('#teacherBoardList').querySelectorAll('.public-toggle').forEach((btn) => btn.addEventListener('click', () => togglePublic(btn.dataset.id, btn.dataset.public === 'true')));
       $('#teacherBoardList').querySelectorAll('.delete-board').forEach((btn) => btn.addEventListener('click', () => deleteBoard(btn.dataset.id)));
+    } catch (error) {
+      setStatus(error.message, 'error');
+    }
+  }
+
+  async function togglePublic(boardId, currentlyPublic) {
+    try {
+      await api(`/api/board/${boardId}/save`, { method: 'POST', body: JSON.stringify({ public: !currentlyPublic }) });
+      await loadTeacherBoards();
+      setStatus(currentlyPublic ? 'Board is now private.' : 'Board is now public — it will appear in Public Lessons.', 'success');
     } catch (error) {
       setStatus(error.message, 'error');
     }
@@ -106,11 +125,15 @@
   async function createBoard() {
     const title = $('#newBoardName').value.trim();
     const template = getSelectedTemplate ? getSelectedTemplate() : 'blank';
+    const subject = $('#newBoardSubject') ? $('#newBoardSubject').value : '';
+    const grade = $('#newBoardGrade') ? $('#newBoardGrade').value.trim() : '';
+    const topic = $('#newBoardTopic') ? $('#newBoardTopic').value.trim() : '';
+    const isPublic = $('#newBoardPublic') ? $('#newBoardPublic').checked : false;
     $('#createBoardBtn').disabled = true;
     try {
       const data = await api('/api/board/mine/new', {
         method: 'POST',
-        body: JSON.stringify({ title, template })
+        body: JSON.stringify({ title, template, subject, grade, topic, public: isPublic })
       });
       window.location.href = `/board/${data.board.id}`;
     } catch (error) {

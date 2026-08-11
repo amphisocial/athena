@@ -141,6 +141,11 @@ function boardSummary(board) {
     shared: Boolean(board.shared),
     isLive: Boolean(board.isLive),
     publicToken: board.publicToken || null,
+    subject: board.subject || null,
+    grade: board.grade || '',
+    topic: board.topic || '',
+    public: Boolean(board.public),
+    rating: board.rating || { sum: 0, count: 0 },
     pageCount: board.pages.length,
     strokeCount: board.pages.reduce((n, p) => n + p.strokes.length, 0)
   };
@@ -164,7 +169,7 @@ function isSafeExpression(text) {
 // REST routes
 // ---------------------------------------------------------------------
 function attachBoardRoutes(app, deps) {
-  const { requireUser, readStore, emailOnRoster, canViewTeachersContent, userHasWhiteboardAccess, userHasLiveAccess, notifyTeamOfShare, APP_BASE_URL, askVisionAI, generateWithProvider, saveGeneratedSet, canCreateSet } = deps;
+  const { requireUser, readStore, emailOnRoster, canViewTeachersContent, userHasWhiteboardAccess, userHasLiveAccess, boardLimitFor, notifyTeamOfShare, APP_BASE_URL, askVisionAI, generateWithProvider, saveGeneratedSet, canCreateSet } = deps;
   // canViewTeachersContent = on the team roster OR invited under the older
   // per-study-set model. Whiteboard access used to be granted purely by the
   // latter, so checking only the roster silently cut off every student who
@@ -195,6 +200,18 @@ function attachBoardRoutes(app, deps) {
     return board.publicToken;
   }
 
+  // Normalize teacher-supplied metadata (subject / grade / topic / public).
+  function sanitizeBoardMeta(body) {
+    const subjectRaw = String(body.subject || '').toLowerCase();
+    const subject = ['math', 'science'].includes(subjectRaw) ? subjectRaw : null;
+    return {
+      subject,
+      grade: String(body.grade || '').trim().slice(0, 40),
+      topic: String(body.topic || '').trim().slice(0, 80),
+      public: Boolean(body.public)
+    };
+  }
+
   function findBoard(store, boardIdParam) {
     return store.boards.find((b) => b.id === boardIdParam);
   }
@@ -214,14 +231,23 @@ function attachBoardRoutes(app, deps) {
     if (!requireWhiteboardPlan(req, res)) return;
     const store = readBoardStore();
     const existing = store.boards.filter((b) => b.teacherId === req.user.id);
-    if (existing.length >= MAX_BOARDS_PER_TEACHER) {
-      return res.status(400).json({ error: `You've reached the ${MAX_BOARDS_PER_TEACHER}-board limit. Delete an old board to make room.` });
+    const limit = (boardLimitFor && boardLimitFor(req.user)) || MAX_BOARDS_PER_TEACHER;
+    if (existing.length >= limit) {
+      const msg = limit === 1
+        ? 'The Free plan includes 1 whiteboard. Delete it, or start a free trial of Pro/Teams for more.'
+        : `You've reached your ${limit}-board limit. Delete an old board to make room.`;
+      return res.status(400).json({ error: msg });
     }
     const title = String(req.body.title || '').trim().slice(0, 80) || `Untitled board ${existing.length + 1}`;
+    const meta = sanitizeBoardMeta(req.body);
     const board = {
       id: boardId(),
       teacherId: req.user.id,
       title,
+      subject: meta.subject,
+      grade: meta.grade,
+      topic: meta.topic,
+      public: meta.public,
       createdAt: nowIso(),
       updatedAt: nowIso(),
       shared: false,
@@ -229,6 +255,7 @@ function attachBoardRoutes(app, deps) {
       strokes: [],
       aiNotes: []
     };
+    if (board.public) ensurePublicToken(board);
     migrateBoardShape(board); // gives it pages[0]
     // Seed starter content from the chosen template (if any).
     seedBoardFromTemplate(board, req.body.template);
@@ -244,6 +271,14 @@ function attachBoardRoutes(app, deps) {
     const board = findBoard(store, req.params.boardId);
     if (!board || board.teacherId !== req.user.id) return res.status(404).json({ error: 'Board not found.' });
     if (req.body.title !== undefined) board.title = String(req.body.title).trim().slice(0, 80) || board.title;
+    if (req.body.subject !== undefined) { const s = String(req.body.subject).toLowerCase(); board.subject = ['math', 'science'].includes(s) ? s : null; }
+    if (req.body.grade !== undefined) board.grade = String(req.body.grade).trim().slice(0, 40);
+    if (req.body.topic !== undefined) board.topic = String(req.body.topic).trim().slice(0, 80);
+    if (req.body.public !== undefined) {
+      board.public = Boolean(req.body.public);
+      // A public board is discoverable, so it also needs a public link.
+      if (board.public) ensurePublicToken(board);
+    }
     board.updatedAt = nowIso();
     writeBoardStore(store);
     res.json({ board: boardSummary(board) });

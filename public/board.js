@@ -2336,6 +2336,9 @@
     updateUndoButtons();
     resizeCanvas();
     if (!NOLOGIN) connect();
+    if (!NOLOGIN && isOwner && new URLSearchParams(location.search).get('share') === '1') {
+      setTimeout(() => { try { openShareDialog(); } catch (_) {} }, 400);
+    }
   }
 
   // ---- Public (no-login) shared board -------------------------------------

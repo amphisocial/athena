@@ -87,6 +87,25 @@
         <label class="board-name-label">Board name
           <input id="newBoardName" placeholder="e.g. Algebra II — Period 3" />
         </label>
+        <div class="board-meta-row">
+          <label>Subject
+            <select id="newBoardSubject">
+              <option value="">—</option>
+              <option value="math">Math</option>
+              <option value="science">Science</option>
+            </select>
+          </label>
+          <label>Grade level
+            <input id="newBoardGrade" placeholder="e.g. Grade 8" />
+          </label>
+        </div>
+        <label class="board-name-label">Topic / lesson
+          <input id="newBoardTopic" placeholder="e.g. Solving quadratics" />
+        </label>
+        <label class="board-public-row">
+          <input type="checkbox" id="newBoardPublic" />
+          <span>List on <strong>Public Lessons</strong> (anyone can find &amp; open it). You can change this anytime. Default is private — shared only by your link/QR.</span>
+        </label>
         <p class="template-help">Pick a starting point. A template drops the equation or prompt on the board with a note telling you what to Analyze — or start blank.</p>
         <div class="template-groups" id="templateGroups"></div>
         <div class="template-actions">

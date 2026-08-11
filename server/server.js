@@ -126,9 +126,10 @@ const stripe = process.env.STRIPE_SECRET_KEY ? Stripe(process.env.STRIPE_SECRET_
 const PLAN_LIMITS = {
   // whiteboard      = can create & share boards (static share links)
   // whiteboardLive  = can go live / take questions / collaborate in real time
-  free:    { label: 'Free',    setsPerDay: 5,  shareSeats: 0,  whiteboard: false, whiteboardLive: false },
-  starter: { label: 'Pro',     setsPerDay: 10, shareSeats: 0,  whiteboard: true,  whiteboardLive: false },
-  team:    { label: 'Teams',   setsPerDay: 20, shareSeats: 30, whiteboard: true,  whiteboardLive: true }
+  // maxBoards       = how many boards the teacher can keep
+  free:    { label: 'Free',    setsPerDay: 5,  shareSeats: 0,  whiteboard: true,  whiteboardLive: false, maxBoards: 1 },
+  starter: { label: 'Pro',     setsPerDay: 10, shareSeats: 0,  whiteboard: true,  whiteboardLive: false, maxBoards: 50 },
+  team:    { label: 'Teams',   setsPerDay: 20, shareSeats: 30, whiteboard: true,  whiteboardLive: true,  maxBoards: 200 }
 };
 
 // Plans a user may self-serve trial without paying. 7 days each, one trial
@@ -1979,6 +1980,7 @@ attachBoardRoutes(app, {
   canViewTeachersContent,
   userHasWhiteboardAccess,
   userHasLiveAccess,
+  boardLimitFor: (user) => membership.effectiveLimits(user).maxBoards || 1,
   notifyTeamOfShare,
   APP_BASE_URL,
   askVisionAI: ({ instructions, imageDataUrl }) => askVisionAI({ instructions, imageDataUrl }),
