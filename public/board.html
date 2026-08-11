@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <link rel="icon" type="image/png" href="/favicon.png" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+  <title>Boardsy — the board</title>
+  <meta name="robots" content="noindex" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/styles.css?v=1" />
+  <link rel="stylesheet" href="/board.css?v=1" />
+  <link rel="stylesheet" href="/viz3d.css?v=1" />
+</head>
+<body class="board-page">
+  <!-- ===================== TOP BAR ===================== -->
+  <header class="bt-bar">
+    <a class="brand" href="/" aria-label="Boardsy home">
+      <img src="/img/boardsy-logo.svg" alt="" />
+      <span>Board<span class="tm">sy</span></span>
+    </a>
+    <div class="bt-title" id="btTitle">Choose a board</div>
+    <span class="bt-badge" id="btBadge">Sandbox · not saved</span>
+    <span class="bt-spacer"></span>
+    <button class="btn ghost small" id="btPlans">Sign in / Plans</button>
+    <a class="btn primary small" href="/" id="btExit">Exit</a>
+  </header>
+
+  <div class="bt-shell">
+    <!-- ===================== LEFT RAIL ===================== -->
+    <aside class="bt-rail" id="btRail">
+      <section class="rail-sec">
+        <h4>Boards</h4>
+        <div class="subj-tabs" id="subjTabs">
+          <button class="subj-tab active" data-subj="Math">Math</button>
+          <button class="subj-tab" data-subj="Science">Science</button>
+        </div>
+        <div class="tpl-list" id="tplList"></div>
+      </section>
+
+      <section class="rail-sec" id="toolsSec">
+        <h4>Annotate</h4>
+        <button class="mode-toggle" id="drawToggle" aria-pressed="false">
+          <span class="dot"></span><span id="drawToggleLabel">Draw mode: off</span>
+        </button>
+        <p class="rail-hint" id="modeHint">Pointer controls the simulation. Turn on Draw to write over the board.</p>
+        <div class="tool-row" id="penTools" hidden>
+          <button class="tool-btn active" data-tool="pen" title="Pen">✏️</button>
+          <button class="tool-btn" data-tool="eraser" title="Eraser">🧽</button>
+          <button class="tool-btn" id="undoBtn" title="Undo">↶</button>
+          <button class="tool-btn" id="clearBtn" title="Clear annotations">🗑</button>
+        </div>
+        <div class="swatches" id="swatches" hidden></div>
+      </section>
+    </aside>
+
+    <!-- ===================== STAGE ===================== -->
+    <main class="bt-stage">
+      <!-- Picker (shown until a template is chosen) -->
+      <div class="bt-picker" id="picker">
+        <div class="picker-inner">
+          <h1>Enter Boardsy</h1>
+          <p>Pick a subject, then a board. It opens live — play with everything, no login needed.</p>
+          <div class="picker-subj" id="pickerSubj">
+            <button class="psubj active" data-subj="Math">∫ Math</button>
+            <button class="psubj" data-subj="Science">⚛ Science</button>
+          </div>
+          <div class="picker-grid" id="pickerGrid"></div>
+        </div>
+      </div>
+
+      <!-- Live board (shown once a template is chosen) -->
+      <div class="bt-board" id="board" hidden>
+        <div class="board-instruction" id="boardInstruction"></div>
+        <div class="board-canvas-wrap" id="canvasWrap">
+          <div class="sim-mount" id="simMount"></div>
+          <canvas class="annot-canvas" id="annotCanvas"></canvas>
+        </div>
+        <div class="board-foot">
+          <span class="std mono" id="boardStd"></span>
+          <span class="foot-spacer"></span>
+          <span class="foot-note">Draw over it, run it, break it. This is your sandbox.</span>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- ===================== PLANS MODAL ===================== -->
+  <div class="modal-back" id="plansModal">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="plansTitle">
+      <button class="modal-close" data-close aria-label="Close">×</button>
+      <h2 id="plansTitle">Sign in to save &amp; go live</h2>
+      <p class="sub">Everything on the board is free to play with. Sign in to keep your boards, build lessons &amp; quizzes, and bring your students in live.</p>
+
+      <div class="plans-grid">
+        <div class="plan">
+          <h3>Pro</h3>
+          <p class="price">$3.99<span>/mo</span></p>
+          <ul>
+            <li>Save unlimited boards</li>
+            <li>Lessons, flashcards &amp; quizzes</li>
+            <li>Export to PDF</li>
+          </ul>
+          <a class="btn primary" href="#" data-app="signup?plan=pro&trial=1">Start 7-day free trial</a>
+        </div>
+        <div class="plan featured">
+          <span class="plan-flag">For classrooms</span>
+          <h3>Teams</h3>
+          <p class="price">$9.99<span>/mo</span></p>
+          <ul>
+            <li>Everything in Pro</li>
+            <li>Go live — students on their own screens</li>
+            <li>Share boards with up to 30 students</li>
+          </ul>
+          <a class="btn primary" href="#" data-app="signup?plan=team&trial=1">Start 7-day free trial</a>
+        </div>
+      </div>
+
+      <div class="founding-cta">
+        <div>
+          <b>Are you one of our Founding 30?</b>
+          <span>Verified Math &amp; Science teachers get free Teams for the semester.</span>
+        </div>
+        <a class="btn soft" href="/#founding">Contact us — Founding 30</a>
+      </div>
+      <p class="signin-line">Already have an account? <a href="#" data-app="login">Sign in</a></p>
+    </div>
+  </div>
+
+  <script src="/config.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="/viz3d.js?v=1"></script>
+  <script src="/graphdemo.js?v=1"></script>
+  <script src="/board.js?v=1"></script>
+</body>
+</html>

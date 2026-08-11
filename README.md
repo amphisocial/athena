@@ -1,121 +1,73 @@
-# AthenaBot website + contact form
+# Boardsy — the board that thinks with you
 
-This is the production-ready AthenaBot root site for `https://athenabot.ai`.
+The public site and no-login sandbox board for **athenabot.ai**.
 
-The site positions AthenaBot as an AI application development and agentic workflow studio, with links to the current product portfolio:
+Boardsy is the AI whiteboard for **middle & high school Math and Science**. You
+write on the board and live information appears; you drop a stone in real
+gravity, bend a parabola with a slider, rotate a molecule — 3D simulations
+students can play with. Lessons, flashcards and quizzes are built in.
 
-- SmartJobs: `https://smartjobs.athenabot.ai`
-- AI Flashcards: `https://flashcards.athenabot.ai`
-- Lite‑PLM: `https://plm.athenabot.ai`
-- White-label Voice Agent: `https://voice.athenabot.ai`
+This repo replaces the old "AI studio" homepage. It is a single, self-contained
+Node/Express app: a marketing homepage plus a **fully playable sandbox board**
+that needs **no login and no database**. Signing in to save, build lessons, or
+go live routes to the full product.
 
-It includes a real Contact Us form that posts to `POST /api/contact` and sends email to `anu@threadwire.ai` through SMTP.
+## What's here
 
-## Files
-
-```text
-package.json
-server.js
-.env.example
-public/index.html
-deploy/ecosystem.config.js
-deploy/nginx-athenabot.conf
-deploy/DEPLOY-EC2.md
-.gitignore
+```
+server.js                     Express: static host + Founding-30 / contact (SMTP optional)
+public/
+  index.html                  Homepage (hero → Founding 30 → Six lessons → Live classroom → rest)
+  home.js                     Hero stage cycler (gravity ⇄ parabola), ticker, 3D demos, Founding-30 form
+  board.html / board.js       "Enter Boardsy" sandbox: subject → template → live board, draw-over layer, Plans
+  styles.css                  White + blue "graph-paper board" theme
+  board.css                   Sandbox layout
+  viz3d.js / viz3d.css        3D + physics engine (reused, unchanged): molecules, solids, free-fall, incline…
+  graphdemo.js                Interactive 2D graph engine (reused, unchanged): parabola, line, sine
+  img/boardsy-logo.svg
+deploy/                       PM2 + Nginx for athenabot.ai (see deploy/DEPLOY-EC2.md)
 ```
 
-## Local setup
+## Brand & scope changes
+
+- **AthenaBoard → Boardsy** — "The board that thinks with you." No more "AthenaBoard".
+- **Math & Science only** — Geography and History removed everywhere.
+- **One click into the board** — the primary CTA is **Enter Boardsy** (`/board`),
+  which opens a subject → template picker and drops you straight onto a live,
+  fully playable whiteboard. No login needed to play; you just can't save or
+  bring students in.
+- **New hero** — Boardsy is more than a smart board. The headline rotates through
+  the product's real capabilities, and the hero visual **auto-cycles between a
+  real gravity (stone-drop) simulation and an interactive parabola graph**, with
+  a Pause button so a visitor can stop on either and play with it.
+- **Plans on the board** — a Sign in / Plans panel shows **Pro vs Teams**, a
+  **7-day free trial**, and **Contact us — Founding 30**.
+
+## Run locally
 
 ```bash
 npm install
-cp .env.example .env
-nano .env
-npm start
+cp .env.example .env      # optional — the site runs without it
+npm start                 # http://localhost:3000
 ```
 
-Open:
+Health check: `curl -s localhost:3000/api/health` → `{"ok":true,"service":"boardsy"}`
 
-```text
-http://localhost:3000
-```
+The app boots and serves **with or without SMTP**. Without SMTP, Founding-30 and
+contact submissions are logged to the server console instead of emailed — set the
+`SMTP_*` values in `.env` to turn on email.
 
-Health check:
+## Configuration (`.env`)
 
-```bash
-curl -s http://localhost:3000/api/health
-# {"ok":true,"service":"athenabot"}
-```
+| Var | Purpose |
+|---|---|
+| `PORT` | Node port (default 3000). Nginx proxies to it. |
+| `SITE_ORIGIN` | Comma-separated allowed CORS origins. |
+| `APP_BASE_URL` | Where the full logged-in product lives. The board's "Start trial / Sign in" links deep-link here. Leave blank in dev and those CTAs fall back to the Founding-30 contact. |
+| `SMTP_*`, `CONTACT_TO_EMAIL`, `CONTACT_FROM_EMAIL` | Optional email delivery for form submissions. |
 
-## Environment variables
+## Deploy
 
-Set these in `.env` on the server. Do not commit `.env`.
-
-```bash
-SMTP_HOST=smtp.yourprovider.com
-SMTP_PORT=587
-SMTP_SECURE=false
-SMTP_USER=your-smtp-username
-SMTP_PASS=your-smtp-password
-CONTACT_TO_EMAIL=anu@threadwire.ai
-CONTACT_FROM_EMAIL=your-smtp-username
-SITE_ORIGIN=https://athenabot.ai,https://www.athenabot.ai
-PORT=3000
-```
-
-### SMTP notes
-
-For Google Workspace, use:
-
-```bash
-SMTP_HOST=smtp.gmail.com
-SMTP_PORT=587
-SMTP_SECURE=false
-SMTP_USER=your-google-workspace-email
-SMTP_PASS=your-google-app-password
-```
-
-Use an App Password, not the normal Google login password.
-
-For SendGrid:
-
-```bash
-SMTP_HOST=smtp.sendgrid.net
-SMTP_PORT=587
-SMTP_SECURE=false
-SMTP_USER=apikey
-SMTP_PASS=your-sendgrid-api-key
-```
-
-## Deployment
-
-See `deploy/DEPLOY-EC2.md` for the full EC2 + PM2 + Nginx + Certbot instructions.
-
-## Contact endpoint behavior
-
-`POST /api/contact` accepts:
-
-```json
-{
-  "name": "Jane Doe",
-  "email": "jane@company.com",
-  "company": "Company Inc.",
-  "project_type": "Custom AI application",
-  "timeline": "Next 30 days",
-  "budget": "$30k – $75k",
-  "message": "We want an AI workflow agent that..."
-}
-```
-
-The endpoint includes:
-
-- required field validation
-- email format validation
-- 5,000-character message limit
-- honeypot spam field
-- rate limit: 8 requests per 15 minutes per IP
-- HTML escaping before email rendering
-- SMTP verification at boot
-
-## GitHub update note
-
-If replacing an existing repo, copy these files into the repo root and deploy from there.
+Pull to `/opt/apps/athena` and run under the existing **`athenabot`** PM2 instance
+— nothing about the process name or path changes. Full steps in
+[`deploy/DEPLOY-EC2.md`](deploy/DEPLOY-EC2.md).

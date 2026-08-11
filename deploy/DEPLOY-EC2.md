@@ -1,175 +1,108 @@
-# Deploy AthenaBot on EC2 with PM2, Nginx, and SSL
+# Deploy Boardsy to EC2 (athenabot.ai)
 
-These instructions assume you already have an EC2 instance serving the AthenaBot subdomain apps and that Node.js, Nginx, and Certbot are available or can be installed.
+Boardsy takes over the **root domain** and runs from the same place the old
+homepage did: path `/opt/apps/athena`, PM2 instance name **`athenabot`**. The
+old flashcards subdomain app is untouched.
 
-The root domain `athenabot.ai` will run as one more Node app behind Nginx.
+## 0. One-time: push this repo to GitHub
 
-## 1. SSH into the server
-
-```bash
-ssh -i your-key.pem ubuntu@YOUR_EC2_IP
-```
-
-## 2. Clone or update the repo
-
-Recommended folder:
+Locally, from this folder:
 
 ```bash
-mkdir -p /home/ubuntu/apps
-cd /home/ubuntu/apps
+git init            # if not already a repo
+git add .
+git commit -m "Boardsy — athenabot.ai homepage + sandbox board"
+git branch -M main
+git remote add origin git@github.com:amphisocial/athena.git   # keep the same repo
+git push -u origin main
 ```
 
-Fresh clone:
+## 1. Pull onto EC2
 
 ```bash
-git clone https://github.com/amphisocial/athena.git athenabot
-cd athenabot
+cd /opt/apps/athena
+git fetch origin
+git reset --hard origin/main      # replace the old homepage with Boardsy
+npm ci --omit=dev                 # or: npm install --omit=dev
 ```
 
-Existing clone:
+If `/opt/apps/athena` is not yet a clone of this repo:
 
 ```bash
-cd /home/ubuntu/apps/athenabot
-git pull origin main
+sudo mv /opt/apps/athena /opt/apps/athena.bak.$(date +%s)   # keep a backup
+sudo git clone git@github.com:amphisocial/athena.git /opt/apps/athena
+sudo chown -R ubuntu:ubuntu /opt/apps/athena
+cd /opt/apps/athena && npm ci --omit=dev
 ```
 
-## 3. Install dependencies
-
-```bash
-npm ci --omit=dev
-```
-
-If `npm ci` complains because there is no `package-lock.json`, use:
-
-```bash
-npm install --omit=dev
-```
-
-## 4. Create `.env` on the server
+## 2. Environment
 
 ```bash
 cp .env.example .env
 nano .env
-chmod 600 .env
 ```
 
-Use real SMTP values. Example using Google Workspace:
+Recommended production values:
 
 ```bash
-SMTP_HOST=smtp.gmail.com
+PORT=3000
+SITE_ORIGIN=https://athenabot.ai,https://www.athenabot.ai
+# Point Plans "Start trial / Sign in" at the full logged-in product.
+# If it stays on the subdomain for now:
+APP_BASE_URL=https://flashcards.athenabot.ai
+# ...or once the full app is consolidated onto the root:
+# APP_BASE_URL=https://athenabot.ai
+# SMTP is optional; set it to email Founding-30 applications.
+SMTP_HOST=smtp.sendgrid.net
 SMTP_PORT=587
 SMTP_SECURE=false
-SMTP_USER=your-google-workspace-email
-SMTP_PASS=your-google-app-password
+SMTP_USER=apikey
+SMTP_PASS=your-sendgrid-key
 CONTACT_TO_EMAIL=anu@threadwire.ai
-CONTACT_FROM_EMAIL=your-google-workspace-email
-SITE_ORIGIN=https://athenabot.ai,https://www.athenabot.ai
-PORT=3000
+CONTACT_FROM_EMAIL=hello@athenabot.ai
 ```
 
-Important: use a Google App Password or a transactional provider key. Do not use a normal mailbox password.
-
-## 5. Start with PM2
-
-Install PM2 if needed:
+## 3. PM2 — same instance name (`athenabot`)
 
 ```bash
-sudo npm install -g pm2
-```
-
-Start the app:
-
-```bash
-pm2 start deploy/ecosystem.config.js
+cd /opt/apps/athena
+pm2 restart athenabot || pm2 start deploy/ecosystem.config.js
 pm2 save
-pm2 startup
+pm2 logs athenabot --lines 30      # expect: "Boardsy listening on port 3000"
 ```
 
-`pm2 startup` prints a command. Run the command it prints so the app restarts after server reboot.
+## 4. Nginx — point the root domain at it
 
-Useful checks:
-
-```bash
-pm2 status
-pm2 logs athenabot
-curl -s http://127.0.0.1:3000/api/health
-```
-
-Expected health output:
-
-```json
-{"ok":true,"service":"athenabot"}
-```
-
-## 6. Configure Nginx
-
-Copy the Nginx config:
+The old homepage's Nginx server block already sends `athenabot.ai` to
+`127.0.0.1:3000`, so if you kept `PORT=3000` there's nothing to change. If you
+need to (re)install it:
 
 ```bash
 sudo cp deploy/nginx-athenabot.conf /etc/nginx/sites-available/athenabot.ai
 sudo ln -sf /etc/nginx/sites-available/athenabot.ai /etc/nginx/sites-enabled/athenabot.ai
-sudo nginx -t
-sudo systemctl reload nginx
+sudo nginx -t && sudo systemctl reload nginx
+sudo certbot --nginx -d athenabot.ai -d www.athenabot.ai   # if not already on HTTPS
 ```
 
-If your `.env` uses a port other than `3000`, edit this line in `/etc/nginx/sites-available/athenabot.ai`:
-
-```nginx
-proxy_pass http://127.0.0.1:3000;
-```
-
-Then reload Nginx:
+## 5. Verify
 
 ```bash
-sudo nginx -t
-sudo systemctl reload nginx
+curl -s https://athenabot.ai/api/health      # {"ok":true,"service":"boardsy"}
 ```
 
-## 7. DNS
+Then open:
+- `https://athenabot.ai/` — the homepage; the hero should cycle gravity ⇄ parabola.
+- `https://athenabot.ai/board` — the picker; choose Math/Science → a template → live board.
+- `https://athenabot.ai/board?subject=science&template=newton` — jumps straight to free fall.
 
-Make sure both records point to the EC2 public IP:
-
-```text
-athenabot.ai      A      YOUR_EC2_IP
-www.athenabot.ai  A      YOUR_EC2_IP
-```
-
-If DNS is already pointed there because the subdomains are working, this may already be done.
-
-## 8. Enable SSL
+## Routine updates
 
 ```bash
-sudo certbot --nginx -d athenabot.ai -d www.athenabot.ai
+cd /opt/apps/athena && git pull && npm ci --omit=dev && pm2 restart athenabot
 ```
 
-Certbot will add the HTTPS server block and HTTP-to-HTTPS redirect.
-
-## 9. Final verification
+## Rollback
 
 ```bash
-curl -s https://athenabot.ai/api/health
+cd /opt/apps/athena && git reset --hard <previous-commit> && npm ci --omit=dev && pm2 restart athenabot
 ```
-
-Expected:
-
-```json
-{"ok":true,"service":"athenabot"}
-```
-
-Then open `https://athenabot.ai`, submit the Contact Us form once, and confirm the email arrives at `anu@threadwire.ai`.
-
-If it fails:
-
-```bash
-pm2 logs athenabot
-sudo tail -n 100 /var/log/nginx/error.log
-```
-
-Common causes:
-
-- wrong SMTP password or missing app password
-- `CONTACT_FROM_EMAIL` not verified with the SMTP provider
-- Nginx proxy port does not match `.env` `PORT`
-- EC2 security group missing inbound 80/443
-
-Only ports 80 and 443 should be open to the internet. The Node port, such as 3000, should stay private behind Nginx.
