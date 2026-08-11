@@ -145,8 +145,13 @@ app.post('/api/contact', limiter, async (req, res) => {
 app.get('/api/health', (req, res) => res.json({ ok: true, service: 'boardsy' }));
 
 // The board is a client-only sandbox; serve it for /board and any /board/* path.
-app.get(['/board', '/board/*'], (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'board.html'));
+// Written as middleware so it works on both Express 4 and Express 5, whose
+// wildcard route syntax differs (Express 5 rejects bare "*").
+app.use((req, res, next) => {
+  if (req.method === 'GET' && (req.path === '/board' || req.path.startsWith('/board/'))) {
+    return res.sendFile(path.join(__dirname, 'public', 'board.html'));
+  }
+  next();
 });
 
 // SEO plumbing.
@@ -166,7 +171,11 @@ app.get('/sitemap.xml', (req, res) => {
   );
 });
 
-// Everything else falls back to the homepage.
-app.get('*', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
+// Everything else falls back to the homepage. A path-less app.use() is the
+// catch-all in both Express 4 and Express 5 (Express 5 rejects app.get('*')).
+app.use((req, res) => {
+  if (req.method === 'GET') return res.sendFile(path.join(__dirname, 'public', 'index.html'));
+  res.status(404).json({ ok: false, error: 'Not found' });
+});
 
 app.listen(PORT, () => console.log(`Boardsy listening on port ${PORT}`));
