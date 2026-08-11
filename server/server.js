@@ -1257,7 +1257,7 @@ app.get('/auth/google/callback', async (req, res) => {
   }
 });
 
-function buildStudySetObject(user, { title, cards, category, subject, grade, format, sourceType, extra }) {
+function buildStudySetObject(user, { title, cards, category, subject, grade, topic, isPublic, format, sourceType, extra }) {
   return {
     id: id('set'),
     ownerId: user.id,
@@ -1267,6 +1267,9 @@ function buildStudySetObject(user, { title, cards, category, subject, grade, for
     category: String(category || '').trim(),
     subject: String(subject || '').trim(),
     grade: String(grade || '').trim(),
+    topic: String(topic || '').trim(),
+    public: Boolean(isPublic),
+    rating: { sum: 0, count: 0 },
     format,
     invitedEmails: [],
     shared: false,
@@ -1744,6 +1747,52 @@ app.get(['/api/sets/:id', '/api/quizlets/:id'], requireUser, getSet);
 app.delete(['/api/sets/:id', '/api/quizlets/:id'], requireUser, deleteSet);
 app.post(['/api/sets/:id/share-toggle', '/api/quizlets/:id/share-toggle'], requireUser, shareToggleSet);
 app.post(['/api/sets/:id/share', '/api/quizlets/:id/share'], requireUser, shareSet);
+
+// Edit a study set's metadata (subject / grade / topic) and public flag.
+app.post(['/api/sets/:id/meta', '/api/quizlets/:id/meta'], requireUser, (req, res) => {
+  const store = readStore();
+  const set = store.quizlets.find((s) => s.id === req.params.id);
+  if (!set || set.ownerId !== req.user.id) return res.status(404).json({ error: 'Study set not found.' });
+  if (req.body.subject !== undefined) { const s = String(req.body.subject).toLowerCase(); set.subject = ['math', 'science'].includes(s) ? s : ''; }
+  if (req.body.grade !== undefined) set.grade = String(req.body.grade).trim().slice(0, 40);
+  if (req.body.topic !== undefined) set.topic = String(req.body.topic).trim().slice(0, 80);
+  if (req.body.public !== undefined) set.public = Boolean(req.body.public);
+  set.updatedAt = nowIso();
+  writeStore(store);
+  res.json({ set });
+});
+
+// Unified Library: the teacher's boards + study sets in one list, each tagged
+// with a type so the client can render and filter them together.
+app.get('/api/library', requireUser, (req, res) => {
+  const store = readStore();
+  let boards = [];
+  try { boards = (require('./board').readBoardStore().boards || []); } catch (_) { boards = []; }
+  const boardItems = boards
+    .filter((b) => b.teacherId === req.user.id)
+    .map((b) => ({
+      type: 'whiteboard', id: b.id, title: b.title,
+      subject: b.subject || '', grade: b.grade || '', topic: b.topic || '',
+      public: Boolean(b.public), shared: Boolean(b.shared),
+      rating: b.rating || { sum: 0, count: 0 },
+      createdAt: b.createdAt, updatedAt: b.updatedAt || b.createdAt,
+      openUrl: `/board/${b.id}`
+    }));
+  const setItems = store.quizlets
+    .filter((s) => s.ownerId === req.user.id)
+    .map((s) => ({
+      type: 'lesson', id: s.id, title: s.title,
+      subject: s.subject || s.category || '', grade: s.grade || '', topic: s.topic || '',
+      public: Boolean(s.public), shared: Boolean(s.shared),
+      rating: s.rating || { sum: 0, count: 0 },
+      format: s.format, cardCount: (s.cards || []).length,
+      createdAt: s.createdAt, updatedAt: s.updatedAt || s.createdAt,
+      openUrl: `/app?set=${s.id}`
+    }));
+  const items = [...boardItems, ...setItems]
+    .sort((a, b) => String(b.updatedAt).localeCompare(String(a.updatedAt)));
+  res.json({ items });
+});
 
 
 app.post('/api/billing/checkout', requireUser, async (req, res) => {

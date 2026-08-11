@@ -765,3 +765,24 @@ body.no-scroll { overflow: hidden; }
 }
 .board-public-row { display: flex; align-items: flex-start; gap: 10px; margin: 12px 0; font-size: 0.85rem; color: var(--muted, #9fb2d0); }
 .board-public-row input { margin-top: 3px; }
+
+/* ===== Unified Library ===== */
+.library-filters {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 4px 0 18px;
+}
+.library-filters input[type="search"], .library-filters select {
+  font: inherit; padding: 8px 11px; border-radius: 9px;
+  border: 1px solid rgba(255,255,255,0.14); background: rgba(255,255,255,0.05); color: inherit;
+}
+.library-filters input[type="search"] { min-width: 200px; flex: 1; }
+.type-badge {
+  display: inline-block; font-size: 0.66rem; font-weight: 800; letter-spacing: 0.03em;
+  text-transform: uppercase; padding: 2px 8px; border-radius: 6px; margin-right: 6px; vertical-align: middle;
+}
+.type-badge.board { background: rgba(37,99,255,0.2); color: #7aa2ff; }
+.type-badge.lesson { background: rgba(147,112,255,0.2); color: #b39bff; }
+.rating { color: #ffcf6b; font-size: 0.82rem; }
+.rating small { color: #9fb2d0; }
+.rating.none { color: #6b7a94; font-style: italic; }
+.lib-list .lib-item { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.lib-list .lib-main { display: flex; flex-direction: column; gap: 4px; min-width: 0; flex: 1; }

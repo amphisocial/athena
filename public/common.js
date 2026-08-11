@@ -157,8 +157,8 @@ window.AppCommon = (() => {
 
     // Which item is active is derived from the current page.
     const activeFor = {
-      'board-list': 'whiteboard', board: 'whiteboard',
-      app: 'workbench', notes: 'workbench', library: 'workbench',
+      'board-list': 'library', board: 'library', library: 'library',
+      app: 'library', notes: 'library',
       team: 'team', pricing: 'pricing'
     }[page];
 
@@ -166,8 +166,7 @@ window.AppCommon = (() => {
       show ? `<a href="${href}"${activeFor === key ? ' class="active"' : ''} data-nav="${key}">${label}</a>` : '';
 
     nav.innerHTML = [
-      item('whiteboard', '/boards', 'Whiteboard'),
-      item('workbench', '/library', 'AI Workbench'),
+      item('library', '/library', 'Library'),
       item('team', '/team', 'Team', showTeam),
       item('pricing', '/pricing', 'Pricing')
     ].filter(Boolean).join('\n');

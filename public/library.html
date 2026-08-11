@@ -3,14 +3,14 @@
 <head>
   <meta charset="utf-8" />
   <link rel="icon" type="image/png" href="/favicon.png" />
-  <link rel="apple-touch-icon" href="/img/boardsy-logo.png?v=boardsy2" />
+  <link rel="apple-touch-icon" href="/img/boardsy-logo.png?v=boardsy3" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>AI Workbench | Boardsy</title>
   <meta name="robots" content="noindex" />
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/styles.css?v=boardsy2" />
+  <link rel="stylesheet" href="/styles.css?v=boardsy3" />
 </head>
 <body data-page="library">
   <div class="shell">
@@ -34,43 +34,51 @@
       <section class="panel library-panel">
         <div class="panel-header">
           <div>
-            <span class="section-kicker">AI Workbench</span>
-            <h2>Your study material</h2>
+            <span class="section-kicker">Library</span>
+            <h2>Your boards &amp; lessons</h2>
           </div>
           <div class="boards-controls">
-            <div class="seg-toggle" id="workbenchToggle" role="tablist" aria-label="Which material">
-              <button class="seg-btn active" data-scope="mine" role="tab">Yours</button>
-              <button class="seg-btn" data-scope="shared" role="tab">Shared with you</button>
-            </div>
-            <a class="btn primary" href="/app">+ New study set</a>
-            <a class="btn soft" href="/notes">+ New notes</a>
+            <a class="btn primary" href="/boards?new=1">+ New whiteboard</a>
+            <a class="btn soft" href="/app">+ New lesson</a>
           </div>
         </div>
-        <p class="boards-hint" id="workbenchHint" style="color:var(--muted); margin-bottom:16px;">
-          Everything you've created — flashcards, quizzes, slide sets and notes. Start something new with the buttons above, or open a set to study it.
-        </p>
+        <p class="boards-hint">Everything you've made — whiteboards and lessons — newest first. Filter by type, subject, grade or topic.</p>
 
-        <!-- Yours: sets you created -->
-        <div id="mineScope">
-          <div class="set-list" id="mySets"></div>
-        </div>
-
-        <!-- Shared: sets + whiteboards shared with you -->
-        <div id="sharedScope" style="display:none;">
-          <h3>Study sets shared with you</h3>
-          <div class="set-list" id="sharedSets"></div>
-          <div id="sharedBoardsWrap" style="display:none; margin-top:26px;">
-            <h3>Whiteboards shared with you</h3>
-            <div class="set-list" id="sharedBoards"></div>
+        <div class="library-filters">
+          <div class="seg-toggle" id="scopeToggle" role="tablist" aria-label="Which items">
+            <button class="seg-btn active" data-scope="mine" role="tab">Yours</button>
+            <button class="seg-btn" data-scope="shared" role="tab">Shared with you</button>
+            <button class="seg-btn" data-scope="bookmarked" role="tab">Bookmarked</button>
           </div>
+          <input type="search" id="filterSearch" placeholder="Search topic or title…" />
+          <select id="filterType">
+            <option value="">All types</option>
+            <option value="whiteboard">Whiteboards</option>
+            <option value="lesson">Lessons</option>
+          </select>
+          <select id="filterSubject">
+            <option value="">All subjects</option>
+            <option value="math">Math</option>
+            <option value="science">Science</option>
+          </select>
+          <select id="filterGrade">
+            <option value="">All grades</option>
+            <option value="4">Grade 4</option><option value="5">Grade 5</option>
+            <option value="6">Grade 6</option><option value="7">Grade 7</option>
+            <option value="8">Grade 8</option><option value="9">Grade 9</option>
+            <option value="10">Grade 10</option><option value="11">Grade 11</option>
+            <option value="12">Grade 12</option>
+          </select>
         </div>
+
+        <div class="set-list lib-list" id="libraryList"></div>
       </section>
     </main>
   </div>
 
   <div class="toast" id="toast"></div>
 
-  <script src="/common.js?v=boardsy2"></script>
-  <script src="/library.js?v=boardsy2"></script>
+  <script src="/common.js?v=boardsy3"></script>
+  <script src="/library.js?v=boardsy3"></script>
 </body>
 </html>

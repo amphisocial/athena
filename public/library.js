@@ -1,125 +1,150 @@
-/* Your Library page: lists sets you created and sets shared with you. */
+/* library.js — the unified Library: the teacher's whiteboards and lessons in
+ * one list, newest first, with type/subject/grade/topic filters and a
+ * Yours / Shared / Bookmarked scope. */
 (() => {
-  const { state, $, escapeHtml, setStatus, api, initCommon } = window.AppCommon;
+  const { $, $$, escapeHtml, setStatus, api, initCommon, state } = window.AppCommon;
 
-  const emptyText = (text) => `<p class="set-meta">${escapeHtml(text)}</p>`;
+  let allItems = [];          // current scope's items (unified shape)
+  let scope = 'mine';
 
-  const formatLabel = (set) => {
-    if (set.format === 'slides') return 'slides';
-    if (set.format === 'quiz') return 'quiz';
-    if (set.format === 'flashcard') return 'flashcards';
-    return 'mixed';
+  const fmtDate = (iso) => { try { return new Date(iso).toLocaleDateString(); } catch (_) { return ''; } };
+  const gradeLabel = (g) => g ? `Grade ${g}` : '';
+  const subjBadge = (s) => s === 'math' ? '<span class="subj-badge math">Math</span>'
+    : s === 'science' ? '<span class="subj-badge science">Science</span>' : '';
+  const typeBadge = (t) => t === 'whiteboard'
+    ? '<span class="type-badge board">Whiteboard</span>'
+    : '<span class="type-badge lesson">Lesson</span>';
+  const stars = (r) => {
+    if (!r || !r.count) return '<span class="rating none">No ratings</span>';
+    const avg = r.sum / r.count;
+    return `<span class="rating" title="${avg.toFixed(1)} from ${r.count}">${'★'.repeat(Math.round(avg))}${'☆'.repeat(5 - Math.round(avg))} <small>(${r.count})</small></span>`;
   };
 
-  // Students reach shared whiteboards from here, not the Whiteboard tab —
-  // this is where they look for "what did my teacher share with me".
-  async function loadSharedBoards() {
+  async function loadScope() {
+    const list = $('#libraryList');
+    list.innerHTML = '<p class="set-meta">Loading…</p>';
     try {
-      const data = await api('/api/board/shared/mine');
-      const boards = data.boards || [];
-      const wrap = $('#sharedBoardsWrap');
-      if (!boards.length) { wrap.style.display = 'none'; return; }
-      wrap.style.display = 'block';
-      $('#sharedBoards').innerHTML = boards.map((b) => `
-        <div class="set-item">
-          <span class="set-title">${escapeHtml(b.title)} ${b.isLive ? '<span style="color:#14d9c4; font-size:0.75rem; font-weight:700;">● LIVE</span>' : ''}</span>
-          <span class="set-meta">${escapeHtml(b.teacherName)}'s whiteboard${b.isLive ? '' : ' • snapshot available'}</span>
-          <div class="set-actions">
-            ${b.isLive
-              ? `<a class="btn primary" href="/board/${b.boardId}">Join</a>`
-              : `<a class="btn soft" href="/board/${b.boardId}" title="View the last snapshot your teacher shared">View snapshot</a>`}
-          </div>
-        </div>
-      `).join('');
-    } catch (error) {
-      // A student with no shared boards shouldn't see an error for it.
-      $('#sharedBoardsWrap').style.display = 'none';
-    }
-  }
-
-  async function loadLibrary() {
-    try {
-      const data = await api('/api/sets');
-      renderSetList('#mySets', data.my || [], true);
-      renderSetList('#sharedSets', data.shared || [], false);
-    } catch (error) {
-      setStatus(error.message, 'error');
-    }
-  }
-
-  function renderSetList(target, sets, owned) {
-    const node = $(target);
-    if (!sets.length) {
-      node.innerHTML = emptyText(owned ? 'Nothing yet. Use “New study set” or “New notes” above to create your first.' : 'No shared sets yet.');
+      if (scope === 'mine') {
+        const data = await api('/api/library');
+        allItems = data.items || [];
+      } else if (scope === 'shared') {
+        allItems = await loadShared();
+      } else {
+        // Bookmarked — populated once the public Lessons directory ships.
+        allItems = [];
+      }
+    } catch (e) {
+      list.innerHTML = `<p class="set-meta">${escapeHtml(e.message)}</p>`;
       return;
     }
-    node.innerHTML = sets.map((set) => `
-      <div class="set-item" data-id="${set.id}">
-        <span class="set-title">${escapeHtml(set.title)}</span>
-        <span class="set-meta">${set.cards.length} ${set.format === 'slides' ? 'slides' : 'cards'} • ${formatLabel(set)} • ${escapeHtml(set.subject || set.category || 'General')} • ${new Date(set.createdAt).toLocaleDateString()}</span>
-        <div class="set-actions">
-          <button class="btn primary study-mini" data-id="${set.id}">Study</button>
-          ${owned ? `<button class="btn soft share-toggle-mini" data-id="${set.id}" data-shared="${Boolean(set.shared)}">${set.shared ? 'Shared ✓' : 'Share'}</button><button class="btn ghost delete-mini" data-id="${set.id}">Delete</button>` : ''}
-        </div>
-      </div>
-    `).join('');
-    node.querySelectorAll('.set-item').forEach((item) => {
-      item.addEventListener('click', (event) => {
-        if (event.target.closest('button')) return;
-        window.location.href = `/app?set=${item.dataset.id}`;
-      });
+    applyFilters();
+  }
+
+  async function loadShared() {
+    const items = [];
+    try {
+      const sets = await api('/api/sets');
+      (sets.shared || []).forEach((s) => items.push({
+        type: 'lesson', id: s.id, title: s.title, subject: s.subject || s.category || '',
+        grade: s.grade || '', topic: s.topic || '', public: Boolean(s.public), shared: true,
+        rating: s.rating || { sum: 0, count: 0 }, format: s.format, cardCount: (s.cards || []).length,
+        createdAt: s.createdAt, updatedAt: s.updatedAt || s.createdAt, openUrl: `/app?set=${s.id}`, readOnly: true,
+        owner: s.ownerEmail || ''
+      }));
+    } catch (_) {}
+    try {
+      const boards = await api('/api/board/shared/mine');
+      (boards.boards || boards || []).forEach((b) => items.push({
+        type: 'whiteboard', id: b.boardId || b.id, title: b.title, subject: b.subject || '',
+        grade: b.grade || '', topic: b.topic || '', public: Boolean(b.public), shared: true,
+        rating: b.rating || { sum: 0, count: 0 }, createdAt: b.createdAt, updatedAt: b.updatedAt || b.createdAt,
+        openUrl: `/board/${b.boardId || b.id}`, readOnly: true, owner: b.teacherName || ''
+      }));
+    } catch (_) {}
+    return items.sort((a, b) => String(b.updatedAt).localeCompare(String(a.updatedAt)));
+  }
+
+  function applyFilters() {
+    const q = ($('#filterSearch').value || '').trim().toLowerCase();
+    const type = $('#filterType').value;
+    const subject = $('#filterSubject').value;
+    const grade = $('#filterGrade').value;
+    const items = allItems.filter((it) => {
+      if (type && it.type !== type) return false;
+      if (subject && it.subject !== subject) return false;
+      if (grade && String(it.grade) !== grade) return false;
+      if (q && !(`${it.title} ${it.topic}`.toLowerCase().includes(q))) return false;
+      return true;
     });
-    node.querySelectorAll('.study-mini').forEach((button) => button.addEventListener('click', () => {
-      window.location.href = `/app?set=${button.dataset.id}`;
-    }));
-    node.querySelectorAll('.share-toggle-mini').forEach((button) => button.addEventListener('click', () => toggleShare(button.dataset.id, button.dataset.shared === 'true')));
-    node.querySelectorAll('.delete-mini').forEach((button) => button.addEventListener('click', () => deleteSet(button.dataset.id)));
+    render(items);
   }
 
-  async function deleteSet(setId) {
-    if (!confirm('Delete this study set?')) return;
-    try {
-      await api(`/api/sets/${setId}`, { method: 'DELETE' });
-      await loadLibrary();
-      setStatus('Study set deleted.', 'success');
-    } catch (error) {
-      setStatus(error.message, 'error');
+  function render(items) {
+    const list = $('#libraryList');
+    if (!items.length) {
+      const msg = scope === 'bookmarked'
+        ? 'No bookmarks yet. Bookmark public lessons from the Public Lessons directory (coming soon).'
+        : scope === 'shared' ? 'Nothing shared with you yet.'
+        : 'Nothing here yet — use “New whiteboard” or “New lesson” above.';
+      list.innerHTML = `<p class="set-meta">${msg}</p>`;
+      return;
     }
+    list.innerHTML = items.map((it) => `
+      <div class="set-item lib-item" data-id="${it.id}" data-type="${it.type}">
+        <div class="lib-main">
+          <span class="set-title">${typeBadge(it.type)} ${escapeHtml(it.title)} ${subjBadge(it.subject)}
+            ${it.public ? '<span class="pub-pill public">Public</span>' : (it.readOnly ? '' : '<span class="pub-pill">Private</span>')}</span>
+          <span class="set-meta">${escapeHtml([gradeLabel(it.grade), it.topic].filter(Boolean).join(' • ')) || 'No topic set'}
+            ${it.owner ? '• by ' + escapeHtml(it.owner) : ''}
+            • created ${fmtDate(it.createdAt)} • updated ${fmtDate(it.updatedAt)} • ${stars(it.rating)}</span>
+        </div>
+        <div class="set-actions">
+          <a class="btn primary" href="${it.openUrl}">Enter</a>
+          ${it.readOnly ? '' : `
+            <a class="btn soft" href="${it.type === 'whiteboard' ? `/board/${it.id}?share=1` : `/app?set=${it.id}`}">Share</a>
+            <button class="btn soft pub-toggle" data-id="${it.id}" data-type="${it.type}" data-public="${it.public}">${it.public ? 'Make private' : 'Make public'}</button>
+            <button class="btn ghost del-item" data-id="${it.id}" data-type="${it.type}">Delete</button>`}
+        </div>
+      </div>`).join('');
+
+    list.querySelectorAll('.pub-toggle').forEach((b) => b.addEventListener('click', () =>
+      togglePublic(b.dataset.type, b.dataset.id, b.dataset.public === 'true')));
+    list.querySelectorAll('.del-item').forEach((b) => b.addEventListener('click', () =>
+      delItem(b.dataset.type, b.dataset.id)));
   }
 
-  // Sharing is a single on/off toggle now — once on, it's visible to
-  // everyone on your team roster (see /team), no per-item email list to
-  // manage. If the account isn't on the Teams plan, the server rejects
-  // this with a clear message pointing at the Teams trial.
-  async function toggleShare(setId, currentlyShared) {
+  async function togglePublic(type, id, currentlyPublic) {
     try {
-      await api(`/api/sets/${setId}/share-toggle`, { method: 'POST', body: JSON.stringify({ shared: !currentlyShared }) });
-      await loadLibrary();
-      setStatus(currentlyShared ? 'No longer shared.' : 'Shared with your team.', 'success');
-    } catch (error) {
-      setStatus(error.message, 'error');
-    }
+      if (type === 'whiteboard') {
+        await api(`/api/board/${id}/save`, { method: 'POST', body: JSON.stringify({ public: !currentlyPublic }) });
+      } else {
+        await api(`/api/sets/${id}/meta`, { method: 'POST', body: JSON.stringify({ public: !currentlyPublic }) });
+      }
+      setStatus(currentlyPublic ? 'Now private.' : 'Now public — it will appear in Public Lessons.', 'success');
+      loadScope();
+    } catch (e) { setStatus(e.message, 'error'); }
   }
 
-  function switchScope(scope) {
-    $('#workbenchToggle').querySelectorAll('.seg-btn').forEach((b) =>
-      b.classList.toggle('active', b.dataset.scope === scope));
-    const mine = scope === 'mine';
-    $('#mineScope').style.display = mine ? '' : 'none';
-    $('#sharedScope').style.display = mine ? 'none' : '';
-    $('#workbenchHint').style.display = mine ? '' : 'none';
+  async function delItem(type, id) {
+    if (!confirm('Delete this? This cannot be undone.')) return;
+    try {
+      await api(type === 'whiteboard' ? `/api/board/${id}` : `/api/sets/${id}`, { method: 'DELETE' });
+      setStatus('Deleted.', 'success');
+      loadScope();
+    } catch (e) { setStatus(e.message, 'error'); }
   }
 
-  async function init() {
+  (async () => {
     await initCommon();
     if (!state.user) { window.location.href = '/?login=1'; return; }
-    $('#workbenchToggle').querySelectorAll('.seg-btn').forEach((b) =>
-      b.addEventListener('click', () => switchScope(b.dataset.scope)));
-    // Yours first for everyone — students can create Notes and study sets too.
-    switchScope('mine');
-    await loadLibrary();
-    await loadSharedBoards();
-  }
-
-  init().catch((error) => setStatus(error.message, 'error'));
+    $('#scopeToggle').querySelectorAll('.seg-btn').forEach((b) => b.addEventListener('click', () => {
+      scope = b.dataset.scope;
+      $('#scopeToggle').querySelectorAll('.seg-btn').forEach((x) => x.classList.toggle('active', x === b));
+      loadScope();
+    }));
+    ['#filterSearch', '#filterType', '#filterSubject', '#filterGrade'].forEach((sel) => {
+      const el = $(sel); if (el) el.addEventListener('input', applyFilters);
+    });
+    loadScope();
+  })();
 })();

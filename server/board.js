@@ -1083,4 +1083,4 @@ function getOrCreateCurrentBoardId(teacherId) {
   return board.id;
 }
 
-module.exports = { attachBoardRoutes, attachBoardWebSocket, getOrCreateCurrentBoardId };
+module.exports = { attachBoardRoutes, attachBoardWebSocket, getOrCreateCurrentBoardId, readBoardStore };

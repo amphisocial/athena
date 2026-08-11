@@ -20,7 +20,7 @@
             <span class="set-title">${escapeHtml(b.title)} ${subjectBadge(b.subject)}
               ${b.public ? '<span class="pub-pill public">Public</span>' : '<span class="pub-pill">Private</span>'}
               ${b.isLive ? '<span class="live-pill">● LIVE</span>' : ''}</span>
-            <span class="set-meta">${escapeHtml([b.grade, b.topic].filter(Boolean).join(' • ')) || 'No topic set'} • ${b.pageCount || 1} page(s) • created ${fmtDate(b.createdAt)} • updated ${fmtDate(b.updatedAt)}</span>
+            <span class="set-meta">${escapeHtml([b.grade ? `Grade ${b.grade}` : '', b.topic].filter(Boolean).join(' • ')) || 'No topic set'} • ${b.pageCount || 1} page(s) • created ${fmtDate(b.createdAt)} • updated ${fmtDate(b.updatedAt)}</span>
           </div>
           <div class="set-actions">
             <a class="btn primary" href="/board/${b.id}">Enter</a>
@@ -212,6 +212,7 @@
     if (canCreate) {
       newBtn.style.display = '';
       newBtn.addEventListener('click', openNewBoard);
+      if (new URLSearchParams(location.search).get('new') === '1') setTimeout(openNewBoard, 150);
       $('#createBoardBtn').addEventListener('click', createBoard);
       $('#templateClose').addEventListener('click', () => $('#templateDialog').close());
       $('#newBoardName').addEventListener('keydown', (e) => { if (e.key === 'Enter') createBoard(); });
