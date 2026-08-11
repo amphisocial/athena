@@ -5,7 +5,7 @@
  */
 (async () => {
   const C = window.AppCommon;
-  const { $, escapeHtml, api, initCommon, checkout, setStatus, state } = C;
+  const { $, escapeHtml, api, initCommon, checkout, startTrial, setStatus, state } = C;
 
   await initCommon();
   if (!state.user) { window.location.href = '/?login=1'; return; }
@@ -25,10 +25,10 @@
     { label: 'AI study sets per day', value: (m) => String(m.limits.setsPerDay) },
     { label: 'Flashcards, quizzes & notes', plans: ['free', 'starter', 'team'] },
     { label: 'Scan a page → notes + quiz', plans: ['free', 'starter', 'team'] },
-    { label: 'Live AI whiteboard', plans: ['team'] },
-    { label: '3D science & physics sims', plans: ['team'] },
-    { label: 'Live classroom (students join)', plans: ['team'] },
-    { label: 'Share with up to 30 students', plans: ['team'] }
+    { label: 'Create & share boards (link + QR)', plans: ['starter', 'team'] },
+    { label: '3D science & physics sims', plans: ['starter', 'team'] },
+    { label: 'Live classroom (students join live)', plans: ['team'] },
+    { label: 'Real-time collaboration & questions', plans: ['team'] }
   ];
 
   let membership = null;
@@ -40,11 +40,83 @@
   }
 
   renderStatus(membership);
+  renderPlanPicker(membership);
   renderFeatures(membership);
   renderUpgrade(membership);
   renderReferrals(membership);
   renderPromo(membership);
   if (membership.isAdmin) renderAdmin();
+
+  // Plan picker: for free & Pro users, offer a card-free 7-day trial, paid
+  // subscribe, and an application to the Founding 30. Founders/admins already
+  // have everything, so they don't see it.
+  function renderPlanPicker(m) {
+    const sec = $('#planPicker');
+    if (!sec) return;
+    if (m.isAdmin || m.isFounder) { sec.style.display = 'none'; return; }
+
+    const eff = m.effectivePlan;
+    const trial = m.trial || {};
+    const avail = trial.availableTrials || [];
+    const trialActive = Boolean(trial.active);
+
+    const planCard = (plan, name, price, blurb) => {
+      if (eff === plan) return '';                 // already have this plan
+      const canTrial = avail.includes(plan);
+      return `
+        <div class="plan-card">
+          <div class="plan-head"><h3>${name}</h3><span class="plan-price">$${price}<small>/mo</small></span></div>
+          <p>${blurb}</p>
+          <div class="plan-actions">
+            ${canTrial ? `<button class="btn primary pp-trial" data-plan="${plan}">Start 7-day free trial</button>` : ''}
+            <button class="btn ${canTrial ? 'soft' : 'primary'} pp-checkout" data-plan="${plan}">Subscribe $${price}/mo</button>
+          </div>
+          ${(!canTrial && !trialActive) ? '<p class="plan-note">Your free trial of this plan was already used.</p>' : ''}
+        </div>`;
+    };
+
+    const pro = planCard('starter', 'Pro', '3.99',
+      'Create boards and share a static link (with QR) to your class. Flashcards, quizzes, slides and PDF export. Students never need to pay.');
+    const team = planCard('team', 'Teams', '9.99',
+      'Everything in Pro, plus the live AI whiteboard, 3D science & physics sims, live classroom where students join and ask questions, and real-time collaboration.');
+
+    const founding = `
+      <div class="plan-card founding">
+        <div class="plan-head"><h3>Founding 30</h3><span class="plan-price plan-free">Free</span></div>
+        <p>We're onboarding 30 founding teachers with full access, no charge, in exchange for feedback. Apply to claim a spot.</p>
+        <div class="plan-actions"><button class="btn primary" id="applyFoundingBtn">Apply as a founding teacher</button></div>
+        <div class="form-status" id="foundingApplyStatus"></div>
+      </div>`;
+
+    const cards = [pro, team, founding].filter(Boolean).join('');
+    if (!pro && !team) {
+      // On Teams already — just offer founding.
+      sec.innerHTML = `<h2>Founding teachers</h2><div class="plan-grid">${founding}</div>`;
+    } else {
+      sec.innerHTML = `<h2>Choose a plan</h2>
+        <p class="plan-lead">Try any paid plan free for 7 days — no card needed. Students you share with never pay.</p>
+        <div class="plan-grid">${cards}</div>`;
+    }
+    sec.style.display = '';
+
+    // These are rendered after initCommon, so wire them here.
+    sec.querySelectorAll('.pp-trial').forEach((b) => b.addEventListener('click', () => startTrial(b.dataset.plan)));
+    sec.querySelectorAll('.pp-checkout').forEach((b) => b.addEventListener('click', () => checkout(b.dataset.plan)));
+    const fb = $('#applyFoundingBtn');
+    if (fb) fb.addEventListener('click', async () => {
+      fb.disabled = true; const label = fb.textContent; fb.textContent = 'Applying…';
+      const st = $('#foundingApplyStatus');
+      try {
+        await api('/api/founder/apply', { method: 'POST', body: JSON.stringify({}) });
+        st.className = 'form-status ok';
+        st.textContent = "You're in the queue — we'll email you shortly to set up your onboarding.";
+        fb.textContent = 'Applied ✓';
+      } catch (e) {
+        st.className = 'form-status err'; st.textContent = e.message;
+        fb.disabled = false; fb.textContent = label;
+      }
+    });
+  }
 
   function renderStatus(m) {
     const roleLabel = m.isAdmin ? 'Admin' : m.isFounder ? 'Founding Teacher' : PLAN_NAMES[m.effectivePlan] || 'Free';
@@ -88,8 +160,12 @@
   }
 
   function renderUpgrade(m) {
-    // Only paying-but-not-Teams users (Pro) see the upgrade path. Founders/
-    // admins already have everything; free users are nudged elsewhere.
+    // Superseded by the plan picker above (which offers trial + subscribe for
+    // Pro and Teams). Keep the section hidden so there's a single CTA surface.
+    const el = $('#upgradeSection');
+    if (el) el.style.display = 'none';
+    if (true) return;
+    // eslint-disable-next-line no-unreachable
     const show = m.effectivePlan === 'starter' && !m.isFounder && !m.isAdmin;
     $('#upgradeSection').style.display = show ? '' : 'none';
     if (show) {

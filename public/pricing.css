@@ -96,3 +96,28 @@
   border: 1px solid var(--brand-2); background: rgba(20,217,196,0.12);
   color: #dff7f2; font-weight: 600; line-height: 1.5;
 }
+
+/* ===== Plan picker (trial / subscribe / founding) ===== */
+.plan-picker { margin: 8px 0 28px; }
+.plan-picker > h2 { margin: 0 0 4px; }
+.plan-lead { color: #9fb2d0; margin: 0 0 16px; font-size: 0.95rem; }
+.plan-grid {
+  display: grid; gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+}
+.plan-card {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  border-radius: 16px; padding: 20px;
+  display: flex; flex-direction: column; gap: 10px;
+}
+.plan-card.founding { border-color: rgba(255, 176, 32, 0.5); }
+.plan-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.plan-head h3 { margin: 0; font-size: 1.15rem; }
+.plan-price { font-size: 1.4rem; font-weight: 800; color: #fff; }
+.plan-price small { font-size: 0.7rem; font-weight: 600; color: #9fb2d0; }
+.plan-price.plan-free { color: #ffb020; font-size: 1.05rem; }
+.plan-card p { margin: 0; color: #c3d0e6; font-size: 0.9rem; line-height: 1.5; }
+.plan-actions { display: flex; flex-direction: column; gap: 8px; margin-top: auto; padding-top: 8px; }
+.plan-actions .btn { width: 100%; justify-content: center; }
+.plan-note { color: #9fb2d0; font-size: 0.8rem; font-style: italic; }
