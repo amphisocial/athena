@@ -3,135 +3,207 @@
 <head>
   <meta charset="utf-8" />
   <link rel="icon" type="image/png" href="/favicon.png" />
+  <link rel="apple-touch-icon" href="/img/athenaboard-logo.png" />
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
-  <title>Boardsy — the board</title>
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <title>Whiteboard | AthenaBoard</title>
   <meta name="robots" content="noindex" />
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/styles.css?v=1" />
-  <link rel="stylesheet" href="/board.css?v=1" />
-  <link rel="stylesheet" href="/viz3d.css?v=1" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/styles.css?v=20260725-v21" />
+  <link rel="stylesheet" href="/board.css?v=20260729-v25" />
 </head>
-<body class="board-page">
-  <!-- ===================== TOP BAR ===================== -->
-  <header class="bt-bar">
-    <a class="brand" href="/" aria-label="Boardsy home">
-      <img src="/img/boardsy-logo.svg" alt="" />
-      <span>Board<span class="tm">sy</span></span>
-    </a>
-    <div class="bt-title" id="btTitle">Choose a board</div>
-    <span class="bt-badge" id="btBadge">Sandbox · not saved</span>
-    <span class="bt-spacer"></span>
-    <button class="btn ghost small" id="btPlans">Sign in / Plans</button>
-    <a class="btn primary small" href="/" id="btExit">Exit</a>
-  </header>
+<body data-page="board">
+  <div class="board-shell" id="boardShell">
+    <header class="board-topbar">
+      <a class="brand" href="/boards" id="brandLink" aria-label="Back">
+        <span class="brand-mark">AthenaBoard</span>
+        <span><strong>Athena</strong><span class="brand-suffix">Board</span></span>
+      </a>
+      <div class="board-title" id="boardTitle">Loading…</div>
+      <span class="board-badge" id="boardBadge" style="display:none"></span>
 
-  <div class="bt-shell">
-    <!-- ===================== LEFT RAIL ===================== -->
-    <aside class="bt-rail" id="btRail">
-      <section class="rail-sec">
-        <h4>Boards</h4>
-        <div class="subj-tabs" id="subjTabs">
-          <button class="subj-tab active" data-subj="Math">Math</button>
-          <button class="subj-tab" data-subj="Science">Science</button>
-        </div>
-        <div class="tpl-list" id="tplList"></div>
-      </section>
+      <div class="board-topbar-actions" id="ownerActions" style="display:none">
+        <button class="btn ghost small" id="undoBtn" title="Undo (Ctrl+Z)">↶</button>
+        <button class="btn ghost small" id="redoBtn" title="Redo (Ctrl+Shift+Z)">↷</button>
+        <button class="btn ghost small" id="studySetBtn" title="Turn this board into flashcards">→ Study set</button>
+        <button class="btn ghost small" id="exportBtn" title="Export as PDF">PDF</button>
+        <button class="btn ghost small" id="shareToggleBtn">Share</button>
+        <button class="btn primary small" id="liveToggleBtn">Go live</button>
+        <button class="btn ghost small" id="viewersBtn">Viewers (<span id="viewerCount">0</span>)</button>
+        <button class="btn ghost small" id="questionsBtn">Questions (<span id="qBtnCount">0</span>)</button>
+        <span class="lost-pill" id="lostPill" style="display:none">🤔 <span id="lostCount">0</span> lost</span>
+      </div>
 
-      <section class="rail-sec" id="toolsSec">
-        <h4>Annotate</h4>
-        <button class="mode-toggle" id="drawToggle" aria-pressed="false">
-          <span class="dot"></span><span id="drawToggleLabel">Draw mode: off</span>
-        </button>
-        <p class="rail-hint" id="modeHint">Pointer controls the simulation. Turn on Draw to write over the board.</p>
-        <div class="tool-row" id="penTools" hidden>
-          <button class="tool-btn active" data-tool="pen" title="Pen">✏️</button>
-          <button class="tool-btn" data-tool="eraser" title="Eraser">🧽</button>
-          <button class="tool-btn" id="undoBtn" title="Undo">↶</button>
-          <button class="tool-btn" id="clearBtn" title="Clear annotations">🗑</button>
-        </div>
-        <div class="swatches" id="swatches" hidden></div>
-      </section>
-    </aside>
+      <div class="board-topbar-actions">
+        <span class="board-status" id="boardStatus">Connecting…</span>
+        <button class="btn ghost small" id="panelToggle" title="Toggle info panel">☰ Info</button>
+        <button class="btn ghost small" id="fullscreenBtn" title="Full screen">⤢</button>
+        <a class="btn ghost small" href="/boards" id="exitLink">Exit</a>
+      </div>
+    </header>
 
-    <!-- ===================== STAGE ===================== -->
-    <main class="bt-stage">
-      <!-- Picker (shown until a template is chosen) -->
-      <div class="bt-picker" id="picker">
-        <div class="picker-inner">
-          <h1>Enter Boardsy</h1>
-          <p>Pick a subject, then a board. It opens live — play with everything, no login needed.</p>
-          <div class="picker-subj" id="pickerSubj">
-            <button class="psubj active" data-subj="Math">∫ Math</button>
-            <button class="psubj" data-subj="Science">⚛ Science</button>
+    <div class="board-body">
+      <aside class="board-toolbar" id="boardToolbar">
+        <section class="tool-section" data-section="tools">
+          <button class="tool-section-head" data-target="sec-tools"><span>Tools</span><span class="chev">▾</span></button>
+          <div class="tool-section-body" id="sec-tools">
+            <!-- Primary tools: the five a teacher reaches for constantly. -->
+            <div class="tool-group" role="group" aria-label="Tools">
+              <button class="tool-btn active" data-tool="pen" title="Pen">✏️</button>
+              <button class="tool-btn" data-tool="shape" title="Draw &amp; snap shape">◻︎</button>
+              <button class="tool-btn" data-tool="eraser" title="Eraser">🧽</button>
+              <button class="tool-btn" data-tool="select" title="Select region">⬚</button>
+              <button class="tool-btn" data-tool="text" title="Text box">🅣</button>
+              <button class="tool-btn more-toggle" id="moreToolsToggle" title="More tools" aria-expanded="false">⋯</button>
+            </div>
+            <!-- Secondary tools: available, but not competing for attention. -->
+            <div class="tool-group more-tools" id="moreTools" role="group" aria-label="More tools" hidden>
+              <button class="tool-btn" data-tool="pan" title="Pan (or hold Space)">✋</button>
+              <button class="tool-btn" data-tool="move" title="Move shapes">✥</button>
+              <button class="tool-btn" data-tool="connect" title="Connect two shapes">⇢</button>
+              <button class="tool-btn" data-tool="laser" title="Laser pointer (live only)">🔴</button>
+              <button class="tool-btn" data-tool="note" title="Sticky note">🗒️</button>
+            </div>
+            <div class="tool-group colors" role="group" aria-label="Color">
+              <button class="swatch active" data-color="#eef6ff" style="--sw:#eef6ff"></button>
+              <button class="swatch" data-color="#7c5cff" style="--sw:#7c5cff"></button>
+              <button class="swatch" data-color="#14d9c4" style="--sw:#14d9c4"></button>
+              <button class="swatch" data-color="#ffcc66" style="--sw:#ffcc66"></button>
+              <button class="swatch" data-color="#ff6b7a" style="--sw:#ff6b7a"></button>
+            </div>
+            <label class="size-label">Size<input type="range" id="sizeRange" min="1" max="18" value="3" /></label>
           </div>
-          <div class="picker-grid" id="pickerGrid"></div>
-        </div>
-      </div>
+        </section>
 
-      <!-- Live board (shown once a template is chosen) -->
-      <div class="bt-board" id="board" hidden>
-        <div class="board-instruction" id="boardInstruction"></div>
-        <div class="board-canvas-wrap" id="canvasWrap">
-          <div class="sim-mount" id="simMount"></div>
-          <canvas class="annot-canvas" id="annotCanvas"></canvas>
-        </div>
-        <div class="board-foot">
-          <span class="std mono" id="boardStd"></span>
-          <span class="foot-spacer"></span>
-          <span class="foot-note">Draw over it, run it, break it. This is your sandbox.</span>
-        </div>
-      </div>
-    </main>
-  </div>
+        <section class="tool-section collapsed" data-section="page">
+          <button class="tool-section-head" data-target="sec-page"><span>Page</span><span class="chev">▾</span></button>
+          <div class="tool-section-body" id="sec-page" style="display:none">
+            <label class="size-label">Template
+              <select id="templateSelect">
+                <option value="blank">Blank</option>
+                <option value="grid">Graph paper</option>
+                <option value="lined">Lined</option>
+                <option value="coordinate">Coordinate grid</option>
+                <option value="flowchart">Flowchart</option>
+              </select>
+            </label>
+            <button class="btn ghost small" id="bgImportBtn">Import image</button>
+            <input type="file" id="bgFile" accept="image/*" style="display:none" />
+            <button class="btn ghost small" id="bgClearBtn">Remove image</button>
+            <button class="btn ghost small" id="zoomResetBtn">Reset zoom</button>
+            <button class="btn ghost small" id="clearBoardBtn">Clear page</button>
+          </div>
+        </section>
 
-  <!-- ===================== PLANS MODAL ===================== -->
-  <div class="modal-back" id="plansModal">
-    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="plansTitle">
-      <button class="modal-close" data-close aria-label="Close">×</button>
-      <h2 id="plansTitle">Sign in to save &amp; go live</h2>
-      <p class="sub">Everything on the board is free to play with. Sign in to keep your boards, build lessons &amp; quizzes, and bring your students in live.</p>
+        <section class="tool-section flow-palette" id="flowPalette" style="display:none" data-section="flow">
+          <button class="tool-section-head" data-target="sec-flow"><span>Flowchart shapes</span><span class="chev">▾</span></button>
+          <div class="tool-section-body" id="sec-flow">
+            <div class="flow-grid">
+              <button class="flow-shape-btn" data-kind="terminator" title="Start / End"><span class="fs term"></span>Start</button>
+              <button class="flow-shape-btn" data-kind="process" title="Process"><span class="fs proc"></span>Process</button>
+              <button class="flow-shape-btn" data-kind="decision" title="Decision (Y/N)"><span class="fs dec"></span>Decision</button>
+              <button class="flow-shape-btn" data-kind="data" title="Input / Output"><span class="fs data"></span>In/Out</button>
+              <button class="flow-shape-btn" data-kind="document" title="Document"><span class="fs doc"></span>Doc</button>
+              <button class="flow-shape-btn" data-kind="connectorDot" title="Connector"><span class="fs dot"></span>Link</button>
+            </div>
+            <p class="tool-hint">Add shapes, drag with <strong>✥</strong>, then tap <strong>⇢</strong> and touch two shapes to join. Decision branches auto-label <strong>Y</strong> then <strong>N</strong>.</p>
+          </div>
+        </section>
 
-      <div class="plans-grid">
-        <div class="plan">
-          <h3>Pro</h3>
-          <p class="price">$3.99<span>/mo</span></p>
-          <ul>
-            <li>Save unlimited boards</li>
-            <li>Lessons, flashcards &amp; quizzes</li>
-            <li>Export to PDF</li>
-          </ul>
-          <a class="btn primary" href="#" data-app="signup?plan=pro&trial=1">Start 7-day free trial</a>
-        </div>
-        <div class="plan featured">
-          <span class="plan-flag">For classrooms</span>
-          <h3>Teams</h3>
-          <p class="price">$9.99<span>/mo</span></p>
-          <ul>
-            <li>Everything in Pro</li>
-            <li>Go live — students on their own screens</li>
-            <li>Share boards with up to 30 students</li>
-          </ul>
-          <a class="btn primary" href="#" data-app="signup?plan=team&trial=1">Start 7-day free trial</a>
-        </div>
-      </div>
+        <section class="tool-section" data-section="ai">
+          <button class="tool-section-head" data-target="sec-ai"><span>Smart AI</span><span class="chev">▾</span></button>
+          <div class="tool-section-body" id="sec-ai">
+            <button class="btn primary small" id="analyzeBtn">Analyze board</button>
+            <button class="btn soft small" id="liveAnalyzeBtn" title="Auto-plot equations as you write them">⚡ Live analyze: off</button>
+            <p class="tool-hint">Type a function to graph it on the board, or select a handwritten equation and plot it.</p>
+            <button class="btn soft small" id="plotSelectionBtn" style="display:none">Plot selection</button>
+            <form id="plotForm" class="plot-form">
+              <input type="text" id="plotInput" placeholder="y = 4x + 3" />
+              <button type="submit" class="btn soft small">Plot</button>
+            </form>
+          </div>
+        </section>
+      </aside>
 
-      <div class="founding-cta">
-        <div>
-          <b>Are you one of our Founding 30?</b>
-          <span>Verified Math &amp; Science teachers get free Teams for the semester.</span>
+      <main class="board-canvas-wrap" id="canvasWrap">
+        <canvas id="boardCanvas"></canvas>
+        <div class="objects-layer" id="objectsLayer"></div>
+        <canvas id="laserCanvas" class="laser-canvas"></canvas>
+        <div class="reactions-layer" id="reactionsLayer"></div>
+
+        <div class="board-readonly-banner" id="readonlyBanner" style="display:none">
+          <span id="readonlyBannerText">Viewing live. Only the teacher can draw.</span>
         </div>
-        <a class="btn soft" href="/#founding">Contact us — Founding 30</a>
-      </div>
-      <p class="signin-line">Already have an account? <a href="#" data-app="login">Sign in</a></p>
+
+        <div class="student-bar" id="studentBar" style="display:none">
+          <button class="react-btn" data-emoji="👍">👍</button>
+          <button class="react-btn" data-emoji="😮">😮</button>
+          <button class="react-btn" data-emoji="🎉">🎉</button>
+          <button class="react-btn" data-emoji="🙏">🙏</button>
+          <button class="react-btn" data-emoji="❤️">❤️</button>
+          <button class="btn soft small" id="lostBtn">🤔 I'm lost</button>
+          <button class="btn soft small" id="askBtn">✋ Ask</button>
+          <button class="btn soft small" id="studentAnalyzeBtn" title="Analyze the board yourself with AI">🔍 Analyze</button>
+          <button class="btn soft small" id="studentExportBtn" title="Save this board + notes as PDF">⬇ PDF</button>
+        </div>
+
+        <div class="page-bar" id="pageBar">
+          <button class="btn ghost small" id="prevPageBtn">‹</button>
+          <span id="pageLabel">Page 1 / 1</span>
+          <button class="btn ghost small" id="nextPageBtn">›</button>
+          <button class="btn ghost small owner-only" id="addPageBtn" title="Add page">+</button>
+          <button class="btn ghost small owner-only" id="delPageBtn" title="Delete page">🗑</button>
+          <span class="zoom-label" id="zoomLabel">100%</span>
+        </div>
+
+        <div class="replay-bar" id="replayBar" style="display:none">
+          <button class="btn ghost small" id="replayPlayBtn">▶</button>
+          <input type="range" id="replayRange" min="0" max="100" value="100" />
+          <span id="replayLabel">0 / 0</span>
+          <button class="btn ghost small" id="replayCloseBtn">✕</button>
+        </div>
+        <button class="btn ghost small replay-open owner-only" id="replayOpenBtn" title="Replay how this was built">⏱ Replay</button>
+
+        <div class="questions-panel" id="questionsPanel" style="display:none">
+          <div class="ai-panel-header"><span>Questions <span id="qCount" class="q-count">0</span></span><button class="ai-panel-close" id="questionsClose">×</button></div>
+          <div class="ai-panel-body" id="questionsBody"></div>
+        </div>
+
+        <div class="graph-controls" id="graphControls" style="display:none">
+          <div class="graph-controls-head"><span id="graphCtrlLabel">Graph</span><button class="ai-panel-close" id="graphCtrlClose">×</button></div>
+          <div id="graphSliders"></div>
+          <p class="tool-hint">Drag a slider to move the curve live. Students see it update.</p>
+        </div>
+
+        <div class="viewers-panel" id="viewersPanel" style="display:none">
+          <div class="ai-panel-header"><span>Currently watching</span><button class="ai-panel-close" id="viewersPanelClose">×</button></div>
+          <div class="ai-panel-body" id="viewersPanelBody"></div>
+        </div>
+      </main>
+
+      <aside class="info-panel" id="infoPanel">
+        <div class="info-panel-header">
+          <span id="infoTitle">AI Notes</span>
+          <div class="info-panel-header-actions">
+            <button class="btn ghost tiny owner-only" id="eraseNotesBtn" title="Erase all AI Notes for everyone" style="display:none">Erase all</button>
+            <button class="ai-panel-close" id="infoClose" title="Collapse">›</button>
+          </div>
+        </div>
+        <div class="info-panel-body" id="infoBody">
+          <p class="info-empty">Draw or write something, then hit <strong>Analyze board</strong> and the explanation appears here.</p>
+        </div>
+      </aside>
     </div>
   </div>
 
-  <script src="/config.js"></script>
+  <div class="toast" id="toast"></div>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-  <script src="/viz3d.js?v=1"></script>
-  <script src="/graphdemo.js?v=1"></script>
-  <script src="/board.js?v=1"></script>
+  <script src="/viz3d.js?v=20260726-v23"></script>
+  <script src="/common.js?v=20260725-v21"></script>
+  <script src="/board.js?v=20260729-v25"></script>
 </body>
 </html>

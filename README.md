@@ -1,73 +1,67 @@
-# Boardsy — the board that thinks with you
+# Boardsy — athenabot.ai
 
-The public site and no-login sandbox board for **athenabot.ai**.
+The complete product behind **athenabot.ai**: the AI whiteboard for middle &
+high school **Math and Science**, with live 3D physics/math simulations, plus
+built-in lessons, flashcards and quizzes. This is the full application —
+accounts, saved boards, live collaboration (WebSocket), Stripe billing, and AI
+generation — with the **Boardsy** homepage as its landing page.
 
-Boardsy is the AI whiteboard for **middle & high school Math and Science**. You
-write on the board and live information appears; you drop a stone in real
-gravity, bend a parabola with a slider, rotate a molecule — 3D simulations
-students can play with. Lessons, flashcards and quizzes are built in.
+This repo replaces both the old static homepage *and* the
+`flashcards.athenabot.ai` subdomain: everything now runs from one app at
+`/opt/apps/athena` under the pm2 name `athenabot`.
 
-This repo replaces the old "AI studio" homepage. It is a single, self-contained
-Node/Express app: a marketing homepage plus a **fully playable sandbox board**
-that needs **no login and no database**. Signing in to save, build lessons, or
-go live routes to the full product.
-
-## What's here
+## Layout
 
 ```
-server.js                     Express: static host + Founding-30 / contact (SMTP optional)
+server/            Express app: auth, boards (+WebSocket), study sets, teams,
+                   Stripe billing, AI generation, mailer, Postgres (server/db.js)
 public/
-  index.html                  Homepage (hero → Founding 30 → Six lessons → Live classroom → rest)
-  home.js                     Hero stage cycler (gravity ⇄ parabola), ticker, 3D demos, Founding-30 form
-  board.html / board.js       "Enter Boardsy" sandbox: subject → template → live board, draw-over layer, Plans
-  styles.css                  White + blue "graph-paper board" theme
-  board.css                   Sandbox layout
-  viz3d.js / viz3d.css        3D + physics engine (reused, unchanged): molecules, solids, free-fall, incline…
-  graphdemo.js                Interactive 2D graph engine (reused, unchanged): parabola, line, sine
-  img/boardsy-logo.svg
-deploy/                       PM2 + Nginx for athenabot.ai (see deploy/DEPLOY-EC2.md)
+  index.html       Boardsy homepage (new brand) wired to the real login modal
+  home.js          Homepage hero (gravity ⇄ parabola), ticker, 3D demos, Founding-30
+  boardsy-home.css Homepage white/blue theme + the auth-dialog styling
+  sandbox.html/.js/.css   No-login sandbox board (draw + live sims) at /sandbox
+  board.html/.js   The real, auth-gated collaborative board at /board
+  common.js        Shared auth/session/topbar engine (unchanged)
+  viz3d.js/.css    3D + physics engine (molecules, solids, free-fall, incline…)
+  graphdemo.js     Interactive 2D graph engine (parabola, line, sine)
+  pricing/library/team/notes/join …   the rest of the product
+scripts/           tests + lesson build + one-off migration helpers
+deploy/            ecosystem.config.js, nginx-athenabot.conf, CUTOVER-EC2.md
 ```
 
-## Brand & scope changes
+## How the homepage relates to the product
 
-- **AthenaBoard → Boardsy** — "The board that thinks with you." No more "AthenaBoard".
-- **Math & Science only** — Geography and History removed everywhere.
-- **One click into the board** — the primary CTA is **Enter Boardsy** (`/board`),
-  which opens a subject → template picker and drops you straight onto a live,
-  fully playable whiteboard. No login needed to play; you just can't save or
-  bring students in.
-- **New hero** — Boardsy is more than a smart board. The headline rotates through
-  the product's real capabilities, and the hero visual **auto-cycles between a
-  real gravity (stone-drop) simulation and an interactive parabola graph**, with
-  a Pause button so a visitor can stop on either and play with it.
-- **Plans on the board** — a Sign in / Plans panel shows **Pro vs Teams**, a
-  **7-day free trial**, and **Contact us — Founding 30**.
+- **Enter Boardsy** → `/sandbox`: a fully playable board (draw + live 3D/graph
+  simulations) that needs **no account**. You just can't save or bring students
+  in live. Sign-in / plan links inside it point at the real product.
+- **Sign in** → the product's login modal (`#authDialog`, email/password +
+  Google). Once signed in, the nav's "Sign in" becomes "My boards" (`/boards`).
+- **/board** is the real collaborative whiteboard (auth required, saves to
+  Postgres, live via WebSocket).
+- **Pricing / trials** → `/pricing` (Pro $3.99, Teams $9.99, 7-day trial).
+- **Founding-30** → a public form (`POST /api/founding/apply`) that emails
+  `ADMIN_EMAIL`; no account required.
+
+## Database
+
+Connects via a single `DATABASE_URL` and creates tables with
+`CREATE TABLE IF NOT EXISTS`. Point it at the **existing** flashcards database
+and every account, board, study set, team and subscription carries over — no
+dump, no migration. See `deploy/CUTOVER-EC2.md`.
 
 ## Run locally
 
 ```bash
 npm install
-cp .env.example .env      # optional — the site runs without it
-npm start                 # http://localhost:3000
+cp .env.example .env         # set DATABASE_URL (a local or the shared Postgres)
+npm start                    # http://localhost:3000
 ```
 
-Health check: `curl -s localhost:3000/api/health` → `{"ok":true,"service":"boardsy"}`
+The app requires Postgres (`DATABASE_URL`) to boot. AI keys, Stripe, Google
+OAuth and SMTP are optional locally — features that need them degrade or no-op
+without them.
 
-The app boots and serves **with or without SMTP**. Without SMTP, Founding-30 and
-contact submissions are logged to the server console instead of emailed — set the
-`SMTP_*` values in `.env` to turn on email.
+## Deploy / cutover
 
-## Configuration (`.env`)
-
-| Var | Purpose |
-|---|---|
-| `PORT` | Node port (default 3000). Nginx proxies to it. |
-| `SITE_ORIGIN` | Comma-separated allowed CORS origins. |
-| `APP_BASE_URL` | Where the full logged-in product lives. The board's "Start trial / Sign in" links deep-link here. Leave blank in dev and those CTAs fall back to the Founding-30 contact. |
-| `SMTP_*`, `CONTACT_TO_EMAIL`, `CONTACT_FROM_EMAIL` | Optional email delivery for form submissions. |
-
-## Deploy
-
-Pull to `/opt/apps/athena` and run under the existing **`athenabot`** PM2 instance
-— nothing about the process name or path changes. Full steps in
-[`deploy/DEPLOY-EC2.md`](deploy/DEPLOY-EC2.md).
+Full step-by-step (external dashboards, env, nginx+WebSocket, pm2, verification,
+retiring the subdomain, rollback) is in **`deploy/CUTOVER-EC2.md`**.

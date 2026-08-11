@@ -12,10 +12,10 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/styles.css?v=1" />
+  <link rel="stylesheet" href="/boardsy-home.css?v=1" />
   <link rel="stylesheet" href="/viz3d.css?v=1" />
 </head>
-<body>
+<body data-page="landing">
   <!-- ===================== NAV ===================== -->
   <header class="topbar">
     <div class="shell topbar-inner">
@@ -31,8 +31,8 @@
       </nav>
       <span class="nav-spacer"></span>
       <div class="nav-cta">
-        <a class="btn ghost small" href="/board" id="navPlans">Sign in</a>
-        <a class="btn primary small" href="/board">Enter Boardsy →</a>
+        <a class="btn ghost small" href="/?login=1" id="navPlans">Sign in</a>
+        <a class="btn primary small" href="/sandbox">Enter Boardsy →</a>
       </div>
     </div>
   </header>
@@ -68,15 +68,15 @@
         <p class="lede">Not just a smart board. Boardsy runs real 3D physics and math simulations right on the canvas — the Xbox-and-PlayStation world your students already love, now teaching them.</p>
 
         <div class="hero-actions" style="margin-top:26px">
-          <a class="btn primary large" href="/board">Enter Boardsy</a>
+          <a class="btn primary large" href="/sandbox">Enter Boardsy</a>
           <a class="btn ghost large" href="#lessons">See the six lessons</a>
         </div>
 
         <div class="hero-quick">
-          <a class="quick-chip" href="/board?subject=science&template=newton">Free fall <span class="qc-arrow">→</span></a>
-          <a class="quick-chip" href="/board?subject=math&template=quadratic">Parabola <span class="qc-arrow">→</span></a>
-          <a class="quick-chip" href="/board?subject=science&template=molecule">3D molecule <span class="qc-arrow">→</span></a>
-          <a class="quick-chip" href="/board?subject=science&template=incline">Block on a ramp <span class="qc-arrow">→</span></a>
+          <a class="quick-chip" href="/sandbox?subject=science&template=newton">Free fall <span class="qc-arrow">→</span></a>
+          <a class="quick-chip" href="/sandbox?subject=math&template=quadratic">Parabola <span class="qc-arrow">→</span></a>
+          <a class="quick-chip" href="/sandbox?subject=science&template=molecule">3D molecule <span class="qc-arrow">→</span></a>
+          <a class="quick-chip" href="/sandbox?subject=science&template=incline">Block on a ramp <span class="qc-arrow">→</span></a>
         </div>
 
         <div class="trust-row">
@@ -145,42 +145,42 @@
         <p>Each opens as a live board — the standard, a short outline, and full play. No setup, no login.</p>
       </div>
       <div class="lesson-grid">
-        <a class="lesson-card" href="/board?subject=science&template=newton">
+        <a class="lesson-card" href="/sandbox?subject=science&template=newton">
           <span class="tag science">Science</span>
           <h3>Newton's laws in free fall</h3>
           <p>Drop a stone and a feather in real gravity; toggle air resistance, switch to the Moon.</p>
           <span class="std">NGSS MS-PS2-2</span>
           <span class="go">Open the board →</span>
         </a>
-        <a class="lesson-card" href="/board?subject=science&template=incline">
+        <a class="lesson-card" href="/sandbox?subject=science&template=incline">
           <span class="tag science">Science</span>
           <h3>Block on a wedge</h3>
           <p>Tilt the ramp, change the friction; the block slides when tanθ beats μ — mass doesn't matter.</p>
           <span class="std">NGSS MS-PS2-2</span>
           <span class="go">Open the board →</span>
         </a>
-        <a class="lesson-card" href="/board?subject=science&template=pendulum">
+        <a class="lesson-card" href="/sandbox?subject=science&template=pendulum">
           <span class="tag science">Science</span>
           <h3>The pendulum</h3>
           <p>Change length and gravity; the period holds — independent of the bob's mass.</p>
           <span class="std">NGSS MS-PS2 / MS-PS3</span>
           <span class="go">Open the board →</span>
         </a>
-        <a class="lesson-card" href="/board?subject=science&template=reflection">
+        <a class="lesson-card" href="/sandbox?subject=science&template=reflection">
           <span class="tag science">Science</span>
           <h3>Laws of reflection</h3>
           <p>Parallel rays hit flat, concave and convex mirrors; watch them converge on the focus.</p>
           <span class="std">NGSS MS-PS4-2</span>
           <span class="go">Open the board →</span>
         </a>
-        <a class="lesson-card" href="/board?subject=math&template=quadratic">
+        <a class="lesson-card" href="/sandbox?subject=math&template=quadratic">
           <span class="tag math">Math</span>
           <h3>Quadratic graphs</h3>
           <p>Drag a, b and c and watch the parabola open, tilt and lift — live, in front of the class.</p>
           <span class="std">Common Core 8.F / A-REI</span>
           <span class="go">Open the board →</span>
         </a>
-        <a class="lesson-card" href="/board?subject=science&template=molecule">
+        <a class="lesson-card" href="/sandbox?subject=science&template=molecule">
           <span class="tag science">Science</span>
           <h3>3D molecules</h3>
           <p>Rotate a ball-and-stick model; click any atom to fly into its electron shells.</p>
@@ -204,7 +204,7 @@
             <li>Notes are archived on the board, so students keep them and export to PDF.</li>
             <li>Shared boards stay viewable as a snapshot after you end the live session.</li>
           </ul>
-          <div style="margin-top:24px"><a class="btn primary" href="/board">Try a live board</a></div>
+          <div style="margin-top:24px"><a class="btn primary" href="/sandbox">Try a live board</a></div>
         </div>
         <div class="mock-live">
           <svg class="m-curve" viewBox="0 0 400 320" preserveAspectRatio="none" aria-hidden="true">
@@ -245,13 +245,13 @@
         <p>We do Math and Science deeply instead of everything shallowly — mapped to the standards you already plan against.</p>
       </div>
       <div class="subject-grid">
-        <a class="subject-card math" href="/board?subject=math">
+        <a class="subject-card math" href="/sandbox?subject=math">
           <span class="s-icon">∫</span>
           <h3>Math</h3>
           <p>Live graphs with sliders for slope, intercept and shape · coordinate geometry · 3D solids with surface area &amp; volume.</p>
           <span class="std">Common Core Math · middle &amp; high school</span>
         </a>
-        <a class="subject-card science" href="/board?subject=science">
+        <a class="subject-card science" href="/sandbox?subject=science">
           <span class="s-icon">⚛</span>
           <h3>Science</h3>
           <p>Real-gravity physics, forces on a ramp, reflection · rotatable molecules &amp; electron shells · pendulums and more.</p>
@@ -307,15 +307,15 @@
           <h3>Free</h3>
           <p class="price">$0</p>
           <p class="desc">Full board, all simulations, no login. Play with every Math &amp; Science template — you just can't save or bring students in.</p>
-          <div class="price-actions"><a class="btn ghost" href="/board">Enter Boardsy</a></div>
+          <div class="price-actions"><a class="btn ghost" href="/sandbox">Enter Boardsy</a></div>
         </article>
         <article class="price-card featured">
           <h3>Pro</h3>
           <p class="price">$3.99<span>/mo</span></p>
           <p class="desc">Save unlimited boards, build lessons, flashcards and quizzes, and export to PDF. For your own prep and teaching.</p>
           <div class="price-actions">
-            <a class="btn primary" href="/board?plan=pro">Start 7-day free trial</a>
-            <a class="btn soft" href="/board?plan=pro">See Pro</a>
+            <a class="btn primary" href="/pricing">Start 7-day free trial</a>
+            <a class="btn soft" href="/pricing">See Pro</a>
           </div>
         </article>
         <article class="price-card">
@@ -323,7 +323,7 @@
           <p class="price">$9.99<span>/mo</span></p>
           <p class="desc">Everything in Pro, plus the live classroom: go live, share, and bring up to 30 students onto their own screens.</p>
           <div class="price-actions">
-            <a class="btn primary" href="/board?plan=team">Start 7-day free trial</a>
+            <a class="btn primary" href="/pricing">Start 7-day free trial</a>
             <button class="btn soft" id="ctaFoundingPricing">Contact us — Founding 30</button>
           </div>
         </article>
@@ -337,7 +337,7 @@
       <div class="final">
         <h2>Bring the thinking board to your classroom.</h2>
         <p>No hardware. Open it in a browser and start teaching.</p>
-        <a class="btn large" href="/board">Enter Boardsy →</a>
+        <a class="btn large" href="/sandbox">Enter Boardsy →</a>
       </div>
     </div>
   </section>
@@ -347,7 +347,7 @@
     <div class="shell footer-inner">
       <a class="brand" href="/" style="font-size:1.1rem"><img src="/img/boardsy-logo.svg" alt="" style="width:26px;height:26px" /> Board<span class="tm">sy</span></a>
       <div class="footer-links">
-        <a href="/board">Enter Boardsy</a>
+        <a href="/sandbox">Enter Boardsy</a>
         <a href="#lessons">Lessons</a>
         <a href="#pricing">Pricing</a>
         <a href="#founding">Founding 30</a>
@@ -388,9 +388,48 @@
     </div>
   </div>
 
+    <dialog id="authDialog" class="modal">
+    <form method="dialog" class="modal-card">
+      <button class="modal-close" value="cancel" aria-label="Close">×</button>
+      <h2 id="authTitle">Sign up free</h2>
+      <div class="two-col auth-names" id="authNames">
+        <label>First name<input id="firstName" autocomplete="given-name" /></label>
+        <label>Last name<input id="lastName" autocomplete="family-name" /></label>
+      </div>
+      <label>Email<input id="authEmail" type="email" autocomplete="email" /></label>
+      <label>Password<input id="authPassword" type="password" autocomplete="current-password" /></label>
+      <ul class="pw-hints" id="pwHints" style="display:none">
+        <li data-rule="len">At least 8 characters</li>
+        <li data-rule="num">At least one number</li>
+      </ul>
+      <div class="modal-error" id="authError" role="alert"></div>
+      <button type="button" class="btn primary large" id="authSubmit" value="default">Continue</button>
+      <a class="google-link" href="/auth/google">Continue with Google</a>
+      <p class="switch-auth" id="switchAuth"></p>
+    </form>
+  </dialog>
+
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <script src="/viz3d.js?v=1"></script>
   <script src="/graphdemo.js?v=1"></script>
+  <script src="/common.js?v=1"></script>
   <script src="/home.js?v=1"></script>
+  <script>
+    (async () => {
+      const A = window.AppCommon; if (!A) return;
+      try { await A.initCommon(); } catch (_) {}
+      const nav = document.getElementById('navPlans');
+      if (A.state && A.state.user) {
+        if (nav) { nav.textContent = 'My boards'; nav.setAttribute('href', '/boards'); }
+      } else if (nav) {
+        nav.addEventListener('click', (e) => { e.preventDefault(); A.openAuth('login'); });
+      }
+      const params = new URLSearchParams(location.search);
+      if (params.has('login') && !(A.state && A.state.user)) {
+        A.openAuth(params.get('login') === '0' ? 'signup' : 'login');
+      }
+    })();
+  </script>
+
 </body>
 </html>

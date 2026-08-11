@@ -1,0 +1,219 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <link rel="icon" type="image/png" href="/favicon.png" />
+  <link rel="apple-touch-icon" href="/img/athenaboard-logo.png" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Create & Study | AthenaBoard</title>
+  <meta name="robots" content="noindex" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/styles.css?v=20260725-v21" />
+</head>
+<body data-page="app">
+  <div class="shell">
+    <header class="topbar">
+      <a class="brand" href="/" aria-label="AthenaBoard home">
+        <span class="brand-mark">AthenaBoard</span>
+        <span><strong>Athena</strong><span class="brand-suffix">Board</span></span>
+      </a>
+      <nav class="nav-links">
+        <a href="/app" class="active">Create</a>
+        <a href="/notes">Notes</a>
+        <a href="/library">Your Library</a>
+        <a href="/board" id="whiteboardNavLink" style="display:none">Whiteboard</a>
+        <a href="/team" id="teamNavLink" style="display:none">Team</a>
+        <a href="/#pricing">Pricing</a>
+      </nav>
+      <div class="auth-area" id="authArea"></div>
+    </header>
+
+    <main class="app-page">
+      <section class="app-grid">
+        <div class="panel creator-panel" id="creatorPanel">
+          <div class="panel-header">
+            <div>
+              <span class="section-kicker">Create</span>
+              <h2>Build a study set</h2>
+            </div>
+            <div class="header-tools">
+              <span class="usage-pill" id="usagePill">Loading usage…</span>
+              <button class="btn ghost max-btn" data-target="creatorPanel" title="Maximize this panel" aria-label="Maximize Build a study set">⤢</button>
+            </div>
+          </div>
+
+          <div class="tabs" role="tablist" aria-label="Source type">
+            <button class="tab active" data-tab="paste">Paste content</button>
+            <button class="tab" data-tab="upload">Upload document</button>
+            <button class="tab" data-tab="chat">Guided chat</button>
+          </div>
+
+          <div class="tab-panel active" id="tab-paste">
+            <label for="pasteContent">Paste notes, job description, course content, policy text, or any knowledgebase excerpt.</label>
+            <textarea id="pasteContent" placeholder="Paste your material here. Example: FinOps principles, a chapter summary, interview notes, SAT topic notes..."></textarea>
+          </div>
+
+          <div class="tab-panel" id="tab-upload">
+            <label for="docUpload">Upload PDF, DOCX, TXT, Markdown, CSV, or JSON. File size limit is 15MB.</label>
+            <div class="upload-box">
+              <input id="docUpload" type="file" accept=".pdf,.docx,.txt,.md,.csv,.json" />
+              <button class="btn soft" id="extractBtn">Extract text</button>
+            </div>
+            <textarea id="uploadContent" placeholder="Extracted text will appear here. You can edit it before generating." readonly></textarea>
+            <button class="btn soft" id="planBtn" style="display:none">🧭 Analyze document &amp; plan sections</button>
+            <div class="plan-preview" id="planPreview" style="display:none">
+              <p class="plan-reasoning" id="planReasoning"></p>
+              <div class="plan-sections" id="planSections"></div>
+              <button class="btn primary" id="buildPlanBtn">Build full set from this plan</button>
+            </div>
+          </div>
+
+          <div class="tab-panel" id="tab-chat">
+            <div class="chat-box" id="chatBox"></div>
+            <div class="chat-input-row">
+              <input id="chatInput" placeholder="Answer the coach prompt..." />
+              <button class="btn primary" id="chatSend">Send</button>
+            </div>
+            <div class="chat-ready-banner" id="chatReadyBanner" style="display:none"></div>
+            <button class="btn ghost" id="resetChat">Restart guided chat</button>
+          </div>
+
+          <div class="control-grid">
+            <label>Items
+              <input id="cardCount" type="number" min="1" max="60" value="10" />
+            </label>
+            <label>Format
+              <select id="format">
+                <option value="mixed">Mixed</option>
+                <option value="flashcard">Flashcards</option>
+                <option value="quiz">Quiz questions</option>
+                <option value="slides">Slides</option>
+              </select>
+            </label>
+            <label>Category
+              <select id="category">
+                <option>Interview preparation</option>
+                <option>SAT prep</option>
+                <option>GMAT prep</option>
+                <option>Grade-level study</option>
+                <option>Professional certification</option>
+                <option>General learning</option>
+              </select>
+            </label>
+            <label>Grade / level
+              <input id="grade" placeholder="e.g., Grade 8, MBA, Executive" />
+            </label>
+            <label>Subject
+              <input id="subject" placeholder="e.g., History, Math, Science" />
+            </label>
+            <label id="satSectionLabel" style="display:none">SAT section
+              <select id="satSection">
+                <option value="Reading and Writing">Reading and Writing</option>
+                <option value="Math">Math</option>
+              </select>
+            </label>
+          </div>
+
+          <label class="wide-label">Extra instructions
+            <input id="notes" placeholder="Example: make it CIO interview-ready, include answer choices, keep language simple..." />
+          </label>
+
+          <div class="form-actions">
+            <button class="btn primary large" id="generateBtn">Generate</button>
+            <span class="status" id="statusText"></span>
+          </div>
+        </div>
+
+        <div class="panel study-panel" id="studyPanel">
+          <div class="panel-header">
+            <div>
+              <span class="section-kicker">Study</span>
+              <h2 id="setTitle">No set selected</h2>
+            </div>
+            <div class="header-tools">
+              <span class="card-count" id="cardCounter">0 / 0</span>
+              <button class="btn ghost max-btn" data-target="studyPanel" title="Maximize this panel" aria-label="Maximize Study">⤢</button>
+            </div>
+          </div>
+
+          <div class="flashcard" id="flashcard" tabindex="0" role="button" aria-label="Flip card">
+            <div class="flashcard-inner">
+              <div class="card-face card-front">
+                <span class="mini-label" id="frontLabel">Question</span>
+                <span class="difficulty-badge" id="difficultyBadge" style="display:none"></span>
+                <div class="passage-box" id="passageBox" style="display:none"></div>
+                <p id="cardFront">Create or select a study set to begin.</p>
+                <div class="choices" id="choices"></div>
+              </div>
+              <div class="card-face card-back">
+                <span class="mini-label">Answer</span>
+                <div class="verdict" id="verdict"></div>
+                <p id="cardBack">The answer will appear here.</p>
+                <small id="cardExplanation"></small>
+              </div>
+            </div>
+          </div>
+
+          <div class="slide-view" id="slideView" style="display:none">
+            <div class="slide-stage" id="slideStage">
+              <div class="slide-media" id="slideMedia"><span class="media-icon" id="mediaIcon"></span></div>
+              <div class="slide-content">
+                <span class="slide-kicker" id="slideKicker"></span>
+                <h2 id="slideTitle"></h2>
+                <ul class="slide-bullets" id="slideBullets"></ul>
+                <div class="slide-stat" id="slideStat" style="display:none">
+                  <span class="stat-value" id="statValue"></span>
+                  <span class="stat-label" id="statLabel"></span>
+                </div>
+                <blockquote class="slide-quote" id="slideQuote" style="display:none">
+                  <p id="quoteText"></p>
+                  <cite id="quoteAttribution"></cite>
+                </blockquote>
+                <div class="slide-chart" id="slideChart" style="display:none"></div>
+              </div>
+            </div>
+            <div class="slide-progress-track"><div class="slide-progress-fill" id="slideProgressFill"></div></div>
+            <div class="slide-footer">
+              <small id="slideNotes"></small>
+              <small class="slide-credit" id="slideCredit"></small>
+            </div>
+          </div>
+
+          <div class="sat-stage-bar" id="satStageBar" style="display:none">
+            <span id="satStageLabel"></span>
+            <div class="slide-progress-track"><div class="slide-progress-fill" id="satStageProgress"></div></div>
+          </div>
+
+          <div class="study-actions" id="studyActions">
+            <button class="btn soft" id="prevCard">← Previous</button>
+            <button class="btn primary" id="flipCard">Flip</button>
+            <button class="btn soft" id="nextCard">Next →</button>
+            <button class="btn ghost" id="shuffleCards">Shuffle</button>
+          </div>
+          <button class="btn primary large" id="satSubmitStage" style="display:none">Submit stage & continue →</button>
+          <div class="card-list" id="cardList"></div>
+
+          <div class="sat-results" id="satResults" style="display:none">
+            <h3>Practice complete</h3>
+            <p class="sat-results-caveat">This is an informal practice accuracy score, not an official or scaled SAT score.</p>
+            <div class="sat-results-summary">
+              <div class="sat-score-circle" id="satScoreCircle">
+                <span id="satScorePct">0%</span>
+                <small>accuracy</small>
+              </div>
+              <div class="sat-domain-bars" id="satDomainBars"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script src="/common.js?v=20260725-v21"></script>
+  <script src="/app.js?v=20260724-v6"></script>
+</body>
+</html>

@@ -1,0 +1,125 @@
+/* Your Library page: lists sets you created and sets shared with you. */
+(() => {
+  const { state, $, escapeHtml, setStatus, api, initCommon } = window.AppCommon;
+
+  const emptyText = (text) => `<p class="set-meta">${escapeHtml(text)}</p>`;
+
+  const formatLabel = (set) => {
+    if (set.format === 'slides') return 'slides';
+    if (set.format === 'quiz') return 'quiz';
+    if (set.format === 'flashcard') return 'flashcards';
+    return 'mixed';
+  };
+
+  // Students reach shared whiteboards from here, not the Whiteboard tab —
+  // this is where they look for "what did my teacher share with me".
+  async function loadSharedBoards() {
+    try {
+      const data = await api('/api/board/shared/mine');
+      const boards = data.boards || [];
+      const wrap = $('#sharedBoardsWrap');
+      if (!boards.length) { wrap.style.display = 'none'; return; }
+      wrap.style.display = 'block';
+      $('#sharedBoards').innerHTML = boards.map((b) => `
+        <div class="set-item">
+          <span class="set-title">${escapeHtml(b.title)} ${b.isLive ? '<span style="color:#14d9c4; font-size:0.75rem; font-weight:700;">● LIVE</span>' : ''}</span>
+          <span class="set-meta">${escapeHtml(b.teacherName)}'s whiteboard${b.isLive ? '' : ' • snapshot available'}</span>
+          <div class="set-actions">
+            ${b.isLive
+              ? `<a class="btn primary" href="/board/${b.boardId}">Join</a>`
+              : `<a class="btn soft" href="/board/${b.boardId}" title="View the last snapshot your teacher shared">View snapshot</a>`}
+          </div>
+        </div>
+      `).join('');
+    } catch (error) {
+      // A student with no shared boards shouldn't see an error for it.
+      $('#sharedBoardsWrap').style.display = 'none';
+    }
+  }
+
+  async function loadLibrary() {
+    try {
+      const data = await api('/api/sets');
+      renderSetList('#mySets', data.my || [], true);
+      renderSetList('#sharedSets', data.shared || [], false);
+    } catch (error) {
+      setStatus(error.message, 'error');
+    }
+  }
+
+  function renderSetList(target, sets, owned) {
+    const node = $(target);
+    if (!sets.length) {
+      node.innerHTML = emptyText(owned ? 'Nothing yet. Use “New study set” or “New notes” above to create your first.' : 'No shared sets yet.');
+      return;
+    }
+    node.innerHTML = sets.map((set) => `
+      <div class="set-item" data-id="${set.id}">
+        <span class="set-title">${escapeHtml(set.title)}</span>
+        <span class="set-meta">${set.cards.length} ${set.format === 'slides' ? 'slides' : 'cards'} • ${formatLabel(set)} • ${escapeHtml(set.subject || set.category || 'General')} • ${new Date(set.createdAt).toLocaleDateString()}</span>
+        <div class="set-actions">
+          <button class="btn primary study-mini" data-id="${set.id}">Study</button>
+          ${owned ? `<button class="btn soft share-toggle-mini" data-id="${set.id}" data-shared="${Boolean(set.shared)}">${set.shared ? 'Shared ✓' : 'Share'}</button><button class="btn ghost delete-mini" data-id="${set.id}">Delete</button>` : ''}
+        </div>
+      </div>
+    `).join('');
+    node.querySelectorAll('.set-item').forEach((item) => {
+      item.addEventListener('click', (event) => {
+        if (event.target.closest('button')) return;
+        window.location.href = `/app?set=${item.dataset.id}`;
+      });
+    });
+    node.querySelectorAll('.study-mini').forEach((button) => button.addEventListener('click', () => {
+      window.location.href = `/app?set=${button.dataset.id}`;
+    }));
+    node.querySelectorAll('.share-toggle-mini').forEach((button) => button.addEventListener('click', () => toggleShare(button.dataset.id, button.dataset.shared === 'true')));
+    node.querySelectorAll('.delete-mini').forEach((button) => button.addEventListener('click', () => deleteSet(button.dataset.id)));
+  }
+
+  async function deleteSet(setId) {
+    if (!confirm('Delete this study set?')) return;
+    try {
+      await api(`/api/sets/${setId}`, { method: 'DELETE' });
+      await loadLibrary();
+      setStatus('Study set deleted.', 'success');
+    } catch (error) {
+      setStatus(error.message, 'error');
+    }
+  }
+
+  // Sharing is a single on/off toggle now — once on, it's visible to
+  // everyone on your team roster (see /team), no per-item email list to
+  // manage. If the account isn't on the Teams plan, the server rejects
+  // this with a clear message pointing at the Teams trial.
+  async function toggleShare(setId, currentlyShared) {
+    try {
+      await api(`/api/sets/${setId}/share-toggle`, { method: 'POST', body: JSON.stringify({ shared: !currentlyShared }) });
+      await loadLibrary();
+      setStatus(currentlyShared ? 'No longer shared.' : 'Shared with your team.', 'success');
+    } catch (error) {
+      setStatus(error.message, 'error');
+    }
+  }
+
+  function switchScope(scope) {
+    $('#workbenchToggle').querySelectorAll('.seg-btn').forEach((b) =>
+      b.classList.toggle('active', b.dataset.scope === scope));
+    const mine = scope === 'mine';
+    $('#mineScope').style.display = mine ? '' : 'none';
+    $('#sharedScope').style.display = mine ? 'none' : '';
+    $('#workbenchHint').style.display = mine ? '' : 'none';
+  }
+
+  async function init() {
+    await initCommon();
+    if (!state.user) { window.location.href = '/?login=1'; return; }
+    $('#workbenchToggle').querySelectorAll('.seg-btn').forEach((b) =>
+      b.addEventListener('click', () => switchScope(b.dataset.scope)));
+    // Yours first for everyone — students can create Notes and study sets too.
+    switchScope('mine');
+    await loadLibrary();
+    await loadSharedBoards();
+  }
+
+  init().catch((error) => setStatus(error.message, 'error'));
+})();

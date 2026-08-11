@@ -157,7 +157,7 @@
       if (!data.email || !data.firstName) { status.className = 'form-status err'; status.textContent = 'Please add your name and school email.'; return; }
       submit.disabled = true; submit.textContent = 'Sending…';
       try {
-        const res = await fetch('/api/founder/apply', {
+        const res = await fetch('/api/founding/apply', {
           method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data)
         });
         const out = await res.json().catch(() => ({}));
