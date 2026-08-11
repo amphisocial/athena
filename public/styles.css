@@ -49,7 +49,7 @@ textarea { resize: vertical; }
   width: 38px;
   height: 38px;
   border-radius: 11px;
-  background-image: url('/img/boardsy-logo.svg');
+  background-image: url('/img/boardsy-logo.svg?v=boardsy2');
   background-size: cover;
   background-position: center;
   box-shadow: 0 10px 24px rgba(26,49,69,0.4);
