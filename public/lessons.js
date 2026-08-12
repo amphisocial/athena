@@ -7,6 +7,7 @@
   let items = [];
   let user = null;
   let bookmarks = new Set();
+  let plPage = 0;
 
   const subjBadge = (s) => s === 'math' ? '<span class="subj-badge math">Math</span>'
     : s === 'science' ? '<span class="subj-badge science">Science</span>' : '';
@@ -49,7 +50,12 @@
     });
     const grid = $('#plGrid');
     if (!list.length) { grid.innerHTML = '<div class="list-empty">No public lessons match — try clearing filters.</div>'; return; }
-    grid.innerHTML = '<div class="row-list">' + list.map((it) => `
+    const PAGE = 25;
+    const pages = Math.max(1, Math.ceil(list.length / PAGE));
+    if (plPage >= pages) plPage = 0;
+    const start = plPage * PAGE;
+    const pageItems = list.slice(start, start + PAGE);
+    grid.innerHTML = '<div class="row-list">' + pageItems.map((it) => `
       <div class="list-row">
         <div class="lr-main">
           <div class="lr-titleline">
@@ -62,10 +68,22 @@
           <a class="btn primary xs" href="${it.openUrl}">Open</a>
           ${bookmarkBtnXs(it)}
         </div>
-      </div>`).join('') + '</div>';
+      </div>`).join('') + '</div>' + pager(list.length, start, PAGE, plPage, pages);
 
     grid.querySelectorAll('.pl-star').forEach((b) => b.addEventListener('click', () => rate(b)));
     grid.querySelectorAll('.pl-bm').forEach((b) => b.addEventListener('click', () => toggleBookmark(b)));
+    grid.querySelectorAll('.pager-btn').forEach((b) => b.addEventListener('click', () => { plPage = Number(b.dataset.p); render(); }));
+  }
+
+  function pager(total, start, size, page, pages) {
+    if (pages <= 1) return '';
+    const end = Math.min(total, start + size);
+    return `<div class="pager">
+      <span class="pager-info">${start + 1}–${end} of ${total}</span>
+      <button class="pager-btn" data-p="${Math.max(0, page - 1)}" ${page === 0 ? 'disabled' : ''}>‹ Prev</button>
+      <span class="pager-page">Page ${page + 1} / ${pages}</span>
+      <button class="pager-btn" data-p="${Math.min(pages - 1, page + 1)}" ${page >= pages - 1 ? 'disabled' : ''}>Next ›</button>
+    </div>`;
   }
 
   async function rate(btn) {
@@ -100,7 +118,7 @@
       items = data.items || [];
     } catch (e) { $('#plGrid').innerHTML = `<p class="pl-empty">${escapeHtml(e.message)}</p>`; return; }
     if (!items.length) { $('#plGrid').innerHTML = '<p class="pl-empty">No public lessons yet. Teachers can mark a board or lesson Public from their Library.</p>'; return; }
-    ['#plSearch', '#plType', '#plSubject', '#plGrade'].forEach((s) => { const el = $(s); if (el) el.addEventListener('input', render); });
+    ['#plSearch', '#plType', '#plSubject', '#plGrade'].forEach((s) => { const el = $(s); if (el) el.addEventListener('input', () => { plPage = 0; render(); }); });
     render();
   })();
 })();

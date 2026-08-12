@@ -5,6 +5,8 @@
   const { $, $$, escapeHtml, setStatus, api, initCommon, state } = window.AppCommon;
 
   let allItems = [];          // current scope's items (unified shape)
+  let lastItems = [];         // last filtered set (for pager re-render)
+  let libPage = 0;
   let scope = 'mine';
 
   const fmtDate = (iso) => { try { return new Date(iso).toLocaleDateString(); } catch (_) { return ''; } };
@@ -77,6 +79,8 @@
       if (q && !(`${it.title} ${it.topic}`.toLowerCase().includes(q))) return false;
       return true;
     });
+    lastItems = items;
+    libPage = 0;
     render(items);
   }
 
@@ -90,7 +94,12 @@
       list.innerHTML = `<div class="list-empty">${msg}</div>`;
       return;
     }
-    list.innerHTML = '<div class="row-list">' + items.map((it) => `
+    const PAGE = 25;
+    const pages = Math.max(1, Math.ceil(items.length / PAGE));
+    if (libPage >= pages) libPage = 0;
+    const start = libPage * PAGE;
+    const pageItems = items.slice(start, start + PAGE);
+    list.innerHTML = '<div class="row-list">' + pageItems.map((it) => `
       <div class="list-row" data-id="${it.id}" data-type="${it.type}">
         <div class="lr-main">
           <div class="lr-titleline">
@@ -106,12 +115,24 @@
             <button class="btn ghost xs pub-toggle" data-id="${it.id}" data-type="${it.type}" data-public="${it.public}" title="${it.public ? 'Make private' : 'Make public'}">${it.public ? 'Unpublish' : 'Publish'}</button>
             <button class="btn ghost xs del-item" data-id="${it.id}" data-type="${it.type}" title="Delete">✕</button>`}
         </div>
-      </div>`).join('') + '</div>';
+      </div>`).join('') + '</div>' + pager(items.length, start, PAGE, libPage, pages);
 
     list.querySelectorAll('.pub-toggle').forEach((b) => b.addEventListener('click', () =>
       togglePublic(b.dataset.type, b.dataset.id, b.dataset.public === 'true')));
     list.querySelectorAll('.del-item').forEach((b) => b.addEventListener('click', () =>
       delItem(b.dataset.type, b.dataset.id)));
+    list.querySelectorAll('.pager-btn').forEach((b) => b.addEventListener('click', () => { libPage = Number(b.dataset.p); render(lastItems); }));
+  }
+
+  function pager(total, start, size, page, pages) {
+    if (pages <= 1) return '';
+    const end = Math.min(total, start + size);
+    return `<div class="pager">
+      <span class="pager-info">${start + 1}–${end} of ${total}</span>
+      <button class="pager-btn" data-p="${Math.max(0, page - 1)}" ${page === 0 ? 'disabled' : ''}>‹ Prev</button>
+      <span class="pager-page">Page ${page + 1} / ${pages}</span>
+      <button class="pager-btn" data-p="${Math.min(pages - 1, page + 1)}" ${page >= pages - 1 ? 'disabled' : ''}>Next ›</button>
+    </div>`;
   }
 
   async function togglePublic(type, id, currentlyPublic) {

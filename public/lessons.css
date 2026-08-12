@@ -93,3 +93,13 @@
 .list-row .pl-stars .pl-star { font-size: 0.92rem; }
 .list-row .pl-rating-count { font-size: 0.72rem; }
 .list-empty { padding: 16px; color: var(--muted, #5a6b85); }
+
+/* Pagination footer */
+.pager { display: flex; align-items: center; justify-content: flex-end; gap: 12px; padding: 12px 4px 0; font-size: 0.82rem; color: var(--muted, #5a6b85); }
+.pager-info { margin-right: auto; }
+.pager-btn {
+  border: 1px solid var(--line, #dce6f5); background: #fff; color: var(--ink, #0f1e35);
+  border-radius: 8px; padding: 5px 12px; font: inherit; font-size: 0.82rem; cursor: pointer;
+}
+.pager-btn:disabled { opacity: 0.4; cursor: default; }
+.pager-btn:not(:disabled):hover { border-color: var(--brand, #2563ff); color: var(--brand, #2563ff); }
