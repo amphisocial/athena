@@ -104,7 +104,7 @@
         <div class="lr-main">
           <div class="lr-titleline">
             ${typeBadge(it.type)} <a class="lr-title" href="${it.openUrl}">${escapeHtml(it.title)}</a> ${subjBadge(it.subject)}
-            ${it.public ? '<span class="pub-pill public">Public</span>' : (it.readOnly ? '' : '<span class="pub-pill">Private</span>')}
+            ${it.public ? '<span class="pub-pill public">Public</span>' : (it.readOnly ? '' : '<span class="pub-pill">Private</span>')} ${it.isLive ? '<span class="live-badge">● LIVE</span>' : ''}
           </div>
           <div class="lr-meta">${escapeHtml([gradeLabel(it.grade), it.topic, it.owner ? 'by ' + it.owner : '', 'updated ' + fmtDate(it.updatedAt)].filter(Boolean).join(' · '))}${it.rating && it.rating.count ? ' · ★' + (it.rating.sum / it.rating.count).toFixed(1) + ' (' + it.rating.count + ')' : ''}</div>
         </div>

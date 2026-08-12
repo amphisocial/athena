@@ -59,7 +59,7 @@
       <div class="list-row">
         <div class="lr-main">
           <div class="lr-titleline">
-            ${typeBadge(it.type)} <a class="lr-title" href="${it.openUrl}">${escapeHtml(it.title)}</a> ${subjBadge(it.subject)}
+            ${typeBadge(it.type)} <a class="lr-title" href="${it.openUrl}">${escapeHtml(it.title)}</a> ${subjBadge(it.subject)} ${it.isLive ? '<span class="live-badge">● LIVE</span>' : ''}
           </div>
           <div class="lr-meta">${escapeHtml([gradeLabel(it.grade), it.topic, 'by ' + (it.creator || 'a teacher'), fmtDate(it.updatedAt)].filter(Boolean).join(' · '))}</div>
         </div>

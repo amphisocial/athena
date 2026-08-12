@@ -114,3 +114,26 @@ body.public-lesson .usage-pill { display: none !important; }
 .public-lesson-bar .pl-star.on { color: #ffb020; }
 .public-lesson-bar .pl-star:hover { color: #ffcf6b; }
 .public-lesson-bar .pl-rating-count { color: var(--muted, #5a6b85); font-size: 0.82rem; margin-left: 6px; }
+
+/* ===== Live lesson session chrome ===== */
+.live-strip { max-width: 1100px; margin: 10px auto 0; padding: 0 20px; }
+.live-head { display: flex; align-items: center; gap: 12px; font-weight: 600; color: var(--ink, #0f1e35); }
+.live-dot { color: #e23b3b; font-weight: 800; animation: livePulse 1.4s infinite; }
+@keyframes livePulse { 50% { opacity: 0.45; } }
+.live-body { margin-top: 8px; display: flex; flex-direction: column; gap: 8px; padding: 10px 14px; border: 1px solid var(--line, #dce6f5); border-radius: 12px; background: #fff; }
+.live-agg { font-weight: 600; color: #0f9c8f; }
+.live-agg.muted { color: var(--muted, #5a6b85); font-weight: 500; }
+.live-react { display: inline-flex; gap: 6px; }
+.react-btn { border: 1px solid var(--line, #dce6f5); background: #f7faff; border-radius: 10px; font-size: 1.1rem; cursor: pointer; padding: 3px 8px; }
+.react-btn:hover { border-color: var(--brand, #2563ff); }
+.live-qtitle { font-weight: 700; font-size: 0.85rem; color: var(--muted, #5a6b85); margin-top: 4px; }
+.live-qs { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; max-height: 160px; overflow: auto; }
+.live-qs li { font-size: 0.9rem; display: flex; gap: 8px; align-items: baseline; }
+.q-clear { margin-left: auto; border: 0; background: none; color: #0f9c8f; cursor: pointer; }
+.live-qs-empty { color: var(--muted, #5a6b85); font-size: 0.85rem; }
+.live-ask { display: flex; gap: 8px; }
+.live-ask input { flex: 1; padding: 8px 12px; border: 1px solid var(--line, #dce6f5); border-radius: 10px; background: #f7faff; }
+.live-emoji { position: absolute; bottom: 60px; font-size: 2rem; animation: floatUp 2.2s ease-out forwards; pointer-events: none; z-index: 50; }
+@keyframes floatUp { 0% { transform: translateY(0); opacity: 0; } 15% { opacity: 1; } 100% { transform: translateY(-180px); opacity: 0; } }
+/* Students in a live room don't drive the deck. */
+body.live-student #prevCard, body.live-student #nextCard, body.live-student #flipCard, body.live-student #shuffleCards { display: none !important; }

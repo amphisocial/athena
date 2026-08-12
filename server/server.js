@@ -1746,6 +1746,32 @@ app.delete(['/api/sets/:id', '/api/quizlets/:id'], requireUser, deleteSet);
 app.post(['/api/sets/:id/share-toggle', '/api/quizlets/:id/share-toggle'], requireUser, shareToggleSet);
 app.post(['/api/sets/:id/share', '/api/quizlets/:id/share'], requireUser, shareSet);
 
+// Lesson LIVE sessions (Teams / founders / admins). Going live lets students
+// join a synced, teacher-driven presentation of the set.
+app.post(['/api/sets/:id/go-live', '/api/quizlets/:id/go-live'], requireUser, (req, res) => {
+  if (!membership.effectiveLimits(req.user).whiteboardLive) {
+    return res.status(403).json({ error: 'Live lesson sessions are on the Teams plan. Start a free 7-day Teams trial to go live.' });
+  }
+  const store = readStore();
+  const set = store.quizlets.find((s) => s.id === req.params.id);
+  if (!set || set.ownerId !== req.user.id) return res.status(404).json({ error: 'Lesson not found.' });
+  set.isLive = true;
+  set.liveStartedAt = nowIso();
+  set.updatedAt = nowIso();
+  writeStore(store);
+  res.json({ set });
+});
+
+app.post(['/api/sets/:id/stop-live', '/api/quizlets/:id/stop-live'], requireUser, (req, res) => {
+  const store = readStore();
+  const set = store.quizlets.find((s) => s.id === req.params.id);
+  if (!set || set.ownerId !== req.user.id) return res.status(404).json({ error: 'Lesson not found.' });
+  set.isLive = false;
+  set.updatedAt = nowIso();
+  writeStore(store);
+  res.json({ set });
+});
+
 // Edit a study set's metadata (subject / grade / topic) and public flag.
 app.post(['/api/sets/:id/meta', '/api/quizlets/:id/meta'], requireUser, (req, res) => {
   const store = readStore();
@@ -1780,7 +1806,7 @@ app.get('/api/library', requireUser, (req, res) => {  const store = readStore();
     .map((s) => ({
       type: 'lesson', id: s.id, title: s.title,
       subject: s.subject || s.category || '', grade: s.grade || '', topic: s.topic || '',
-      public: Boolean(s.public), shared: Boolean(s.shared),
+      public: Boolean(s.public), shared: Boolean(s.shared), isLive: Boolean(s.isLive),
       rating: s.rating || { sum: 0, count: 0 },
       format: s.format, cardCount: (s.cards || []).length,
       createdAt: s.createdAt, updatedAt: s.updatedAt || s.createdAt,
@@ -1817,7 +1843,7 @@ app.get('/api/public/lessons', (req, res) => {
   const boardItems = boards.filter((b) => b.public).map((b) => ({
     type: 'whiteboard', id: b.id, title: b.title,
     subject: b.subject || '', grade: b.grade || '', topic: b.topic || '',
-    creator: creatorName(store, b.teacherId),
+    creator: creatorName(store, b.teacherId), isLive: Boolean(b.isLive),
     createdAt: b.createdAt, updatedAt: b.updatedAt || b.createdAt,
     rating: ratingSummary(b),
     openUrl: b.publicToken ? `/s/${b.publicToken}` : `/board/${b.id}`
@@ -1825,7 +1851,7 @@ app.get('/api/public/lessons', (req, res) => {
   const setItems = store.quizlets.filter((s) => s.public).map((s) => ({
     type: 'lesson', id: s.id, title: s.title,
     subject: s.subject || s.category || '', grade: s.grade || '', topic: s.topic || '',
-    creator: creatorName(store, s.ownerId),
+    creator: creatorName(store, s.ownerId), isLive: Boolean(s.isLive),
     format: s.format, cardCount: (s.cards || []).length,
     createdAt: s.createdAt, updatedAt: s.updatedAt || s.createdAt,
     rating: ratingSummary(s),
@@ -1845,7 +1871,7 @@ app.get('/api/public/lesson/:id', (req, res) => {
   res.json({
     set: { id: s.id, title: s.title, cards: s.cards || [], format: s.format,
       subject: s.subject || '', grade: s.grade || '', topic: s.topic || '',
-      creator: creatorName(store, s.ownerId), rating: ratingSummary(s) }
+      isLive: Boolean(s.isLive), creator: creatorName(store, s.ownerId), rating: ratingSummary(s) }
   });
 });
 
@@ -2269,6 +2295,11 @@ attachBoardWebSocket(httpServer, {
   userHasWhiteboardAccess,
   askVisionAI: ({ instructions, imageDataUrl }) => askVisionAI({ instructions, imageDataUrl })
 });
+
+// Live LESSON sessions (synced slides/quiz/flashcards, quiz aggregates,
+// questions, reactions) — students may be anonymous when the lesson is public.
+const { attachLessonWebSocket } = require('./lesson-live');
+attachLessonWebSocket(httpServer, { getUserFromCookieHeader, readStore, writeStore, emailOnRoster, nowIso });
 
 // Boot: initialize Postgres (create schema + warm the in-memory snapshot)
 // BEFORE we start accepting requests, so the first request sees real data.

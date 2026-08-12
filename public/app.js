@@ -275,6 +275,7 @@
     if (shouldAutoMaximize && !studyPanel.classList.contains('maximized')) {
       toggleMaximize(studyPanel, true);
     }
+    if (typeof renderLiveChrome === 'function') renderLiveChrome();
   }
 
   const currentCard = () => study.set?.cards?.[study.index];
@@ -487,8 +488,11 @@
       button.addEventListener('click', (event) => {
         event.stopPropagation();
         if (study.flipped) return;
-        study.answers[card.id] = Number(button.dataset.index);
+        const choice = Number(button.dataset.index);
+        study.answers[card.id] = choice;
         renderStudy();
+        // In a live session, students send their answer to the teacher's tally.
+        if (Live.on && Live.role === 'student') liveSend({ type: 'answer', index: study.index, choice });
       });
     });
 
@@ -520,21 +524,26 @@
   }
 
   function flipCard() {
+    if (Live.on && Live.role === 'student') return;   // teacher drives the deck
     const card = currentCard();
     if (!card || isSlide(card)) return;
     study.flipped = !study.flipped;
     renderStudy();
+    if (Live.on && Live.role === 'teacher') liveSend({ type: 'nav', index: study.index, flipped: study.flipped });
   }
 
   function moveCard(delta) {
+    if (Live.on && Live.role === 'student') return;
     const cards = study.set?.cards || [];
     if (!cards.length) return;
     study.index = (study.index + delta + cards.length) % cards.length;
     study.flipped = false;
     renderStudy();
+    if (Live.on && Live.role === 'teacher') liveSend({ type: 'nav', index: study.index, flipped: study.flipped });
   }
 
   function shuffleCards() {
+    if (Live.on) return;   // shuffling would desync a live room
     if (!study.set?.cards?.length) return;
     study.set.cards = study.set.cards
       .map((card) => ({ card, sort: Math.random() }))
@@ -696,6 +705,121 @@
     });
   }
 
+  // ===================== Live lesson sessions =====================
+  const Live = { ws: null, role: null, on: false, setId: null, aggregate: null, questions: [] };
+  function liveSend(o) { try { if (Live.ws && Live.ws.readyState === 1) Live.ws.send(JSON.stringify(o)); } catch (_) {} }
+  const wsLessonUrl = (setId) => `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws/lesson?set=${encodeURIComponent(setId)}`;
+
+  function connectLive(setId, role) {
+    closeLive();
+    Live.setId = setId; Live.role = role;
+    const ws = new WebSocket(wsLessonUrl(setId));
+    Live.ws = ws;
+    ws.onopen = () => { Live.on = true; renderLiveChrome(); };
+    ws.onclose = () => { Live.on = false; renderLiveChrome(); };
+    ws.onmessage = (ev) => { let m; try { m = JSON.parse(ev.data); } catch { return; } handleLive(m); };
+  }
+  function closeLive() { if (Live.ws) { try { Live.ws.close(); } catch (_) {} } Live.ws = null; Live.on = false; }
+
+  function handleLive(m) {
+    if (m.type === 'sync') {
+      if (Live.role === 'student' && m.set) loadSetIntoStudy(m.set);
+      applyRemoteState(m.state);
+    } else if (m.type === 'nav') {
+      applyRemoteState({ index: m.index, flipped: m.flipped });
+    } else if (m.type === 'reaction') {
+      floatEmoji(m.emoji);
+    } else if (m.type === 'presence') {
+      Live.count = m.count; Live.roster = m.roster || null; renderLiveChrome();
+    } else if (m.type === 'quiz:aggregate') {
+      Live.aggregate = m; renderLiveChrome();
+    } else if (m.type === 'question') {
+      Live.questions.unshift(m.question); renderLiveChrome();
+    } else if (m.type === 'question:cleared') {
+      Live.questions = Live.questions.filter((q) => q.id !== m.id); renderLiveChrome();
+    } else if (m.type === 'ended') {
+      closeLive(); setStatus('The teacher ended the live session.', 'info'); renderLiveChrome();
+    }
+  }
+  function applyRemoteState(st) { if (!st) return; study.index = Number(st.index) || 0; study.flipped = Boolean(st.flipped); renderStudy(); }
+
+  function floatEmoji(emoji) {
+    const host = document.getElementById('studyPanel') || document.body;
+    const el = document.createElement('div');
+    el.className = 'live-emoji'; el.textContent = emoji;
+    el.style.left = `${20 + Math.random() * 60}%`;
+    host.appendChild(el);
+    setTimeout(() => el.remove(), 2200);
+  }
+
+  async function teacherGoLive() {
+    const set = study.set; if (!set) return;
+    try { await api(`/api/sets/${set.id}/go-live`, { method: 'POST' }); }
+    catch (e) { setStatus(e.message, 'error'); return; }
+    connectLive(set.id, 'teacher');
+    setStatus('You are live — students can join from the public lesson link.', 'success');
+  }
+  async function teacherEndLive() {
+    const set = study.set; if (!set) return;
+    liveSend({ type: 'end' });
+    try { await api(`/api/sets/${set.id}/stop-live`, { method: 'POST' }); } catch (_) {}
+    closeLive(); Live.questions = []; Live.aggregate = null; renderLiveChrome();
+    setStatus('Live session ended.', 'info');
+  }
+
+  // Renders the live strip/panel + reaction/question controls into #studyActions.
+  function renderLiveChrome() {
+    const actions = document.getElementById('studyActions');
+    if (!actions) return;
+    let strip = document.getElementById('liveStrip');
+    if (!strip) { strip = document.createElement('div'); strip.id = 'liveStrip'; strip.className = 'live-strip'; actions.insertAdjacentElement('afterend', strip); }
+
+    const isTeacher = Live.role === 'teacher';
+    const ownsSet = study.set && state.user && study.set.ownerId === state.user.id;
+
+    // Not connected: teacher (owner) sees a "Go Live" button; others see nothing.
+    if (!Live.on) {
+      strip.innerHTML = (ownsSet && !document.body.classList.contains('public-lesson'))
+        ? `<button class="btn primary" id="goLiveBtn">● Go live</button>`
+        : '';
+      const gl = document.getElementById('goLiveBtn'); if (gl) gl.addEventListener('click', teacherGoLive);
+      return;
+    }
+
+    const react = `<span class="live-react">${['👍', '🎉', '❓', '😮', '👏'].map((e) => `<button class="react-btn" data-emoji="${e}">${e}</button>`).join('')}</span>`;
+
+    if (isTeacher) {
+      const agg = Live.aggregate;
+      const aggHtml = (agg && agg.total) ? (() => {
+        const pct = agg.correctIndex >= 0 ? Math.round((agg.correct / agg.total) * 100) : null;
+        return `<span class="live-agg">${agg.total} answered${pct != null ? ` · ${pct}% correct (${agg.correct}/${agg.total})` : ''}</span>`;
+      })() : '<span class="live-agg muted">No answers yet on this card</span>';
+      const qs = Live.questions.length
+        ? `<ul class="live-qs">${Live.questions.map((q) => `<li><strong>${escapeHtml(q.name || q.label)}</strong>: ${escapeHtml(q.text)} <button class="q-clear" data-id="${q.id}">✓</button></li>`).join('')}</ul>`
+        : '<div class="live-qs-empty">No questions yet.</div>';
+      strip.innerHTML = `
+        <div class="live-head"><span class="live-dot">● LIVE</span> <span>${Live.count || 0} student${Live.count === 1 ? '' : 's'}</span>
+          <button class="btn ghost small" id="endLiveBtn">End live</button></div>
+        <div class="live-body">${aggHtml} ${react}<div class="live-qtitle">Questions</div>${qs}</div>`;
+      document.getElementById('endLiveBtn').addEventListener('click', teacherEndLive);
+      strip.querySelectorAll('.q-clear').forEach((b) => b.addEventListener('click', () => liveSend({ type: 'question:clear', id: b.dataset.id })));
+    } else {
+      // Student: following the teacher, can react + ask a question. Nav is locked.
+      strip.innerHTML = `
+        <div class="live-head"><span class="live-dot">● LIVE</span> <span>Following the teacher</span></div>
+        <div class="live-body">
+          ${react}
+          <div class="live-ask"><input id="liveQ" placeholder="Ask a question…" maxlength="400" /><button class="btn soft small" id="liveQSend">Ask</button></div>
+        </div>`;
+      const sendQ = () => { const v = document.getElementById('liveQ').value.trim(); if (!v) return; liveSend({ type: 'question:ask', text: v }); document.getElementById('liveQ').value = ''; setStatus('Question sent to the teacher.', 'success'); };
+      document.getElementById('liveQSend').addEventListener('click', sendQ);
+      document.getElementById('liveQ').addEventListener('keydown', (e) => { if (e.key === 'Enter') sendQ(); });
+    }
+    strip.querySelectorAll('.react-btn').forEach((b) => b.addEventListener('click', () => liveSend({ type: 'reaction', emoji: b.dataset.emoji })));
+    // Lock nav for students.
+    document.body.classList.toggle('live-student', Live.on && Live.role === 'student');
+  }
+
   async function init() {
     bindEvents();
     resetChat();
@@ -718,6 +842,8 @@
         const data = await api(`/api/public/lesson/${token}`);
         loadSetIntoStudy(data.set);
         mountPublicRating(data.set, token);
+        // If the lesson is live right now, join the session as a student.
+        if (data.set.isLive) connectLive(token, 'student');
       } catch (error) {
         setStatus(error.message || 'This lesson is not available.', 'error');
       }
