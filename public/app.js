@@ -777,12 +777,13 @@
     const isTeacher = Live.role === 'teacher';
     const ownsSet = study.set && state.user && study.set.ownerId === state.user.id;
 
-    // Not connected: teacher (owner) sees a "Go Live" button; others see nothing.
+    // Not connected: teacher (owner) sees "Go live" + "Share"; others see nothing.
     if (!Live.on) {
       strip.innerHTML = (ownsSet && !document.body.classList.contains('public-lesson'))
-        ? `<button class="btn primary" id="goLiveBtn">● Go live</button>`
+        ? `<button class="btn primary" id="goLiveBtn">● Go live</button> <button class="btn soft" id="shareLessonBtn">Share</button>`
         : '';
       const gl = document.getElementById('goLiveBtn'); if (gl) gl.addEventListener('click', teacherGoLive);
+      const sh = document.getElementById('shareLessonBtn'); if (sh) sh.addEventListener('click', openLessonShare);
       return;
     }
 
@@ -818,6 +819,48 @@
     strip.querySelectorAll('.react-btn').forEach((b) => b.addEventListener('click', () => liveSend({ type: 'reaction', emoji: b.dataset.emoji })));
     // Lock nav for students.
     document.body.classList.toggle('live-student', Live.on && Live.role === 'student');
+  }
+
+  // Share a lesson by link + QR + email (parity with the whiteboard share).
+  async function openLessonShare() {
+    const set = study.set; if (!set) return;
+    let token; let url;
+    try {
+      const d = await api(`/api/sets/${set.id}/share`, { method: 'POST' });
+      token = d.token; url = `${window.location.origin}/l/${token}`;
+    } catch (e) { setStatus(e.message, 'error'); return; }
+    let m = document.getElementById('lessonShareModal');
+    if (!m) { m = document.createElement('div'); m.id = 'lessonShareModal'; m.className = 'study-modal'; document.body.appendChild(m);
+      m.addEventListener('click', (e) => { if (e.target === m || e.target.classList.contains('study-close')) m.classList.remove('open'); }); }
+    m.innerHTML = `<div class="study-card share-card"><button class="study-close" aria-label="Close">×</button>
+      <h3>Share this lesson</h3>
+      <p class="share-sub">Anyone with the link can open and study it — no login. If you go live, they can join the live session from the same link.</p>
+      <div class="share-linkrow"><input id="lessonShareUrl" readonly value="${url}" /><button class="btn primary small" id="lessonShareCopy">Copy</button></div>
+      <div class="share-qr"><img src="/qr?d=${encodeURIComponent(url)}" alt="QR code" width="160" height="160" /><span>Scan or project this in class</span></div>
+      <div class="share-email">
+        <label>Email it to your class<textarea id="lessonShareEmails" placeholder="student1@school.edu, student2@school.edu"></textarea></label>
+        <label>Note (optional)<input id="lessonShareNote" placeholder="Join my live lesson at 2pm — scan to open." /></label>
+        <button class="btn primary" id="lessonShareSend">Send links</button>
+        <div class="form-status" id="lessonShareStatus"></div>
+      </div></div>`;
+    m.classList.add('open');
+    document.getElementById('lessonShareCopy').addEventListener('click', () => {
+      const inp = document.getElementById('lessonShareUrl'); inp.select();
+      navigator.clipboard?.writeText(inp.value).then(() => { document.getElementById('lessonShareCopy').textContent = 'Copied'; }).catch(() => {});
+    });
+    document.getElementById('lessonShareSend').addEventListener('click', async () => {
+      const emails = document.getElementById('lessonShareEmails').value.trim();
+      const note = document.getElementById('lessonShareNote').value.trim();
+      const st = document.getElementById('lessonShareStatus'); const btn = document.getElementById('lessonShareSend');
+      if (!emails) { st.className = 'form-status err'; st.textContent = 'Add at least one email.'; return; }
+      btn.disabled = true; btn.textContent = 'Sending…';
+      try {
+        const d = await api(`/api/sets/${set.id}/share-email`, { method: 'POST', body: JSON.stringify({ emails, note }) });
+        st.className = 'form-status ok';
+        st.textContent = d.sent ? `Sent to ${d.sent} of ${d.total}.` : 'Links prepared. (Email is not configured on the server.)';
+      } catch (e) { st.className = 'form-status err'; st.textContent = e.message; }
+      finally { btn.disabled = false; btn.textContent = 'Send links'; }
+    });
   }
 
   async function init() {

@@ -62,12 +62,13 @@ function attachLessonWebSocket(httpServer, deps) {
   wss.on('connection', (ws, req) => {
     try {
       const url = new URL(req.url, 'http://localhost');
-      const setId = url.searchParams.get('set');
-      if (!setId) return ws.close(4001, 'Missing set');
+      const setKey = url.searchParams.get('set');
+      if (!setKey) return ws.close(4001, 'Missing set');
 
       const store = readStore();
-      const set = (store.quizlets || []).find((s) => s.id === setId);
+      const set = (store.quizlets || []).find((s) => s.id === setKey || s.shareToken === setKey);
       if (!set) return ws.close(4004, 'Lesson not found');
+      const setId = set.id;   // canonical room key (teacher uses id, students may use token)
 
       const user = getUserFromCookieHeader(req.headers.cookie);
       const isTeacher = Boolean(user && user.id === set.ownerId);
@@ -76,7 +77,7 @@ function attachLessonWebSocket(httpServer, deps) {
         // Students may only join a LIVE lesson, and only if it's public or
         // shared with them (roster). Anonymous is allowed only when public.
         if (!set.isLive) return ws.close(4003, 'This lesson is not live');
-        const allowed = set.public || (user && emailOnRoster(store, set.ownerId, user.email));
+        const allowed = set.public || set.shared || (user && emailOnRoster(store, set.ownerId, user.email));
         if (!allowed) return ws.close(4003, 'This live lesson is private');
       } else if (!set.isLive) {
         // Teacher connecting implies/keeps it live.

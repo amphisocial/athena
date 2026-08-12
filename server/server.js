@@ -1866,13 +1866,68 @@ app.get('/api/public/lessons', (req, res) => {
 // A public study set, for the no-login study viewer at /l/:id.
 app.get('/api/public/lesson/:id', (req, res) => {
   const store = readStore();
-  const s = store.quizlets.find((x) => x.id === req.params.id && x.public);
+  // Resolve by share token first (unguessable, like the whiteboard link), then
+  // fall back to a public set by id. A lesson opens if it's public, has been
+  // shared (link/QR/email), or is live.
+  const key = req.params.id;
+  const s = store.quizlets.find((x) => (x.shareToken === key || (x.id === key && x.public)) && (x.public || x.shared || x.isLive));
   if (!s) return res.status(404).json({ error: 'This lesson is not available.' });
   res.json({
     set: { id: s.id, title: s.title, cards: s.cards || [], format: s.format,
       subject: s.subject || '', grade: s.grade || '', topic: s.topic || '',
       isLive: Boolean(s.isLive), creator: creatorName(store, s.ownerId), rating: ratingSummary(s) }
   });
+});
+
+// Ensure a lesson has an unguessable share token (for QR / link / email).
+function ensureLessonToken(set) {
+  if (!set.shareToken) set.shareToken = `les${Math.random().toString(16).slice(2, 12)}`;
+  return set.shareToken;
+}
+
+// Get (or create) the share link for a lesson — owner only.
+app.post(['/api/sets/:id/share', '/api/quizlets/:id/share-link'], requireUser, (req, res) => {
+  const store = readStore();
+  const set = store.quizlets.find((s) => s.id === req.params.id);
+  if (!set || set.ownerId !== req.user.id) return res.status(404).json({ error: 'Lesson not found.' });
+  set.shared = true;
+  ensureLessonToken(set);
+  writeStore(store);
+  res.json({ token: set.shareToken, url: `${APP_BASE_URL}/l/${set.shareToken}` });
+});
+
+// Email the lesson link (+ QR) to a class — owner only.
+app.post(['/api/sets/:id/share-email', '/api/quizlets/:id/share-email'], requireUser, async (req, res) => {
+  const store = readStore();
+  const set = store.quizlets.find((s) => s.id === req.params.id);
+  if (!set || set.ownerId !== req.user.id) return res.status(404).json({ error: 'Lesson not found.' });
+  set.shared = true; ensureLessonToken(set); writeStore(store);
+
+  const emails = String(req.body.emails || '').split(/[\s,;]+/).map((e) => e.trim()).filter((e) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e));
+  if (!emails.length) return res.status(400).json({ error: 'Add at least one valid email address.' });
+  if (emails.length > 60) return res.status(400).json({ error: 'Please send to at most 60 addresses at a time.' });
+
+  const url = `${APP_BASE_URL}/l/${set.shareToken}`;
+  const qr = `${APP_BASE_URL}/qr?d=${encodeURIComponent(url)}`;
+  const teacher = [req.user.firstName, req.user.lastName].filter(Boolean).join(' ') || 'Your teacher';
+  const note = String(req.body.note || '').slice(0, 500);
+  const subject = `${teacher} shared a Boardsy lesson: ${set.title}`;
+  const esc = (v) => String(v || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const text = `${teacher} shared a lesson with you on Boardsy.\n\n${set.title}\nOpen it: ${url}\n\n${note}\n\nNo login needed — study it, and join live if the teacher goes live.`;
+  const html = `<div style="font-family:Arial,sans-serif;color:#0f1e35">
+    <p><strong>${esc(teacher)}</strong> shared a lesson with you on Boardsy.</p>
+    <p style="font-size:18px;margin:12px 0"><strong>${esc(set.title)}</strong></p>
+    <p><a href="${url}" style="background:#2563ff;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none">Open the lesson</a></p>
+    <p style="margin:16px 0"><img src="${qr}" alt="QR code" width="160" height="160" style="border:1px solid #dce6f5;border-radius:10px" /><br><span style="color:#5a6b85;font-size:13px">Scan to open on a phone</span></p>
+    ${note ? `<p style="white-space:pre-wrap">${esc(note)}</p>` : ''}</div>`;
+
+  let sent = 0;
+  for (const to of emails) {
+    // eslint-disable-next-line no-await-in-loop
+    const r = await sendMail({ to, subject, text, html }).catch(() => ({ sent: false }));
+    if (r && r.sent) sent += 1;
+  }
+  res.json({ ok: true, url, sent, total: emails.length });
 });
 
 // Rate a public item 1–5. One rating per IP per item (re-rating updates it).

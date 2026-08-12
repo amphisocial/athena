@@ -137,3 +137,15 @@ body.public-lesson .usage-pill { display: none !important; }
 @keyframes floatUp { 0% { transform: translateY(0); opacity: 0; } 15% { opacity: 1; } 100% { transform: translateY(-180px); opacity: 0; } }
 /* Students in a live room don't drive the deck. */
 body.live-student #prevCard, body.live-student #nextCard, body.live-student #flipCard, body.live-student #shuffleCards { display: none !important; }
+
+/* Lesson share dialog (reuses study-modal shell) */
+.share-card .share-sub { color: var(--muted, #5a6b85); font-size: 0.9rem; }
+.share-linkrow { display: flex; gap: 8px; margin: 14px 0; }
+.share-linkrow input { flex: 1; padding: 10px 12px; border: 1px solid var(--line,#dce6f5); border-radius: 8px; background: #f3f7ff; }
+.share-qr { display: flex; flex-direction: column; align-items: center; gap: 6px; margin: 8px 0 16px; }
+.share-qr img { border: 1px solid var(--line,#dce6f5); border-radius: 12px; }
+.share-qr span { color: var(--muted,#5a6b85); font-size: 0.82rem; }
+.share-email { display: grid; gap: 10px; border-top: 1px solid var(--line,#dce6f5); padding-top: 14px; }
+.share-email label { display: flex; flex-direction: column; gap: 6px; font-weight: 600; font-size: 0.85rem; color: var(--muted,#5a6b85); }
+.share-email textarea, .share-email input { font: inherit; padding: 10px 12px; border: 1px solid var(--line,#dce6f5); border-radius: 8px; background: #f3f7ff; min-height: 44px; }
+.share-email textarea { min-height: 68px; resize: vertical; }
