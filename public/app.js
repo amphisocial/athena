@@ -709,8 +709,50 @@
       const rest = params.toString();
       window.history.replaceState({}, '', rest ? `${window.location.pathname}?${rest}` : window.location.pathname);
     }
+    // Public lesson viewer (/l/:id) — no login. Reuse the full study viewer
+    // (interactive quiz, slide deck, flip/shuffle/fullscreen) with a public set.
+    if (window.location.pathname.startsWith('/l/')) {
+      document.body.classList.add('public-lesson');
+      const token = decodeURIComponent(window.location.pathname.split('/').pop());
+      try {
+        const data = await api(`/api/public/lesson/${token}`);
+        loadSetIntoStudy(data.set);
+        mountPublicRating(data.set, token);
+      } catch (error) {
+        setStatus(error.message || 'This lesson is not available.', 'error');
+      }
+      return;
+    }
     const setId = params.get('set');
     if (setId) await openSet(setId);
+  }
+
+  // Rating bar + back link shown under the study viewer for public lessons.
+  function mountPublicRating(set, token) {
+    const panel = document.getElementById('studyPanel');
+    if (!panel) return;
+    const bar = document.createElement('div');
+    bar.className = 'public-lesson-bar';
+    const rate = (set.rating && set.rating.count) ? (set.rating.sum / set.rating.count) : 0;
+    const count = set.rating ? set.rating.count : 0;
+    let stars = '';
+    for (let n = 1; n <= 5; n += 1) stars += `<button class="pl-star${n <= Math.round(rate) ? ' on' : ''}" data-stars="${n}">★</button>`;
+    bar.innerHTML = `
+      <a class="btn ghost" href="/lessons">← Public Lessons</a>
+      <span class="pl-bar-rate"><span class="pl-rate-label">Rate this:</span> ${stars}
+        <span class="pl-rating-count" id="plRateCount">${count ? rate.toFixed(1) + ' (' + count + ')' : ''}</span></span>
+      <a class="btn primary" href="/pricing">Sign in / Plans</a>`;
+    panel.insertAdjacentElement('afterend', bar);
+    bar.querySelectorAll('.pl-star').forEach((b) => b.addEventListener('click', async () => {
+      try {
+        const d = await api('/api/public/rate', { method: 'POST', body: JSON.stringify({ type: 'lesson', id: token, stars: Number(b.dataset.stars) }) });
+        if (d.rating) {
+          const avg = d.rating.count ? d.rating.sum / d.rating.count : 0;
+          bar.querySelectorAll('.pl-star').forEach((s, i) => s.classList.toggle('on', i < Math.round(avg)));
+          document.getElementById('plRateCount').textContent = avg.toFixed(1) + ' (' + d.rating.count + ')';
+        }
+      } catch (_) {}
+    }));
   }
 
   init().catch((error) => setStatus(error.message, 'error'));

@@ -1917,7 +1917,7 @@ app.get('/api/bookmarks', requireUser, (req, res) => {
 
 // Public pages (no auth).
 app.get('/lessons', (req, res) => res.sendFile(path.join(PUBLIC_DIR, 'lessons.html')));
-app.get('/l/:id', (req, res) => res.sendFile(path.join(PUBLIC_DIR, 'study.html')));
+app.get('/l/:id', (req, res) => res.sendFile(path.join(PUBLIC_DIR, 'app.html')));
 // ============================================================================
 
 
