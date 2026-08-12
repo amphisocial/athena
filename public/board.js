@@ -2470,19 +2470,25 @@
     if (!cards.length) { openStudyModal(null, '<p class="study-err">No study items were generated. Try a board with more written on it.</p>'); return; }
     const esc = escapeHtml;
     const items = cards.map((c, i) => {
-      // Render whatever fields the generator produced, defensively.
-      if (c.options || c.choices) {
-        const opts = (c.options || c.choices || []).map((o) => `<li>${esc(String(o))}</li>`).join('');
-        const ans = c.answer != null ? `<div class="sc-ans">Answer: ${esc(String(c.answer))}</div>` : '';
-        return `<div class="study-item"><div class="sc-q">${i + 1}. ${esc(String(c.question || c.prompt || c.front || ''))}</div><ul class="sc-opts">${opts}</ul>${ans}</div>`;
+      const type = c.type || (Array.isArray(c.choices) && c.choices.length >= 2 ? 'quiz' : 'flashcard');
+      if (type === 'slide') {
+        const bullets = String(c.back || '').split(/\n+/).map((l) => l.replace(/^[-•*]\s*/, '').trim()).filter(Boolean);
+        const img = (c.layout !== 'quote' && c.imageUrl) ? `<figure class="ss-media"><img src="${esc(String(c.imageUrl))}" alt="" loading="lazy" /></figure>` : '';
+        return `<div class="study-slide">
+          ${c.kicker ? `<div class="ss-kicker">${esc(String(c.kicker))}</div>` : ''}
+          <div class="ss-title">${i + 1}. ${esc(String(c.front || ''))}</div>
+          <div class="ss-body${img ? ' has-media' : ''}">${img}
+            <div class="ss-text">${bullets.length ? `<ul>${bullets.map((b) => `<li>${esc(b)}</li>`).join('')}</ul>` : ''}
+            ${c.explanation ? `<p class="ss-notes">${esc(String(c.explanation))}</p>` : ''}</div></div>
+        </div>`;
       }
-      if (c.bullets || c.points) {
-        const b = (c.bullets || c.points || []).map((x) => `<li>${esc(String(x))}</li>`).join('');
-        return `<div class="study-item"><div class="sc-title">${esc(String(c.title || c.heading || `Slide ${i + 1}`))}</div><ul>${b}</ul></div>`;
+      if (type === 'quiz' || (Array.isArray(c.choices) && c.choices.length >= 2)) {
+        let correct = Number.isInteger(c.answerIndex) ? c.answerIndex : -1;
+        if (correct < 0) correct = (c.choices || []).findIndex((ch) => String(ch).trim().toLowerCase() === String(c.back || '').trim().toLowerCase());
+        const opts = (c.choices || []).map((o, n) => `<li class="${n === correct ? 'correct' : ''}">${esc(String(o))}${n === correct ? ' ✓' : ''}</li>`).join('');
+        return `<div class="study-item"><div class="sc-q">${i + 1}. ${esc(String(c.front || ''))}</div><ul class="sc-opts">${opts}</ul>${c.explanation ? `<div class="sc-ans">${esc(String(c.explanation))}</div>` : ''}</div>`;
       }
-      const front = c.term || c.front || c.question || c.prompt || '';
-      const back = c.definition || c.back || c.answer || c.explanation || '';
-      return `<div class="study-item flip"><div class="sc-front">${esc(String(front))}</div><div class="sc-back">${esc(String(back))}</div></div>`;
+      return `<div class="study-item flip"><div class="sc-front">${i + 1}. ${esc(String(c.front || ''))}</div><div class="sc-back">${esc(String(c.back || ''))}</div></div>`;
     }).join('');
     openStudyModal(null, `<div class="study-head"><h3>${esc(set.title || 'Study set')}</h3>
       <span class="study-sub">${cards.length} item${cards.length === 1 ? '' : 's'} · not saved — sign in to keep it</span></div>

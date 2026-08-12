@@ -10,19 +10,55 @@
     const cards = Array.isArray(set.cards) ? set.cards : [];
     if (!cards.length) { $('#studyCards').innerHTML = '<p class="pl-empty">This lesson has no items yet.</p>'; return; }
     $('#studyCards').innerHTML = cards.map((c, i) => {
-      if (c.options || c.choices) {
-        const opts = (c.options || c.choices || []).map((o) => `<li>${esc(o)}</li>`).join('');
-        const ans = c.answer != null ? `<div class="sc-ans">Answer: ${esc(c.answer)}</div>` : '';
-        return `<div class="study-item"><div class="sc-q">${i + 1}. ${esc(c.question || c.prompt || c.front || '')}</div><ul class="sc-opts">${opts}</ul>${ans}</div>`;
-      }
-      if (c.bullets || c.points) {
-        const b = (c.bullets || c.points || []).map((x) => `<li>${esc(x)}</li>`).join('');
-        return `<div class="study-item"><div class="sc-title">${esc(c.title || c.heading || 'Slide ' + (i + 1))}</div><ul>${b}</ul></div>`;
-      }
-      const front = c.term || c.front || c.question || c.prompt || '';
-      const back = c.definition || c.back || c.answer || c.explanation || '';
-      return `<div class="study-item flip"><div class="sc-front">${esc(front)}</div><div class="sc-back">${esc(back)}</div></div>`;
+      const type = c.type || (Array.isArray(c.choices) && c.choices.length >= 2 ? 'quiz' : 'flashcard');
+      if (type === 'slide') return slideHtml(c, i);
+      if (type === 'quiz' || (Array.isArray(c.choices) && c.choices.length >= 2)) return quizHtml(c, i);
+      return flashHtml(c, i);
     }).join('');
+  }
+
+  function bulletsFrom(back) {
+    return String(back || '').split(/\n+/).map((l) => l.replace(/^[-•*]\s*/, '').trim()).filter(Boolean);
+  }
+
+  function slideHtml(c, i) {
+    const layout = c.layout || 'content';
+    const bullets = bulletsFrom(c.back);
+    const showBullets = bullets.length && layout !== 'stat' && layout !== 'quote';
+    const hasImg = layout !== 'quote' && c.imageUrl;
+    return `<div class="study-slide">
+      ${c.kicker ? `<div class="ss-kicker">${esc(c.kicker)}</div>` : ''}
+      <h3 class="ss-title">${i + 1}. ${esc(c.front)}</h3>
+      <div class="ss-body${hasImg ? ' has-media' : ''}">
+        ${hasImg ? `<figure class="ss-media"><img src="${esc(c.imageUrl)}" alt="" loading="lazy" />${c.imageCredit ? `<figcaption>${esc(c.imageCredit)}</figcaption>` : ''}</figure>` : ''}
+        <div class="ss-text">
+          ${showBullets ? `<ul>${bullets.map((b) => `<li>${esc(b)}</li>`).join('')}</ul>` : ''}
+          ${c.stat && c.stat.value ? `<div class="ss-stat"><strong>${esc(c.stat.value)}</strong><span>${esc(c.stat.label || '')}</span></div>` : ''}
+          ${c.quote && c.quote.text ? `<blockquote class="ss-quote">“${esc(c.quote.text)}”${c.quote.attribution ? `<cite>— ${esc(c.quote.attribution)}</cite>` : ''}</blockquote>` : ''}
+          ${c.explanation ? `<p class="ss-notes">${esc(c.explanation)}</p>` : ''}
+        </div>
+      </div>
+    </div>`;
+  }
+
+  function flashHtml(c, i) {
+    return `<div class="study-item flip">
+      <div class="sc-front">${i + 1}. ${esc(c.front)}</div>
+      <div class="sc-back">${esc(c.back)}</div>
+      ${c.explanation ? `<div class="sc-note">${esc(c.explanation)}</div>` : ''}
+    </div>`;
+  }
+
+  function quizHtml(c, i) {
+    const choices = c.choices || [];
+    let correct = Number.isInteger(c.answerIndex) ? c.answerIndex : -1;
+    if (correct < 0) correct = choices.findIndex((ch) => String(ch).trim().toLowerCase() === String(c.back || '').trim().toLowerCase());
+    const opts = choices.map((ch, n) => `<li class="${n === correct ? 'correct' : ''}">${esc(ch)}${n === correct ? ' <span class="qa-tag">✓ answer</span>' : ''}</li>`).join('');
+    return `<div class="study-item">
+      <div class="sc-q">${i + 1}. ${esc(c.front)}</div>
+      <ul class="sc-opts">${opts}</ul>
+      ${c.explanation ? `<div class="sc-ans">${esc(c.explanation)}</div>` : ''}
+    </div>`;
   }
 
   function renderRating(set) {

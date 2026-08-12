@@ -103,3 +103,30 @@
 }
 .pager-btn:disabled { opacity: 0.4; cursor: default; }
 .pager-btn:not(:disabled):hover { border-color: var(--brand, #2563ff); color: var(--brand, #2563ff); }
+
+/* ===== Public lesson slide/flashcard/quiz rendering ===== */
+.study-slide {
+  border: 1px solid var(--line, #dce6f5); border-radius: 14px; padding: 18px 20px; margin-bottom: 14px;
+  background: #fff; box-shadow: 0 4px 14px rgba(15,30,53,0.05);
+}
+.ss-kicker { color: var(--brand, #2563ff); font-weight: 700; font-size: 0.72rem; letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 4px; }
+.ss-title { font-family: 'Space Grotesk', Inter, sans-serif; font-size: 1.15rem; margin: 0 0 12px; color: var(--ink, #0f1e35); }
+.ss-body { display: flex; gap: 18px; align-items: flex-start; }
+.ss-body.has-media .ss-text { flex: 1; }
+.ss-media { flex: 0 0 42%; max-width: 42%; margin: 0; }
+.ss-media img { width: 100%; border-radius: 10px; display: block; border: 1px solid var(--line, #dce6f5); }
+.ss-media figcaption { font-size: 0.7rem; color: var(--muted, #5a6b85); margin-top: 4px; }
+.ss-text { flex: 1; min-width: 0; }
+.ss-text ul { margin: 0; padding-left: 20px; line-height: 1.6; color: #1f3a5f; }
+.ss-text li { margin-bottom: 4px; }
+.ss-stat { padding: 8px 0; }
+.ss-stat strong { font-size: 2rem; color: var(--brand, #2563ff); display: block; font-family: 'Space Grotesk', Inter, sans-serif; }
+.ss-stat span { color: var(--muted, #5a6b85); }
+.ss-quote { border-left: 3px solid var(--brand, #2563ff); margin: 0; padding: 4px 0 4px 14px; font-style: italic; color: #1f3a5f; }
+.ss-quote cite { display: block; font-style: normal; font-size: 0.82rem; color: var(--muted, #5a6b85); margin-top: 6px; }
+.ss-notes { color: var(--muted, #5a6b85); font-size: 0.86rem; margin: 10px 0 0; }
+@media (max-width: 640px) { .ss-body { flex-direction: column; } .ss-media, .ss-body.has-media .ss-media { max-width: 100%; flex-basis: auto; } }
+
+.study-item .sc-note { color: var(--muted, #5a6b85); font-size: 0.82rem; margin-top: 6px; }
+.sc-opts li.correct { color: #0f9c8f; font-weight: 600; }
+.qa-tag { font-size: 0.72rem; color: #0f9c8f; }
