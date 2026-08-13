@@ -159,3 +159,10 @@ body.live-student #prevCard, body.live-student #nextCard, body.live-student #fli
 .live-speakers { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; max-height: 140px; overflow: auto; }
 .live-speakers li { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 0.88rem; }
 .live-speakers li.muted { color: var(--muted,#5a6b85); }
+
+/* ===== Modal shell for the lesson share dialog (app page) ===== */
+.study-modal { position: fixed; inset: 0; z-index: 2000; display: none; align-items: center; justify-content: center; background: rgba(15,30,53,0.45); padding: 20px; }
+.study-modal.open { display: flex; }
+.study-modal .study-card { position: relative; background: #fff; color: var(--ink,#0f1e35); border: 1px solid var(--line,#dce6f5); border-radius: 16px; padding: 24px; max-width: 460px; width: 100%; max-height: 90vh; overflow: auto; box-shadow: 0 30px 70px rgba(15,30,53,0.3); }
+.study-modal .study-card h3 { margin: 0 0 8px; }
+.study-close { position: absolute; top: 10px; right: 12px; border: 0; background: none; font-size: 1.6rem; line-height: 1; cursor: pointer; color: var(--muted,#5a6b85); }

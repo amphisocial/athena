@@ -1886,7 +1886,7 @@ function ensureLessonToken(set) {
 }
 
 // Get (or create) the share link for a lesson — owner only.
-app.post(['/api/sets/:id/share', '/api/quizlets/:id/share-link'], requireUser, (req, res) => {
+app.post(['/api/sets/:id/share-link', '/api/quizlets/:id/share-link'], requireUser, (req, res) => {
   const store = readStore();
   const set = store.quizlets.find((s) => s.id === req.params.id);
   if (!set || set.ownerId !== req.user.id) return res.status(404).json({ error: 'Lesson not found.' });

@@ -761,6 +761,7 @@
     const set = study.set; if (!set) return;
     try { await api(`/api/sets/${set.id}/go-live`, { method: 'POST' }); }
     catch (e) { setStatus(e.message, 'error'); return; }
+    if (study.set) study.set.isLive = true;
     connectLive(set.id, 'teacher');
     // Optional audio: only if the teacher ticked "with audio" and it's available.
     if (Audio.enabled && document.getElementById('audioOpt') && document.getElementById('audioOpt').checked) {
@@ -833,7 +834,8 @@
     const set = study.set; if (!set) return;
     liveSend({ type: 'end' });
     try { await api(`/api/sets/${set.id}/stop-live`, { method: 'POST' }); } catch (_) {}
-    closeLive(); Live.questions = []; Live.aggregate = null; renderLiveChrome();
+    if (study.set) study.set.isLive = false;
+    closeLive(); stopAudio(); Live.questions = []; Live.aggregate = null; renderLiveChrome();
     setStatus('Live session ended.', 'info');
   }
 
@@ -847,16 +849,28 @@
     const isTeacher = Live.role === 'teacher';
     const ownsSet = study.set && state.user && study.set.ownerId === state.user.id;
 
-    // Not connected: teacher (owner) sees "Go live" + "Share"; others see nothing.
+    // Not connected: teacher (owner) sees "Go live" + "Share"; if the lesson is
+    // already live, show "End live" so they always have the control.
     if (!Live.on) {
-      const canAudio = Audio.enabled && state.user && state.user.limits && state.user.limits.whiteboardLive;
-      strip.innerHTML = (ownsSet && !document.body.classList.contains('public-lesson'))
-        ? `<button class="btn primary" id="goLiveBtn">● Go live</button>
-           ${canAudio ? '<label class="audio-opt"><input type="checkbox" id="audioOpt" /> 🎤 with audio</label>' : ''}
-           <button class="btn soft" id="shareLessonBtn">Share</button>`
-        : '';
-      const gl = document.getElementById('goLiveBtn'); if (gl) gl.addEventListener('click', teacherGoLive);
-      const sh = document.getElementById('shareLessonBtn'); if (sh) sh.addEventListener('click', openLessonShare);
+      if (ownsSet && !document.body.classList.contains('public-lesson')) {
+        const canAudio = Audio.enabled && state.user && state.user.limits && state.user.limits.whiteboardLive;
+        if (study.set.isLive) {
+          strip.innerHTML = `<span class="live-dot">● LIVE</span>
+            <button class="btn soft" id="resumeLiveBtn">Resume control</button>
+            <button class="btn ghost" id="endLiveBtn2">End live</button>
+            <button class="btn soft" id="shareLessonBtn">Share</button>`;
+          document.getElementById('resumeLiveBtn').addEventListener('click', () => connectLive(study.set.id, 'teacher'));
+          document.getElementById('endLiveBtn2').addEventListener('click', teacherEndLive);
+        } else {
+          strip.innerHTML = `<button class="btn primary" id="goLiveBtn">● Go live</button>
+            ${canAudio ? '<label class="audio-opt"><input type="checkbox" id="audioOpt" /> 🎤 with audio</label>' : ''}
+            <button class="btn soft" id="shareLessonBtn">Share</button>`;
+          document.getElementById('goLiveBtn').addEventListener('click', teacherGoLive);
+        }
+        const sh = document.getElementById('shareLessonBtn'); if (sh) sh.addEventListener('click', openLessonShare);
+      } else {
+        strip.innerHTML = '';
+      }
       return;
     }
 
@@ -924,7 +938,7 @@
     const set = study.set; if (!set) return;
     let token; let url;
     try {
-      const d = await api(`/api/sets/${set.id}/share`, { method: 'POST' });
+      const d = await api(`/api/sets/${set.id}/share-link`, { method: 'POST' });
       token = d.token; url = `${window.location.origin}/l/${token}`;
     } catch (e) { setStatus(e.message, 'error'); return; }
     let m = document.getElementById('lessonShareModal');
