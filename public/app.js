@@ -777,6 +777,16 @@
     Audio.checked = true;
   }
   const LK = () => window.LivekitClient;
+  function waitForLK(ms = 6000) {
+    return new Promise((resolve, reject) => {
+      if (LK()) return resolve(LK());
+      const t0 = Date.now();
+      const iv = setInterval(() => {
+        if (LK()) { clearInterval(iv); resolve(LK()); }
+        else if (Date.now() - t0 > ms) { clearInterval(iv); reject(new Error('audio library did not load (check your network or ad blocker).')); }
+      }, 120);
+    });
+  }
 
   async function getLiveToken(setId, label) {
     const d = await api('/api/live/token', { method: 'POST', body: JSON.stringify({ kind: 'lesson', id: setId, label: label || '' }) });
@@ -808,7 +818,7 @@
     finally { clearTimeout(timer); }
   }
   async function connectAudioRoom(setId, label) {
-    if (!LK()) throw new Error('audio library not loaded');
+    await waitForLK();
     const tok = await getLiveToken(setId, label);
     const token = tok.token;
     const url = normalizeWsUrl(tok.url);
