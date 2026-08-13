@@ -1209,11 +1209,13 @@
   function applyPanelState() {
     const collapsed = localStorage.getItem(PANEL_KEY) === '1';
     $('#infoPanel').classList.toggle('collapsed', collapsed);
+    document.body.classList.toggle('notes-collapsed', collapsed);
   }
   function togglePanel() {
     const el = $('#infoPanel');
     const collapsed = !el.classList.contains('collapsed');
     el.classList.toggle('collapsed', collapsed);
+    document.body.classList.toggle('notes-collapsed', collapsed);
     localStorage.setItem(PANEL_KEY, collapsed ? '1' : '0');
     setTimeout(resizeCanvas, 200);
   }
@@ -2348,6 +2350,7 @@
     $('#redoBtn').addEventListener('click', doRedo);
     $('#panelToggle').addEventListener('click', togglePanel);
     $('#infoClose').addEventListener('click', togglePanel);
+    $('#infoReopen')?.addEventListener('click', togglePanel);
     $('#analyzeBtn').addEventListener('click', analyzeBoard);
     $('#exportBtn').addEventListener('click', exportPdf);
     $('#eraseNotesBtn')?.addEventListener('click', eraseAllNotes);

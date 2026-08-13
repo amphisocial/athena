@@ -13,7 +13,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/styles.css?v=boardsy13" />
-  <link rel="stylesheet" href="/board.css?v=boardsy13" />
+  <link rel="stylesheet" href="/board.css?v=boardsy19" />
 </head>
 <body data-page="board">
   <div class="board-shell" id="boardShell">
@@ -114,9 +114,9 @@
           </div>
         </section>
 
-        <section class="tool-section" data-section="ai">
+        <section class="tool-section collapsed" data-section="ai">
           <button class="tool-section-head" data-target="sec-ai"><span>Smart AI</span><span class="chev">▾</span></button>
-          <div class="tool-section-body" id="sec-ai">
+          <div class="tool-section-body" id="sec-ai" style="display:none">
             <button class="btn primary small" id="analyzeBtn">Analyze board</button>
             <button class="btn soft small" id="liveAnalyzeBtn" title="Auto-plot equations as you write them">⚡ Live analyze: off</button>
             <p class="tool-hint">Type a function to graph it on the board, or select a handwritten equation and plot it.</p>
@@ -201,12 +201,14 @@
     </div>
   </div>
 
+  <button class="info-reopen" id="infoReopen" title="Show AI Notes">AI Notes ‹</button>
+
   <div class="toast" id="toast"></div>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <script src="/viz3d.js?v=boardsy13"></script>
   <script async src="https://cdn.jsdelivr.net/npm/livekit-client@2/dist/livekit-client.umd.min.js"></script>
   <script src="/common.js?v=boardsy15"></script>
-  <script src="/board.js?v=boardsy18"></script>
+  <script src="/board.js?v=boardsy19"></script>
 </body>
 </html>
