@@ -1873,6 +1873,7 @@
   }
 
   let _audioUnlocked = false;
+  let _studentOptedOut = false;   // student tapped "stop" — don't auto-rejoin
   // iOS blocks audio that doesn't start from a tap. A single user gesture
   // unlocks playback for the rest of the session; we also nudge a WebAudio
   // context, which some iOS versions need before an <audio> element will play.
@@ -1892,16 +1893,16 @@
     const els = [...document.querySelectorAll('audio[data-lk="1"]')];
     return Promise.allSettled(els.map((el) => el.play()));
   }
-  // The student's "tap to hear teacher" control. Modes: 'listen' (needs a tap),
-  // 'on' (playing), 'hide'.
+  // The student's speaker toggle. Modes: 'listen' (tap to start), 'on'
+  // (hearing — tap to stop), 'hide'.
   function showStudentAudioBtn(mode) {
     const btn = $('#studentAudioBtn');
     if (!btn) return;
     if (mode === 'hide' || isOwner) { btn.style.display = 'none'; return; }
     btn.style.display = '';
     btn.disabled = false;
-    if (mode === 'on') { btn.textContent = '🔊 Listening'; btn.classList.add('active'); }
-    else { btn.textContent = '🔊 Tap to hear teacher'; btn.classList.remove('active'); }
+    if (mode === 'on') { btn.textContent = '🔊 Stop listening'; btn.classList.add('active'); }
+    else { btn.textContent = '🔈 Tap to hear teacher'; btn.classList.remove('active'); }
   }
 
   function attachRemoteAudio(track) {
@@ -1911,18 +1912,29 @@
     document.body.appendChild(el);
     // Desktop plays right away. iOS stays blocked until the student taps, so
     // surface the button to start it with a real gesture.
-    el.play().then(() => { if (!isOwner) showStudentAudioBtn('on'); })
+    el.play().then(() => { if (!isOwner) { Audio.hearing = true; showStudentAudioBtn('on'); } })
       .catch(() => { if (!isOwner) showStudentAudioBtn('listen'); });
   }
 
-  // Student taps to (re)start listening — the gesture that satisfies iOS.
+  // Student toggle: start listening (the gesture iOS needs), or stop.
   async function studentTapAudio() {
     const btn = $('#studentAudioBtn');
+    if (Audio.hearing || (Audio.on && _audioUnlocked)) {
+      // Currently listening -> stop, and opt out of auto-rejoin.
+      _studentOptedOut = true;
+      Audio.hearing = false;
+      await stopAudio();
+      showStudentAudioBtn('listen');
+      return;
+    }
+    // Start listening.
+    _studentOptedOut = false;
     if (btn) { btn.disabled = true; btn.textContent = '… connecting'; }
     unlockAudioPlayback();                          // must run inside the gesture
     try {
       if (!Audio.room) await connectAudioRoom('Viewer');
       await playAllLkAudio();                        // play whatever's attached now
+      Audio.hearing = true;
       showStudentAudioBtn('on');
     } catch (e) {
       showStudentAudioBtn('listen');
@@ -1979,7 +1991,8 @@
   }
 
   async function joinViewerAudio() {
-    showStudentAudioBtn('listen');   // give iOS students a gesture entry point
+    showStudentAudioBtn('listen');   // always give iOS students a gesture entry point
+    if (_studentOptedOut) return;    // student chose to stop — don't auto-rejoin
     if (Audio.on) return;
     try { await connectAudioRoom('Viewer'); }
     catch (_) { /* keep the button so a tap can retry */ }
@@ -1987,7 +2000,7 @@
 
   async function stopAudio(tellViewers) {
     if (Audio.room) { try { await Audio.room.disconnect(); } catch (_) {} }
-    Audio.room = null; Audio.on = false;
+    Audio.room = null; Audio.on = false; Audio.hearing = false;
     document.querySelectorAll('audio[data-lk="1"]').forEach((el) => el.remove());
     if (tellViewers) { try { send({ type: 'audio', on: false }); } catch (_) {} }
     showStudentAudioBtn('hide');

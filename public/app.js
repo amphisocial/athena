@@ -196,8 +196,7 @@
       renderStudy();
       renderSatStageBar();
       setStatus(`Stage 1 of ${sat.totalStages} — answer every question, then submit to continue.`, 'success');
-      const studyPanel = $('#studyPanel');
-      if (!studyPanel.classList.contains('maximized')) toggleMaximize(studyPanel, true);
+      setAppView('study');
       $('#studyPanel').scrollIntoView({ behavior: 'smooth', block: 'start' });
     } catch (error) {
       setStatus(error.message, 'error');
@@ -270,10 +269,10 @@
     study.flipped = false;
     study.answers = {};
     renderStudy();
-    const shouldAutoMaximize = set.category === 'SAT prep' || set.format === 'slides';
-    const studyPanel = $('#studyPanel');
-    if (shouldAutoMaximize && !studyPanel.classList.contains('maximized')) {
-      toggleMaximize(studyPanel, true);
+    // Teachers land on the preview after building/opening a set; students and
+    // the public viewer stay where they are.
+    if (!document.body.classList.contains('public-lesson') && Live.role !== 'student') {
+      setAppView('study');
     }
     if (typeof renderLiveChrome === 'function') renderLiveChrome();
   }
@@ -674,8 +673,24 @@
     }
   }
 
+  // Create <-> Study view tabs (teacher builder). Switching also drops any
+  // leftover maximized overlay so the two mechanisms never fight.
+  function setAppView(view) {
+    const grid = document.getElementById('appGrid');
+    if (!grid) return;
+    grid.dataset.view = view;
+    $$('.view-tab').forEach((t) => {
+      const on = t.dataset.view === view;
+      t.classList.toggle('active', on);
+      t.setAttribute('aria-selected', on ? 'true' : 'false');
+    });
+    $$('.panel.maximized').forEach((p) => toggleMaximize(p, false));
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
   function bindEvents() {
     $('#category').addEventListener('change', applySatPrepMode);
+    $$('.view-tab').forEach((t) => t.addEventListener('click', () => setAppView(t.dataset.view)));
     $('#satSubmitStage').addEventListener('click', submitSatStage);
     $$('.tab').forEach((button) => button.addEventListener('click', () => switchTab(button.dataset.tab)));
     $('#extractBtn').addEventListener('click', extractDocument);
@@ -792,9 +807,31 @@
     const d = await api('/api/live/token', { method: 'POST', body: JSON.stringify({ kind: 'lesson', id: setId, label: label || '' }) });
     return d;
   }
+  let _audioUnlocked = false;
+  let _lessonOptedOut = false;
+  function unlockAudioPlayback() {
+    _audioUnlocked = true;
+    try {
+      const Ctx = window.AudioContext || window.webkitAudioContext;
+      if (Ctx) {
+        const c = new Ctx();
+        if (c.state === 'suspended') c.resume();
+        const b = c.createBuffer(1, 1, 22050);
+        const s = c.createBufferSource(); s.buffer = b; s.connect(c.destination); s.start(0);
+      }
+    } catch (_) {}
+  }
+  function playAllLkAudio() {
+    const els = [...document.querySelectorAll('audio[data-lk="1"]')];
+    return Promise.allSettled(els.map((el) => el.play()));
+  }
   function attachRemoteAudio(track) {
     const el = track.attach(); el.autoplay = true; el.dataset.lk = '1';
-    el.style.display = 'none'; document.body.appendChild(el);
+    el.style.display = 'none'; el.setAttribute('playsinline', '');
+    document.body.appendChild(el);
+    // Desktop plays immediately; iOS blocks until the student taps the button.
+    el.play().then(() => { Audio.hearing = true; renderLiveChrome(); })
+      .catch(() => { renderLiveChrome(); });
   }
   function normalizeWsUrl(u) {
     let s = String(u || '').trim();
@@ -856,12 +893,28 @@
     renderLiveChrome();
   }
   async function joinStudentAudio(setId, label) {
+    if (_lessonOptedOut) { renderLiveChrome(); return; }
     try { await connectAudioRoom(setId, label || 'Student'); renderLiveChrome(); }
     catch (_) { /* audio is best-effort for attendees */ }
   }
+  // Student speaker toggle (the tap iOS needs, and a way to stop).
+  async function studentToggleAudio() {
+    if (Audio.hearing || (Audio.on && _audioUnlocked)) {
+      _lessonOptedOut = true; Audio.hearing = false;
+      await stopAudio(); renderLiveChrome(); return;
+    }
+    _lessonOptedOut = false;
+    unlockAudioPlayback();                 // inside the gesture
+    try {
+      if (!Audio.room) await connectAudioRoom(Live.setId, Live.youAre || 'Student');
+      await playAllLkAudio();
+      Audio.hearing = true;
+    } catch (e) { setStatus('Audio: ' + (e.message || 'could not start listening'), 'error'); }
+    renderLiveChrome();
+  }
   async function stopAudio() {
     if (Audio.room) { try { await Audio.room.disconnect(); } catch (_) {} }
-    Audio.room = null; Audio.on = false;
+    Audio.room = null; Audio.on = false; Audio.hearing = false;
     document.querySelectorAll('audio[data-lk="1"]').forEach((el) => el.remove());
   }
   function toggleMyMic() {
@@ -955,10 +1008,11 @@
       // Student: following the teacher, can react + ask a question. Nav is locked.
       const canSpeak = Audio.on && Audio.room && Audio.room.localParticipant && Audio.room.localParticipant.permissions && Audio.room.localParticipant.permissions.canPublish;
       const micOn = canSpeak && Audio.room.localParticipant.isMicrophoneEnabled;
+      const listenBtn = `<button class="btn soft small" id="lessonAudioBtn">${Audio.hearing ? '🔊 Stop listening' : '🔈 Tap to hear teacher'}</button>`;
       const audioNote = Audio.on
-        ? (canSpeak
-          ? `<div class="live-audio"><span class="audio-live">🎤 The teacher unmuted you</span> <button class="btn soft small" id="micToggle">${micOn ? '🔇 Mute' : '🎤 Speak'}</button></div>`
-          : '<div class="live-audio-note">🔊 Listening to the teacher. Ask a question and they may unmute you.</div>')
+        ? `<div class="live-audio">${listenBtn}${canSpeak
+            ? ` <span class="audio-live">🎤 The teacher unmuted you</span> <button class="btn soft small" id="micToggle">${micOn ? '🔇 Mute' : '🎤 Speak'}</button>`
+            : ''}</div>`
         : '';
       strip.innerHTML = `
         <div class="live-head"><span class="live-dot">● LIVE</span> <span>Following the teacher</span></div>
@@ -971,6 +1025,7 @@
       document.getElementById('liveQSend').addEventListener('click', sendQ);
       document.getElementById('liveQ').addEventListener('keydown', (e) => { if (e.key === 'Enter') sendQ(); });
       const mt = document.getElementById('micToggle'); if (mt) mt.addEventListener('click', toggleMyMic);
+      const la = document.getElementById('lessonAudioBtn'); if (la) la.addEventListener('click', studentToggleAudio);
     }
     strip.querySelectorAll('.react-btn').forEach((b) => b.addEventListener('click', () => liveSend({ type: 'reaction', emoji: b.dataset.emoji })));
     // Lock nav for students.

@@ -166,3 +166,43 @@ body.live-student #prevCard, body.live-student #nextCard, body.live-student #fli
 .study-modal .study-card { position: relative; background: #fff; color: var(--ink,#0f1e35); border: 1px solid var(--line,#dce6f5); border-radius: 16px; padding: 24px; max-width: 460px; width: 100%; max-height: 90vh; overflow: auto; box-shadow: 0 30px 70px rgba(15,30,53,0.3); }
 .study-modal .study-card h3 { margin: 0 0 8px; }
 .study-close { position: absolute; top: 10px; right: 12px; border: 0; background: none; font-size: 1.6rem; line-height: 1; cursor: pointer; color: var(--muted,#5a6b85); }
+
+/* ===== Create / Study view tabs (teacher builder page) ===== */
+/* Only on the authoring app page — the public lesson viewer stays single-pane. */
+.app-viewtabs { display: none; }
+body[data-page="app"]:not(.public-lesson) .app-viewtabs {
+  display: flex; gap: 10px; margin: 0 0 22px; max-width: 520px;
+}
+body[data-page="app"]:not(.public-lesson) .app-viewtabs .view-tab {
+  flex: 1; padding: 13px 20px; border-radius: 14px; cursor: pointer;
+  border: 1px solid var(--line, #dce6f5); background: #eef2fa; color: var(--muted, #5a6b85);
+  font: inherit; font-weight: 700; font-size: 1rem; letter-spacing: -0.01em;
+  transition: background 0.16s ease, color 0.16s ease, box-shadow 0.16s ease, transform 0.16s ease;
+}
+body[data-page="app"]:not(.public-lesson) .app-viewtabs .view-tab:hover { transform: translateY(-1px); }
+body[data-page="app"]:not(.public-lesson) .app-viewtabs .view-tab.active {
+  background: linear-gradient(135deg, var(--brand, #2563ff), var(--brand-2, #12b5a6));
+  color: #fff; border-color: transparent; box-shadow: 0 10px 26px rgba(37,99,255,0.22);
+}
+/* One panel at a time, full width — no more cramped side-by-side. */
+body[data-page="app"]:not(.public-lesson) .app-grid { grid-template-columns: 1fr !important; }
+body[data-page="app"]:not(.public-lesson) .app-grid[data-view="create"] .study-panel { display: none; }
+body[data-page="app"]:not(.public-lesson) .app-grid[data-view="study"]  .creator-panel { display: none; }
+body[data-page="app"]:not(.public-lesson) .study-panel { position: static; top: auto; }
+/* Tabs replace the per-panel maximize button here. */
+body[data-page="app"]:not(.public-lesson) .max-btn { display: none; }
+
+/* ===== More refined study + live controls (less "toy", better spacing) ===== */
+body[data-page="app"] .study-actions { gap: 14px; margin: 20px 0 8px; }
+body[data-page="app"] .study-actions .btn { border-radius: 14px; padding: 12px 18px; font-weight: 700; }
+body[data-page="app"] .live-strip {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 12px;
+  margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--line, #dce6f5);
+}
+body[data-page="app"] .live-strip .btn { border-radius: 12px; }
+body[data-page="app"] .audio-opt {
+  background: #eef2fa; border: 1px solid var(--line, #dce6f5); border-radius: 12px;
+  padding: 9px 14px; margin: 0; cursor: pointer; white-space: nowrap;
+}
+body[data-page="app"] .live-audio { gap: 10px; }
+body[data-page="app"] .live-audio .btn { align-self: flex-start; }
