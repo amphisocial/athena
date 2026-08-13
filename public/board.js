@@ -1872,10 +1872,62 @@
     } finally { clearTimeout(timer); }
   }
 
+  let _audioUnlocked = false;
+  // iOS blocks audio that doesn't start from a tap. A single user gesture
+  // unlocks playback for the rest of the session; we also nudge a WebAudio
+  // context, which some iOS versions need before an <audio> element will play.
+  function unlockAudioPlayback() {
+    _audioUnlocked = true;
+    try {
+      const Ctx = window.AudioContext || window.webkitAudioContext;
+      if (Ctx) {
+        const c = new Ctx();
+        if (c.state === 'suspended') c.resume();
+        const b = c.createBuffer(1, 1, 22050);
+        const s = c.createBufferSource(); s.buffer = b; s.connect(c.destination); s.start(0);
+      }
+    } catch (_) {}
+  }
+  function playAllLkAudio() {
+    const els = [...document.querySelectorAll('audio[data-lk="1"]')];
+    return Promise.allSettled(els.map((el) => el.play()));
+  }
+  // The student's "tap to hear teacher" control. Modes: 'listen' (needs a tap),
+  // 'on' (playing), 'hide'.
+  function showStudentAudioBtn(mode) {
+    const btn = $('#studentAudioBtn');
+    if (!btn) return;
+    if (mode === 'hide' || isOwner) { btn.style.display = 'none'; return; }
+    btn.style.display = '';
+    btn.disabled = false;
+    if (mode === 'on') { btn.textContent = '🔊 Listening'; btn.classList.add('active'); }
+    else { btn.textContent = '🔊 Tap to hear teacher'; btn.classList.remove('active'); }
+  }
+
   function attachRemoteAudio(track) {
     const el = track.attach();
     el.autoplay = true; el.dataset.lk = '1'; el.style.display = 'none';
+    el.setAttribute('playsinline', '');   // iOS: don't force fullscreen/native UI
     document.body.appendChild(el);
+    // Desktop plays right away. iOS stays blocked until the student taps, so
+    // surface the button to start it with a real gesture.
+    el.play().then(() => { if (!isOwner) showStudentAudioBtn('on'); })
+      .catch(() => { if (!isOwner) showStudentAudioBtn('listen'); });
+  }
+
+  // Student taps to (re)start listening — the gesture that satisfies iOS.
+  async function studentTapAudio() {
+    const btn = $('#studentAudioBtn');
+    if (btn) { btn.disabled = true; btn.textContent = '… connecting'; }
+    unlockAudioPlayback();                          // must run inside the gesture
+    try {
+      if (!Audio.room) await connectAudioRoom('Viewer');
+      await playAllLkAudio();                        // play whatever's attached now
+      showStudentAudioBtn('on');
+    } catch (e) {
+      showStudentAudioBtn('listen');
+      setStatus('Audio: ' + (e.message || 'could not start listening'), 'error');
+    }
   }
 
   async function connectAudioRoom(label) {
@@ -1927,9 +1979,10 @@
   }
 
   async function joinViewerAudio() {
+    showStudentAudioBtn('listen');   // give iOS students a gesture entry point
     if (Audio.on) return;
     try { await connectAudioRoom('Viewer'); }
-    catch (_) { /* listening is best-effort for viewers */ }
+    catch (_) { /* keep the button so a tap can retry */ }
   }
 
   async function stopAudio(tellViewers) {
@@ -1937,6 +1990,7 @@
     Audio.room = null; Audio.on = false;
     document.querySelectorAll('audio[data-lk="1"]').forEach((el) => el.remove());
     if (tellViewers) { try { send({ type: 'audio', on: false }); } catch (_) {} }
+    showStudentAudioBtn('hide');
     updateAudioBtn();
   }
 
@@ -2372,6 +2426,7 @@
     }));
     $('#lostBtn').addEventListener('click', () => send({ type: 'lost:toggle' }));
     $('#askBtn')?.addEventListener('click', askQuestion);
+    $('#studentAudioBtn')?.addEventListener('click', studentTapAudio);
 
     // Collapsible toolbar sections
     $$('.tool-section-head').forEach((head) => head.addEventListener('click', () => {
