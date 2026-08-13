@@ -786,9 +786,33 @@
     const el = track.attach(); el.autoplay = true; el.dataset.lk = '1';
     el.style.display = 'none'; document.body.appendChild(el);
   }
+  function normalizeWsUrl(u) {
+    let s = String(u || '').trim();
+    if (!s) return s;
+    if (/^https:/i.test(s)) return s.replace(/^https:/i, 'wss:');
+    if (/^http:/i.test(s)) return s.replace(/^http:/i, 'ws:');
+    if (/^wss?:/i.test(s)) return s;
+    return `wss://${s}`;
+  }
+  // Probe the LiveKit host over HTTPS first so an unreachable server surfaces a
+  // clear message instead of "could not establish signal connection: Failed to
+  // fetch". no-cors: a reachable host resolves (opaque); only a real network/
+  // DNS/TLS failure rejects.
+  async function preflightAudio(wsUrl) {
+    const httpUrl = wsUrl.replace(/^wss:/i, 'https:').replace(/^ws:/i, 'http:');
+    let host = httpUrl; try { host = new URL(httpUrl).host; } catch (_) {}
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 4000);
+    try { await fetch(httpUrl, { mode: 'no-cors', cache: 'no-store', signal: ctrl.signal }); }
+    catch (_) { throw new Error(`can't reach the audio server at ${host}. Make sure the LiveKit server is running and reachable over HTTPS (DNS + TLS + nginx proxy for that host).`); }
+    finally { clearTimeout(timer); }
+  }
   async function connectAudioRoom(setId, label) {
     if (!LK()) throw new Error('audio library not loaded');
-    const { token, url } = await getLiveToken(setId, label);
+    const tok = await getLiveToken(setId, label);
+    const token = tok.token;
+    const url = normalizeWsUrl(tok.url);
+    await preflightAudio(url);
     const room = new (LK().Room)({ adaptiveStream: true, dynacast: true });
     room.on(LK().RoomEvent.TrackSubscribed, (track) => { if (track.kind === 'audio') attachRemoteAudio(track); });
     room.on(LK().RoomEvent.ParticipantConnected, () => renderLiveChrome());
@@ -801,7 +825,17 @@
       room.localParticipant.setMicrophoneEnabled(!!canPub).catch(() => {});
       renderLiveChrome();
     });
-    await room.connect(url, token);
+    try {
+      await room.connect(url, token);
+    } catch (e) {
+      try { await room.disconnect(); } catch (_) {}
+      let host = url; try { host = new URL(url.replace(/^ws/i, 'http')).host; } catch (_) {}
+      const raw = (e && e.message) || String(e);
+      if (/failed to fetch|signal connection|network|timeout/i.test(raw)) {
+        throw new Error(`couldn't connect to the audio server at ${host}. Check that LiveKit is running and ${host} resolves over WSS.`);
+      }
+      throw new Error(raw);
+    }
     Audio.room = room; Audio.on = true;
     return room;
   }

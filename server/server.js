@@ -2351,7 +2351,7 @@ app.get('*', (req, res) => {
 const http = require('http');
 const httpServer = http.createServer(app);
 
-attachBoardWebSocket(httpServer, {
+const boardWss = attachBoardWebSocket(httpServer, {
   getUserFromCookieHeader,
   readStore,
   writeStore,
@@ -2364,7 +2364,26 @@ attachBoardWebSocket(httpServer, {
 // Live LESSON sessions (synced slides/quiz/flashcards, quiz aggregates,
 // questions, reactions) — students may be anonymous when the lesson is public.
 const { attachLessonWebSocket } = require('./lesson-live');
-attachLessonWebSocket(httpServer, { getUserFromCookieHeader, readStore, writeStore, emailOnRoster, nowIso });
+const lessonWss = attachLessonWebSocket(httpServer, { getUserFromCookieHeader, readStore, writeStore, emailOnRoster, nowIso });
+
+// Single upgrade router. Both WebSocketServers run in noServer mode, so exactly
+// one 'upgrade' listener lives on the HTTP server and dispatches by path. This
+// replaces the old per-server { server, path } wiring where each server added
+// its own listener and destroyed the other's freshly-upgraded sockets — the
+// cause of the persistent "Reconnecting…" badge. Unknown paths are closed so
+// stray upgrade requests don't leak sockets.
+httpServer.on('upgrade', (req, socket, head) => {
+  let pathname;
+  try { pathname = new URL(req.url, 'http://localhost').pathname; }
+  catch (_) { socket.destroy(); return; }
+
+  const target = pathname === '/ws/board' ? boardWss
+    : pathname === '/ws/lesson' ? lessonWss
+      : null;
+  if (!target) { socket.destroy(); return; }
+
+  target.handleUpgrade(req, socket, head, (ws) => target.emit('connection', ws, req));
+});
 
 // Boot: initialize Postgres (create schema + warm the in-memory snapshot)
 // BEFORE we start accepting requests, so the first request sees real data.

@@ -19,7 +19,12 @@ const { WebSocketServer } = require('ws');
 
 function attachLessonWebSocket(httpServer, deps) {
   const { getUserFromCookieHeader, readStore, writeStore, emailOnRoster, nowIso } = deps;
-  const wss = new WebSocketServer({ server: httpServer, path: '/ws/lesson' });
+  // noServer: upgrades are routed centrally in server.js. See the matching
+  // note in board.js — two WebSocketServers sharing one http.Server via
+  // { server, path } fight over the 'upgrade' event and destroy each other's
+  // sockets. Central routing avoids that. httpServer kept for signature parity.
+  void httpServer;
+  const wss = new WebSocketServer({ noServer: true });
 
   // setId -> { teacher, students:Set, state:{index,flipped}, answers:Map, nextLabel }
   const rooms = new Map();

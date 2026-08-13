@@ -32,6 +32,7 @@
         <button class="btn ghost small" id="exportBtn" title="Export as PDF">PDF</button>
         <button class="btn ghost small" id="shareToggleBtn">Share</button>
         <button class="btn primary small" id="liveToggleBtn">Go live</button>
+        <button class="btn ghost small" id="audioToggleBtn" style="display:none" title="Broadcast your microphone to viewers">🎤 Audio</button>
         <button class="btn ghost small" id="viewersBtn">Viewers (<span id="viewerCount">0</span>)</button>
         <button class="btn ghost small" id="questionsBtn">Questions (<span id="qBtnCount">0</span>)</button>
         <span class="lost-pill" id="lostPill" style="display:none">🤔 <span id="lostCount">0</span> lost</span>
@@ -203,7 +204,8 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <script src="/viz3d.js?v=boardsy13"></script>
-  <script src="/common.js?v=boardsy13"></script>
-  <script src="/board.js?v=boardsy13"></script>
+  <script src="https://cdn.jsdelivr.net/npm/livekit-client@2/dist/livekit-client.umd.min.js"></script>
+  <script src="/common.js?v=boardsy14"></script>
+  <script src="/board.js?v=boardsy14"></script>
 </body>
 </html>
