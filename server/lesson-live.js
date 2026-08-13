@@ -99,7 +99,7 @@ function attachLessonWebSocket(httpServer, deps) {
       // Public projection of the set — no owner internals.
       const publicSet = { id: set.id, title: set.title, cards: set.cards || [], format: set.format,
         subject: set.subject || '', grade: set.grade || '', topic: set.topic || '' };
-      send(ws, { type: 'sync', set: publicSet, state: room.state, role: isTeacher ? 'teacher' : 'student', youAre: client.label || null });
+      send(ws, { type: 'sync', set: publicSet, state: room.state, role: isTeacher ? 'teacher' : 'student', youAre: client.label || null, audioOn: Boolean(room.audioOn) });
       if (isTeacher) {
         // Replay current aggregates so a reconnecting teacher isn't blank.
         [...room.answers.keys()].forEach((i) => send(ws, { type: 'quiz:aggregate', ...aggregateFor(room, set, i) }));
@@ -119,6 +119,11 @@ function attachLessonWebSocket(httpServer, deps) {
           if (msg.type === 'nav') {
             room.state = { index: Math.max(0, Number(msg.index) || 0), flipped: Boolean(msg.flipped) };
             toStudents(room, { type: 'nav', index: room.state.index, flipped: room.state.flipped });
+            return;
+          }
+          if (msg.type === 'audio') {
+            room.audioOn = Boolean(msg.on);
+            toStudents(room, { type: 'audio', on: room.audioOn });
             return;
           }
           if (msg.type === 'question:clear') { toAll(room, { type: 'question:cleared', id: msg.id }); return; }

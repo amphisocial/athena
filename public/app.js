@@ -707,6 +707,7 @@
 
   // ===================== Live lesson sessions =====================
   const Live = { ws: null, role: null, on: false, setId: null, aggregate: null, questions: [] };
+  const Audio = { room: null, enabled: false, url: null, on: false, checked: false };
   function liveSend(o) { try { if (Live.ws && Live.ws.readyState === 1) Live.ws.send(JSON.stringify(o)); } catch (_) {} }
   const wsLessonUrl = (setId) => `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws/lesson?set=${encodeURIComponent(setId)}`;
 
@@ -723,10 +724,14 @@
 
   function handleLive(m) {
     if (m.type === 'sync') {
+      if (m.youAre) Live.youAre = m.youAre;
       if (Live.role === 'student' && m.set) loadSetIntoStudy(m.set);
       applyRemoteState(m.state);
+      if (Live.role === 'student' && m.audioOn) joinStudentAudio(Live.setId, Live.youAre);
     } else if (m.type === 'nav') {
       applyRemoteState({ index: m.index, flipped: m.flipped });
+    } else if (m.type === 'audio') {
+      if (Live.role === 'student') { if (m.on) joinStudentAudio(Live.setId, Live.youAre); else stopAudio(); }
     } else if (m.type === 'reaction') {
       floatEmoji(m.emoji);
     } else if (m.type === 'presence') {
@@ -738,7 +743,7 @@
     } else if (m.type === 'question:cleared') {
       Live.questions = Live.questions.filter((q) => q.id !== m.id); renderLiveChrome();
     } else if (m.type === 'ended') {
-      closeLive(); setStatus('The teacher ended the live session.', 'info'); renderLiveChrome();
+      closeLive(); stopAudio(); setStatus('The teacher ended the live session.', 'info'); renderLiveChrome();
     }
   }
   function applyRemoteState(st) { if (!st) return; study.index = Number(st.index) || 0; study.flipped = Boolean(st.flipped); renderStudy(); }
@@ -757,7 +762,72 @@
     try { await api(`/api/sets/${set.id}/go-live`, { method: 'POST' }); }
     catch (e) { setStatus(e.message, 'error'); return; }
     connectLive(set.id, 'teacher');
-    setStatus('You are live — students can join from the public lesson link.', 'success');
+    // Optional audio: only if the teacher ticked "with audio" and it's available.
+    if (Audio.enabled && document.getElementById('audioOpt') && document.getElementById('audioOpt').checked) {
+      startTeacherAudio(set.id).catch((e) => setStatus('Audio: ' + e.message, 'error'));
+    }
+    setStatus('You are live — share the link or QR so students can join.', 'success');
+  }
+
+  // ---- Optional LiveKit audio ----
+  async function checkAudioConfig() {
+    try { const d = await api('/api/live/config'); Audio.enabled = !!d.enabled; Audio.url = d.url; }
+    catch (_) { Audio.enabled = false; }
+    Audio.checked = true;
+  }
+  const LK = () => window.LivekitClient;
+
+  async function getLiveToken(setId, label) {
+    const d = await api('/api/live/token', { method: 'POST', body: JSON.stringify({ kind: 'lesson', id: setId, label: label || '' }) });
+    return d;
+  }
+  function attachRemoteAudio(track) {
+    const el = track.attach(); el.autoplay = true; el.dataset.lk = '1';
+    el.style.display = 'none'; document.body.appendChild(el);
+  }
+  async function connectAudioRoom(setId, label) {
+    if (!LK()) throw new Error('audio library not loaded');
+    const { token, url } = await getLiveToken(setId, label);
+    const room = new (LK().Room)({ adaptiveStream: true, dynacast: true });
+    room.on(LK().RoomEvent.TrackSubscribed, (track) => { if (track.kind === 'audio') attachRemoteAudio(track); });
+    room.on(LK().RoomEvent.ParticipantConnected, () => renderLiveChrome());
+    room.on(LK().RoomEvent.ParticipantDisconnected, () => renderLiveChrome());
+    room.on(LK().RoomEvent.TrackMuted, () => renderLiveChrome());
+    room.on(LK().RoomEvent.TrackUnmuted, () => renderLiveChrome());
+    room.on(LK().RoomEvent.ParticipantPermissionsChanged, () => {
+      // If the teacher granted us the mic, start publishing; if revoked, stop.
+      const canPub = room.localParticipant.permissions && room.localParticipant.permissions.canPublish;
+      room.localParticipant.setMicrophoneEnabled(!!canPub).catch(() => {});
+      renderLiveChrome();
+    });
+    await room.connect(url, token);
+    Audio.room = room; Audio.on = true;
+    return room;
+  }
+  async function startTeacherAudio(setId) {
+    const room = await connectAudioRoom(setId, 'Teacher');
+    await room.localParticipant.setMicrophoneEnabled(true);
+    liveSend({ type: 'audio', on: true });   // tell students to start listening
+    renderLiveChrome();
+  }
+  async function joinStudentAudio(setId, label) {
+    try { await connectAudioRoom(setId, label || 'Student'); renderLiveChrome(); }
+    catch (_) { /* audio is best-effort for attendees */ }
+  }
+  async function stopAudio() {
+    if (Audio.room) { try { await Audio.room.disconnect(); } catch (_) {} }
+    Audio.room = null; Audio.on = false;
+    document.querySelectorAll('audio[data-lk="1"]').forEach((el) => el.remove());
+  }
+  function toggleMyMic() {
+    if (!Audio.room) return;
+    const lp = Audio.room.localParticipant;
+    lp.setMicrophoneEnabled(!lp.isMicrophoneEnabled).catch(() => {}).finally(renderLiveChrome);
+  }
+  // Teacher grant/mute over LiveKit participant identity.
+  async function grantMic(identity, allow) {
+    try { await api('/api/live/grant', { method: 'POST', body: JSON.stringify({ kind: 'lesson', id: Live.setId, identity, allow }) }); }
+    catch (e) { setStatus(e.message, 'error'); }
   }
   async function teacherEndLive() {
     const set = study.set; if (!set) return;
@@ -779,8 +849,11 @@
 
     // Not connected: teacher (owner) sees "Go live" + "Share"; others see nothing.
     if (!Live.on) {
+      const canAudio = Audio.enabled && state.user && state.user.limits && state.user.limits.whiteboardLive;
       strip.innerHTML = (ownsSet && !document.body.classList.contains('public-lesson'))
-        ? `<button class="btn primary" id="goLiveBtn">● Go live</button> <button class="btn soft" id="shareLessonBtn">Share</button>`
+        ? `<button class="btn primary" id="goLiveBtn">● Go live</button>
+           ${canAudio ? '<label class="audio-opt"><input type="checkbox" id="audioOpt" /> 🎤 with audio</label>' : ''}
+           <button class="btn soft" id="shareLessonBtn">Share</button>`
         : '';
       const gl = document.getElementById('goLiveBtn'); if (gl) gl.addEventListener('click', teacherGoLive);
       const sh = document.getElementById('shareLessonBtn'); if (sh) sh.addEventListener('click', openLessonShare);
@@ -798,23 +871,48 @@
       const qs = Live.questions.length
         ? `<ul class="live-qs">${Live.questions.map((q) => `<li><strong>${escapeHtml(q.name || q.label)}</strong>: ${escapeHtml(q.text)} <button class="q-clear" data-id="${q.id}">✓</button></li>`).join('')}</ul>`
         : '<div class="live-qs-empty">No questions yet.</div>';
+      let audioBlock = '';
+      if (Audio.on && Audio.room) {
+        const micOn = Audio.room.localParticipant && Audio.room.localParticipant.isMicrophoneEnabled;
+        const parts = [...Audio.room.remoteParticipants.values()];
+        const speakers = parts.map((p) => {
+          const canPub = p.permissions && p.permissions.canPublish;
+          return `<li>${escapeHtml(p.name || 'Student')} <button class="btn ghost small grant-mic" data-id="${p.identity}" data-allow="${canPub ? '0' : '1'}">${canPub ? 'Mute' : '🎤 Let speak'}</button></li>`;
+        }).join('');
+        audioBlock = `<div class="live-audio">
+          <button class="btn soft small" id="micToggle">${micOn ? '🔇 Mute me' : '🎤 Unmute me'}</button>
+          <div class="live-qtitle">Audio attendees${parts.length ? ` (${parts.length})` : ''}</div>
+          <ul class="live-speakers">${speakers || '<li class="muted">No one has joined audio yet.</li>'}</ul></div>`;
+      }
       strip.innerHTML = `
         <div class="live-head"><span class="live-dot">● LIVE</span> <span>${Live.count || 0} student${Live.count === 1 ? '' : 's'}</span>
+          ${Audio.on ? '<span class="audio-live">🎤 audio on</span>' : ''}
           <button class="btn ghost small" id="endLiveBtn">End live</button></div>
-        <div class="live-body">${aggHtml} ${react}<div class="live-qtitle">Questions</div>${qs}</div>`;
+        <div class="live-body">${aggHtml} ${react}${audioBlock}<div class="live-qtitle">Questions</div>${qs}</div>`;
       document.getElementById('endLiveBtn').addEventListener('click', teacherEndLive);
       strip.querySelectorAll('.q-clear').forEach((b) => b.addEventListener('click', () => liveSend({ type: 'question:clear', id: b.dataset.id })));
+      const mt = document.getElementById('micToggle'); if (mt) mt.addEventListener('click', toggleMyMic);
+      strip.querySelectorAll('.grant-mic').forEach((b) => b.addEventListener('click', () => grantMic(b.dataset.id, b.dataset.allow === '1')));
     } else {
       // Student: following the teacher, can react + ask a question. Nav is locked.
+      const canSpeak = Audio.on && Audio.room && Audio.room.localParticipant && Audio.room.localParticipant.permissions && Audio.room.localParticipant.permissions.canPublish;
+      const micOn = canSpeak && Audio.room.localParticipant.isMicrophoneEnabled;
+      const audioNote = Audio.on
+        ? (canSpeak
+          ? `<div class="live-audio"><span class="audio-live">🎤 The teacher unmuted you</span> <button class="btn soft small" id="micToggle">${micOn ? '🔇 Mute' : '🎤 Speak'}</button></div>`
+          : '<div class="live-audio-note">🔊 Listening to the teacher. Ask a question and they may unmute you.</div>')
+        : '';
       strip.innerHTML = `
         <div class="live-head"><span class="live-dot">● LIVE</span> <span>Following the teacher</span></div>
         <div class="live-body">
+          ${audioNote}
           ${react}
           <div class="live-ask"><input id="liveQ" placeholder="Ask a question…" maxlength="400" /><button class="btn soft small" id="liveQSend">Ask</button></div>
         </div>`;
       const sendQ = () => { const v = document.getElementById('liveQ').value.trim(); if (!v) return; liveSend({ type: 'question:ask', text: v }); document.getElementById('liveQ').value = ''; setStatus('Question sent to the teacher.', 'success'); };
       document.getElementById('liveQSend').addEventListener('click', sendQ);
       document.getElementById('liveQ').addEventListener('keydown', (e) => { if (e.key === 'Enter') sendQ(); });
+      const mt = document.getElementById('micToggle'); if (mt) mt.addEventListener('click', toggleMyMic);
     }
     strip.querySelectorAll('.react-btn').forEach((b) => b.addEventListener('click', () => liveSend({ type: 'reaction', emoji: b.dataset.emoji })));
     // Lock nav for students.
@@ -869,6 +967,8 @@
     renderEmptyStudy();
     applySatPrepMode();
     await initCommon();
+    // Learn whether live audio is available, then refresh any live controls.
+    checkAudioConfig().then(() => renderLiveChrome()).catch(() => {});
     const params = new URLSearchParams(window.location.search);
     if (params.get('signedIn') === 'google') {
       setStatus('Signed in with Google.', 'success');

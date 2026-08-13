@@ -1999,6 +1999,16 @@ app.get('/api/bookmarks', requireUser, (req, res) => {
 // Public pages (no auth).
 app.get('/lessons', (req, res) => res.sendFile(path.join(PUBLIC_DIR, 'lessons.html')));
 app.get('/l/:id', (req, res) => res.sendFile(path.join(PUBLIC_DIR, 'app.html')));
+
+// Optional LiveKit audio for live sessions (teacher broadcast + granted mics).
+// No-ops gracefully unless LIVEKIT_* env is set. Publishing is Teams-gated.
+const { attachLiveAudioRoutes } = require('./live-audio');
+attachLiveAudioRoutes(app, {
+  requireUserOptional: (req) => getCurrentUser(req),
+  readStore,
+  boardStore: () => require('./board').readBoardStore(),
+  membership
+});
 // ============================================================================
 
 

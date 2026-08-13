@@ -149,3 +149,13 @@ body.live-student #prevCard, body.live-student #nextCard, body.live-student #fli
 .share-email label { display: flex; flex-direction: column; gap: 6px; font-weight: 600; font-size: 0.85rem; color: var(--muted,#5a6b85); }
 .share-email textarea, .share-email input { font: inherit; padding: 10px 12px; border: 1px solid var(--line,#dce6f5); border-radius: 8px; background: #f3f7ff; min-height: 44px; }
 .share-email textarea { min-height: 68px; resize: vertical; }
+
+/* ===== Optional live audio controls ===== */
+.audio-opt { display: inline-flex; align-items: center; gap: 6px; font-size: 0.88rem; color: var(--ink,#0f1e35); font-weight: 600; margin: 0 6px; }
+.audio-opt input { width: auto; }
+.audio-live { color: #0f9c8f; font-weight: 700; font-size: 0.82rem; }
+.live-audio { border-top: 1px solid var(--line,#dce6f5); padding-top: 8px; margin-top: 4px; display: flex; flex-direction: column; gap: 6px; }
+.live-audio-note { color: var(--muted,#5a6b85); font-size: 0.85rem; padding: 6px 0; }
+.live-speakers { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; max-height: 140px; overflow: auto; }
+.live-speakers li { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 0.88rem; }
+.live-speakers li.muted { color: var(--muted,#5a6b85); }
