@@ -479,11 +479,11 @@ body.public-view #ownerActions { display: none !important; }
 .st-rate small { margin-left: 6px; color: var(--muted, #9fb2d0); font-size: 0.78rem; }
 
 /* ============================================================================
-   Miro-style refresh: thin icon rail, lighter top bar, more canvas.
-   Appended last so these win over the base rules above.
+   Miro-style refresh v2: thin tool rail (drawing tools only), lighter top bar,
+   AI + Page controls relocated to the right pane. Appended last.
    ========================================================================== */
 
-/* --- Lighter, tighter top bar (safe on all sizes) --- */
+/* --- Lighter, tighter top bar --- */
 .board-topbar { padding: 6px 12px; gap: 10px; }
 .board-topbar .brand { font-size: 0.9rem; }
 .board-title { font-size: 0.92rem; font-weight: 600; }
@@ -491,13 +491,7 @@ body.public-view #ownerActions { display: none !important; }
 .btn.small { padding: 5px 10px; font-size: 0.78rem; }
 .btn.tiny { padding: 3px 8px; font-size: 0.72rem; }
 
-/* --- Right AI Notes dock: a touch narrower + smaller type --- */
-.info-panel-header { padding: 10px 14px; font-size: 0.82rem; }
-.info-panel-body { padding: 12px 14px; gap: 12px; }
-.insight-card h4 { font-size: 0.92rem; }
-.insight-card p { font-size: 0.82rem; }
-
-/* A slim tab to reopen AI Notes once collapsed (top-bar Info button also works). */
+/* --- AI Notes reopen tab (top-bar Info button also works) --- */
 .info-reopen {
   position: fixed; right: 0; top: 96px; z-index: 40; display: none;
   writing-mode: vertical-rl; padding: 12px 6px; border-radius: 12px 0 0 12px;
@@ -506,45 +500,38 @@ body.public-view #ownerActions { display: none !important; }
 }
 body.notes-collapsed .info-reopen { display: block; }
 
-/* --- Desktop only: thin vertical icon rail. Mobile keeps its row layout. --- */
+/* --- Right pane hosts AI + Page + Flow controls above the notes --- */
+.info-tools { border-bottom: 1px solid var(--line); }
+.info-tools .tool-section { border-bottom: 1px solid var(--line); }
+.info-tools .tool-section:last-child { border-bottom: 0; }
+.info-tools .tool-section-head { padding: 10px 16px; }
+.info-tools .tool-section-body { padding: 0 16px 14px; }
+.info-tools .plot-form input,
+.info-tools .size-label select { width: 100%; }
+.info-tools .btn.small { width: 100%; text-align: center; }
+.info-tools .plot-form { display: flex; gap: 6px; }
+.info-tools .plot-form .btn.small { width: auto; }
+
+/* --- Desktop: thin vertical drawing-tool rail (scrolls if tall) --- */
 @media (min-width: 901px) {
   .board-toolbar {
-    flex: 0 0 68px; padding: 8px 6px; gap: 4px; align-items: stretch;
-    background: rgba(10,21,38,0.92); overflow: visible;   /* let flyouts escape */
+    flex: 0 0 66px; padding: 8px 6px; gap: 6px; align-items: stretch;
+    background: rgba(10,21,38,0.92); overflow-y: auto; overflow-x: hidden;
   }
+  .board-toolbar::-webkit-scrollbar { width: 6px; }
+  .board-toolbar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.14); border-radius: 999px; }
   .tool-btn { width: 44px; height: 44px; border-radius: 12px; margin: 0 auto; font-size: 1.05rem; }
   .swatch { width: 20px; height: 20px; }
-  .info-panel { flex: 0 0 288px; }
+  .info-panel { flex: 0 0 300px; }
 
-  /* Tools always visible: hide its header, stack tools vertically. */
+  /* Only the Tools section lives here now; hide its header, stack it. */
   .tool-section[data-section="tools"] .tool-section-head { display: none; }
-  .tool-section[data-section="tools"] .tool-section-body { padding-bottom: 8px; gap: 8px; }
+  .tool-section[data-section="tools"] .tool-section-body { padding: 0; gap: 8px; }
   .tool-section[data-section="tools"] .tool-group { flex-direction: column; align-items: center; gap: 6px; }
   .tool-section[data-section="tools"] .tool-group.colors {
-    flex-direction: row; flex-wrap: wrap; justify-content: center; gap: 5px;
+    flex-direction: row; flex-wrap: wrap; justify-content: center; gap: 6px;
     padding-top: 8px; border-top: 1px solid var(--line);
   }
-  .size-label { font-size: 0.62rem; text-align: center; align-items: center; }
-  .size-label input[type="range"] { width: 52px; }
-
-  /* Page / Flow / AI collapse to a single icon; body opens as a right-side
-     flyout so the rail stays thin (Miro pattern). */
-  .tool-section[data-section]:not([data-section="tools"]) { border-bottom: 0; position: relative; }
-  .tool-section[data-section]:not([data-section="tools"]) .tool-section-head {
-    justify-content: center; padding: 0; font-size: 0; gap: 0;
-    border: 1px solid var(--line); border-radius: 12px; margin: 2px auto; width: 44px; height: 44px;
-  }
-  .tool-section[data-section]:not([data-section="tools"]) .tool-section-head .chev { display: none; }
-  .tool-section[data-section]:not([data-section="tools"]) .tool-section-head::before { font-size: 1.15rem; line-height: 1; }
-  .tool-section[data-section="page"] .tool-section-head::before { content: "📄"; }
-  .tool-section[data-section="flow"] .tool-section-head::before { content: "🔀"; }
-  .tool-section[data-section="ai"]   .tool-section-head::before { content: "✨"; }
-  .tool-section[data-section]:not([data-section="tools"]):not(.collapsed) .tool-section-head {
-    background: linear-gradient(135deg, var(--brand), var(--brand-2)); border-color: transparent;
-  }
-  .tool-section[data-section]:not([data-section="tools"]) .tool-section-body {
-    position: absolute; left: calc(100% + 8px); top: 0; width: 232px; z-index: 60;
-    background: rgba(11,22,40,0.98); border: 1px solid var(--line); border-radius: 14px;
-    padding: 12px; box-shadow: 0 24px 64px rgba(0,0,0,0.55); gap: 9px;
-  }
+  .tool-section[data-section="tools"] .size-label { font-size: 0.6rem; text-align: center; align-items: center; padding-top: 4px; }
+  .tool-section[data-section="tools"] .size-label input[type="range"] { width: 50px; }
 }
