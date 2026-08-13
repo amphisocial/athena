@@ -752,7 +752,14 @@ function attachBoardWebSocket(httpServer, deps) {
   const { getUserFromCookieHeader, readStore, emailOnRoster, canViewTeachersContent, userHasWhiteboardAccess, askVisionAI } = deps;
   const viewerAllowed = canViewTeachersContent || ((store, teacherId, email) => emailOnRoster(store, teacherId, email));
 
-  const wss = new WebSocketServer({ server: httpServer, path: '/ws/board' });
+  // noServer: upgrades are routed centrally in server.js. Attaching multiple
+  // WebSocketServers to the same http.Server with { server, path } makes each
+  // one add its own 'upgrade' listener; the non-matching server then calls
+  // abortHandshake() and destroys the socket the matching server just upgraded,
+  // which manifested as an endless "Reconnecting…" loop. Central routing fixes
+  // it. httpServer is unused here now but kept for signature stability.
+  void httpServer;
+  const wss = new WebSocketServer({ noServer: true });
 
   // boardId -> Set of { ws, user, isOwner }
   const rooms = new Map();
@@ -929,6 +936,15 @@ function attachBoardWebSocket(httpServer, deps) {
         if (msg.type === 'live:changed') {
           if (!isOwner) return;
           broadcast(targetBoardId, { type: 'live:changed', isLive: !!msg.isLive }, ws);
+          return;
+        }
+
+        // Teacher started/stopped broadcasting live audio (LiveKit). Relay the
+        // on/off flag so viewers auto-join or leave the audio room. No media
+        // travels over this socket — LiveKit carries the actual audio.
+        if (msg.type === 'audio') {
+          if (!isOwner) return;
+          broadcast(targetBoardId, { type: 'audio', on: !!msg.on }, ws);
           return;
         }
 
