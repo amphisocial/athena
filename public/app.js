@@ -4,6 +4,8 @@
 
   const study = { set: null, index: 0, flipped: false, answers: {} };
   const creator = { activeTab: 'paste', chatMessages: [], chatReady: false, chatSeed: null, plan: null };
+  // Metadata carried over from the "New lesson" dialog on the Library page.
+  let pendingLessonMeta = { topic: '', public: false };
 
   const normalize = (value) => String(value || '').trim().toLowerCase().replace(/\s+/g, ' ');
 
@@ -132,7 +134,20 @@
       const data = await api('/api/generate', { method: 'POST', body: JSON.stringify(payload) });
       state.usage = data.usage;
       updateUsagePill();
-      loadSetIntoStudy(data.set || data.quizlet);
+      const newSet = data.set || data.quizlet;
+      // Carry over topic/public chosen in the "New lesson" dialog.
+      if (newSet && (pendingLessonMeta.topic || pendingLessonMeta.public)) {
+        try {
+          await api(`/api/sets/${newSet.id}/meta`, { method: 'POST', body: JSON.stringify({
+            topic: pendingLessonMeta.topic || undefined,
+            public: pendingLessonMeta.public || undefined
+          }) });
+          if (pendingLessonMeta.topic) newSet.topic = pendingLessonMeta.topic;
+          if (pendingLessonMeta.public) newSet.public = true;
+        } catch (_) {}
+        pendingLessonMeta = { topic: '', public: false };
+      }
+      loadSetIntoStudy(newSet);
       setStatus('Study set created and saved to Your Library.', 'success');
       const creatorPanel = $('#creatorPanel');
       if (creatorPanel.classList.contains('maximized')) toggleMaximize(creatorPanel, false);
@@ -991,9 +1006,12 @@
           return `<li>${escapeHtml(p.name || 'Student')} <button class="btn ghost small grant-mic" data-id="${p.identity}" data-allow="${canPub ? '0' : '1'}">${canPub ? 'Mute' : '🎤 Let speak'}</button></li>`;
         }).join('');
         audioBlock = `<div class="live-audio">
-          <button class="btn soft small" id="micToggle">${micOn ? '🔇 Mute me' : '🎤 Unmute me'}</button>
+          <button class="btn soft small ${micOn ? 'primary' : ''}" id="micToggle">${micOn ? '🔇 Mute me' : '🎤 Unmute me'}</button>
           <div class="live-qtitle">Audio attendees${parts.length ? ` (${parts.length})` : ''}</div>
           <ul class="live-speakers">${speakers || '<li class="muted">No one has joined audio yet.</li>'}</ul></div>`;
+      } else {
+        const canAudio = Audio.enabled && state.user && state.user.limits && state.user.limits.whiteboardLive;
+        if (canAudio) audioBlock = '<div class="live-audio"><button class="btn soft small" id="startAudioBtn">🎤 Start audio</button></div>';
       }
       strip.innerHTML = `
         <div class="live-head"><span class="live-dot">● LIVE</span> <span>${Live.count || 0} student${Live.count === 1 ? '' : 's'}</span>
@@ -1003,6 +1021,7 @@
       document.getElementById('endLiveBtn').addEventListener('click', teacherEndLive);
       strip.querySelectorAll('.q-clear').forEach((b) => b.addEventListener('click', () => liveSend({ type: 'question:clear', id: b.dataset.id })));
       const mt = document.getElementById('micToggle'); if (mt) mt.addEventListener('click', toggleMyMic);
+      const sa = document.getElementById('startAudioBtn'); if (sa) sa.addEventListener('click', () => { if (study.set) startTeacherAudio(study.set.id).catch((e) => setStatus('Audio: ' + e.message, 'error')); });
       strip.querySelectorAll('.grant-mic').forEach((b) => b.addEventListener('click', () => grantMic(b.dataset.id, b.dataset.allow === '1')));
     } else {
       // Student: following the teacher, can react + ask a question. Nav is locked.
@@ -1030,6 +1049,7 @@
     strip.querySelectorAll('.react-btn').forEach((b) => b.addEventListener('click', () => liveSend({ type: 'reaction', emoji: b.dataset.emoji })));
     // Lock nav for students.
     document.body.classList.toggle('live-student', Live.on && Live.role === 'student');
+    document.body.classList.toggle('live-on', Live.on);
   }
 
   // Share a lesson by link + QR + email (parity with the whiteboard share).
@@ -1074,8 +1094,20 @@
     });
   }
 
+  // Prefill from the "New lesson" dialog (Library) query params, then clean the
+  // URL so a refresh doesn't re-apply them.
+  function applyNewLessonPrefill() {
+    const p = new URLSearchParams(location.search);
+    if (![...p.keys()].some((k) => ['subject', 'grade', 'topic', 'public'].includes(k))) return;
+    if (p.get('subject') && $('#subject')) $('#subject').value = p.get('subject');
+    if (p.get('grade') && $('#grade')) $('#grade').value = /^\d+$/.test(p.get('grade')) ? `Grade ${p.get('grade')}` : p.get('grade');
+    pendingLessonMeta = { topic: (p.get('topic') || '').trim(), public: p.get('public') === '1' };
+    try { history.replaceState(null, '', location.pathname); } catch (_) {}
+  }
+
   async function init() {
     bindEvents();
+    applyNewLessonPrefill();
     resetChat();
     renderEmptyStudy();
     applySatPrepMode();

@@ -206,3 +206,16 @@ body[data-page="app"] .audio-opt {
 }
 body[data-page="app"] .live-audio { gap: 10px; }
 body[data-page="app"] .live-audio .btn { align-self: flex-start; }
+
+/* ===== Live session: keep controls in view so teachers don't scroll ===== */
+body[data-page="app"].live-on .app-grid[data-view="study"] { padding-bottom: 8px; }
+body[data-page="app"].live-on .app-grid[data-view="study"] .study-actions {
+  position: sticky; bottom: 84px; z-index: 31;
+  background: #ffffff; border: 1px solid var(--line, #dce6f5); border-radius: 14px;
+  padding: 10px; box-shadow: 0 8px 24px rgba(15,30,53,0.10);
+}
+body[data-page="app"].live-on .app-grid[data-view="study"] .live-strip {
+  position: sticky; bottom: 12px; z-index: 30; max-height: 42vh; overflow: auto;
+  background: #ffffff; border: 1px solid var(--line, #dce6f5); border-radius: 16px;
+  padding: 14px 16px; box-shadow: 0 -6px 30px rgba(15,30,53,0.12);
+}

@@ -11,7 +11,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/styles.css?v=boardsy13" />
-  <link rel="stylesheet" href="/theme-light.css?v=boardsy13" />
+  <link rel="stylesheet" href="/theme-light.css?v=boardsy18" />
 </head>
 <body data-page="app">
   <div class="shell">
@@ -32,7 +32,11 @@
     </header>
 
     <main class="app-page">
-      <section class="app-grid">
+      <div class="app-viewtabs" role="tablist" aria-label="Create or study view">
+        <button class="view-tab active" data-view="create" role="tab" aria-selected="true">✏️ Create &amp; edit</button>
+        <button class="view-tab" data-view="study" role="tab" aria-selected="false">📚 Preview &amp; go live</button>
+      </div>
+      <section class="app-grid" id="appGrid" data-view="create">
         <div class="panel creator-panel" id="creatorPanel">
           <div class="panel-header">
             <div>
@@ -216,6 +220,6 @@
 
   <script async src="https://cdn.jsdelivr.net/npm/livekit-client@2/dist/livekit-client.umd.min.js"></script>
   <script src="/common.js?v=boardsy15"></script>
-  <script src="/app.js?v=boardsy15"></script>
+  <script src="/app.js?v=boardsy18"></script>
 </body>
 </html>

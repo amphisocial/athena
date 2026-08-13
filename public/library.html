@@ -41,7 +41,7 @@
           </div>
           <div class="boards-controls">
             <button class="btn primary" id="newWhiteboardBtn">+ New whiteboard</button>
-            <a class="btn soft" href="/app">+ New lesson</a>
+            <button class="btn soft" id="newLessonBtn">+ New lesson</button>
           </div>
         </div>
         <p class="boards-hint">Everything you've made — whiteboards and lessons — newest first. Filter by type, subject, grade or topic.</p>
@@ -125,8 +125,49 @@
       </div>
     </dialog>
 
+  <dialog id="lessonDialog" class="modal template-modal">
+      <div class="modal-card template-card">
+        <button class="modal-close" id="lessonClose" aria-label="Close">×</button>
+        <h2>Start a new lesson</h2>
+        <div class="board-meta-row">
+          <label>Subject
+            <select id="newLessonSubject">
+              <option value="">—</option>
+              <option value="math">Math</option>
+              <option value="science">Science</option>
+            </select>
+          </label>
+          <label>Grade level
+            <select id="newLessonGrade">
+              <option value="">—</option>
+              <option value="4">Grade 4</option>
+              <option value="5">Grade 5</option>
+              <option value="6">Grade 6</option>
+              <option value="7">Grade 7</option>
+              <option value="8">Grade 8</option>
+              <option value="9">Grade 9</option>
+              <option value="10">Grade 10</option>
+              <option value="11">Grade 11</option>
+              <option value="12">Grade 12</option>
+            </select>
+          </label>
+        </div>
+        <label class="board-name-label">Topic / lesson
+          <input id="newLessonTopic" placeholder="e.g. Photosynthesis" />
+        </label>
+        <label class="board-public-row">
+          <input type="checkbox" id="newLessonPublic" />
+          <span>List on <strong>Public Lessons</strong> once generated (anyone can find &amp; open it). You can change this anytime. Default is private.</span>
+        </label>
+        <p class="template-help">Next you'll add your content (paste, upload, or guided chat) and generate the set — your subject, grade, and topic carry over.</p>
+        <div class="template-actions">
+          <button class="btn primary" id="createLessonBtn">Continue →</button>
+        </div>
+      </div>
+    </dialog>
+
   <script src="/board-templates.js?v=boardsy13"></script>
   <script src="/common.js?v=boardsy13"></script>
-  <script src="/library.js?v=boardsy13"></script>
+  <script src="/library.js?v=boardsy18"></script>
 </body>
 </html>

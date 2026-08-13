@@ -179,6 +179,26 @@
         $('#newBoardName')?.addEventListener('keydown', (e) => { if (e.key === 'Enter') createBoard(); });
       }
     }
+    // New lesson: collect metadata first (parity with New whiteboard), then
+    // hand off to /app with those fields prefilled.
+    const nl = $('#newLessonBtn');
+    if (nl) {
+      nl.addEventListener('click', () => { $('#lessonDialog').showModal(); setTimeout(() => $('#newLessonTopic')?.focus(), 50); });
+      $('#lessonClose')?.addEventListener('click', () => $('#lessonDialog').close());
+      $('#createLessonBtn')?.addEventListener('click', () => {
+        const q = new URLSearchParams();
+        const subj = $('#newLessonSubject')?.value || '';
+        const grade = $('#newLessonGrade')?.value || '';
+        const topic = ($('#newLessonTopic')?.value || '').trim();
+        if (subj) q.set('subject', subj);
+        if (grade) q.set('grade', grade);
+        if (topic) q.set('topic', topic);
+        if ($('#newLessonPublic')?.checked) q.set('public', '1');
+        const qs = q.toString();
+        window.location.href = qs ? `/app?${qs}` : '/app';
+      });
+      $('#newLessonTopic')?.addEventListener('keydown', (e) => { if (e.key === 'Enter') $('#createLessonBtn').click(); });
+    }
     loadScope();
   })();
 

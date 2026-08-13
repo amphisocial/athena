@@ -1837,14 +1837,26 @@
   // Show the teacher's mic button only when audio is actually available, the
   // viewer owns the board, and their plan permits broadcasting. Publishing is
   // also enforced server-side, so this is just to avoid a dead button.
+  function micIsOn() {
+    return !!(Audio.room && Audio.room.localParticipant && Audio.room.localParticipant.isMicrophoneEnabled);
+  }
   function updateAudioBtn() {
     const btn = $('#audioToggleBtn');
     if (!btn) return;
     const limits = (window.AppCommon.state.user && window.AppCommon.state.user.limits) || {};
     const canBroadcast = Audio.enabled && isOwner && !!limits.whiteboardLive && !!(board && board.isLive);
     btn.style.display = canBroadcast ? '' : 'none';
-    btn.textContent = Audio.on ? '🔴 Audio on' : '🎤 Audio';
-    btn.classList.toggle('primary', Audio.on);
+    if (!Audio.on) { btn.textContent = '🎤 Start audio'; btn.classList.remove('primary'); }
+    else if (micIsOn()) { btn.textContent = '🔇 Mute'; btn.classList.add('primary'); }
+    else { btn.textContent = '🎤 Unmute'; btn.classList.remove('primary'); }
+  }
+  // Start audio, or (once connected) mute/unmute the mic WITHOUT ending the
+  // session — so a teacher can step away and come back mid-lesson.
+  async function teacherToggleAudio() {
+    if (!Audio.on) { await startTeacherAudio(); return; }
+    const lp = Audio.room && Audio.room.localParticipant;
+    if (lp) { try { await lp.setMicrophoneEnabled(!lp.isMicrophoneEnabled); } catch (_) {} }
+    updateAudioBtn();
   }
 
   // Force a wss:// URL. A bare host or an http(s) URL from config still works.
@@ -2483,9 +2495,7 @@
         setStatus(board.isLive ? 'You are live.' : 'Stopped broadcasting.', 'success');
       } catch (e) { setStatus(e.message, 'error'); }
     });
-    $('#audioToggleBtn')?.addEventListener('click', () => {
-      if (Audio.on) stopAudio(true); else startTeacherAudio();
-    });
+    $('#audioToggleBtn')?.addEventListener('click', teacherToggleAudio);
   }
 
   function cropSelection() {
