@@ -151,6 +151,10 @@ const STRIPE_PRICE_TO_PLAN = Object.fromEntries(
 // Postgres in the background — so the ~40 call sites below are unchanged.
 const db = require('./db');
 
+// The public "Learning" catalog (Massachusetts topics by grade & subject).
+// Its own typed table, seeded from curriculum-data.js after db.init().
+const curriculum = require('./curriculum');
+
 // ensureStore is now a no-op kept for the few places that call it; the DB
 // schema is created by db.init() at boot.
 function ensureStore() { /* schema created in db.init() */ }
@@ -2107,7 +2111,33 @@ app.get('/api/bookmarks', requireUser, (req, res) => {
   res.json({ items });
 });
 
+// ---- Learning: the public Massachusetts curriculum browser ---------------
+// Grade (5–10) × Subject (math|science) -> every MA topic, grouped by strand.
+// Public on purpose (acquisition + genuinely useful), no auth.
+app.get('/api/learning/overview', async (req, res) => {
+  try {
+    res.json(await curriculum.getOverview(db));
+  } catch (e) {
+    console.error('learning overview failed:', e.message);
+    res.status(500).json({ error: 'Could not load the curriculum.' });
+  }
+});
+
+app.get('/api/learning/topics', async (req, res) => {
+  try {
+    const data = await curriculum.getTopics(db, req.query.grade, req.query.subject);
+    if (!data.strands.length) {
+      return res.status(404).json({ error: 'No topics for that grade and subject.', ...data });
+    }
+    res.json(data);
+  } catch (e) {
+    console.error('learning topics failed:', e.message);
+    res.status(500).json({ error: 'Could not load topics.' });
+  }
+});
+
 // Public pages (no auth).
+app.get('/learning', (req, res) => res.sendFile(path.join(PUBLIC_DIR, 'learning.html')));
 app.get('/lessons', (req, res) => res.sendFile(path.join(PUBLIC_DIR, 'lessons.html')));
 app.get('/l/:id', (req, res) => res.sendFile(path.join(PUBLIC_DIR, 'app.html')));
 
@@ -2443,7 +2473,7 @@ app.get('/robots.txt', (req, res) => {
 app.get('/sitemap.xml', (req, res) => {
   const base = siteBase(req);
   const today = new Date().toISOString().slice(0, 10);
-  const urls = ['', ...LESSON_SLUGS.map((s) => `/${s}`)];
+  const urls = ['', '/learning', '/lessons', ...LESSON_SLUGS.map((s) => `/${s}`)];
   const body = urls
     .map((u) => {
       // The homepage is the priority entry; concept pages sit just below it.
@@ -2503,6 +2533,7 @@ httpServer.on('upgrade', (req, socket, head) => {
 // Boot: initialize Postgres (create schema + warm the in-memory snapshot)
 // BEFORE we start accepting requests, so the first request sees real data.
 db.init()
+  .then(() => curriculum.ensureAndSeed(db))
   .then(() => {
     httpServer.listen(PORT, () => {
       console.log(`Boardsy running on ${PORT} (Postgres-backed)`);
