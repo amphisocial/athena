@@ -1786,6 +1786,117 @@ app.post(['/api/sets/:id/meta', '/api/quizlets/:id/meta'], requireUser, (req, re
   res.json({ set });
 });
 
+// ---- Webinars: scheduled live sessions ------------------------------------
+// A webinar points at an existing lesson or whiteboard. Starting it flips that
+// content to live + public so anyone with the link can join as a student.
+// Stored in the JSONB blob under `webinars` (no migration needed).
+function webinarBoards() {
+  try { return require('./board').readBoardStore().boards || []; } catch (_) { return []; }
+}
+function webinarJoinUrl(w) { return w.kind === 'whiteboard' ? `/board/${w.refId}` : `/l/${w.refId}`; }
+function webinarRunUrl(w) { return w.kind === 'whiteboard' ? `/board/${w.refId}` : `/app?set=${w.refId}`; }
+function enrichWebinar(w, store, boards) {
+  let title = w.title; let exists = false; let contentLive = false;
+  if (w.kind === 'lesson') {
+    const s = store.quizlets.find((x) => x.id === w.refId);
+    exists = !!s; contentLive = !!(s && s.isLive); if (!title && s) title = s.title;
+  } else {
+    const b = (boards || []).find((x) => x.id === w.refId);
+    exists = !!b; contentLive = !!(b && b.isLive); if (!title && b) title = b.title;
+  }
+  return { ...w, title: title || 'Untitled webinar', exists, contentLive,
+    joinUrl: webinarJoinUrl(w), runUrl: webinarRunUrl(w) };
+}
+
+app.get('/api/webinars', requireUser, (req, res) => {
+  const store = readStore();
+  const boards = webinarBoards();
+  const mine = (store.webinars || [])
+    .filter((w) => w.ownerId === req.user.id)
+    .sort((a, b) => String(a.scheduledAt).localeCompare(String(b.scheduledAt)))
+    .map((w) => enrichWebinar(w, store, boards));
+  res.json({ webinars: mine });
+});
+
+// Content the teacher can attach to a webinar (their lessons + whiteboards).
+app.get('/api/webinars/options', requireUser, (req, res) => {
+  const store = readStore();
+  const lessons = store.quizlets
+    .filter((s) => s.ownerId === req.user.id)
+    .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)))
+    .map((s) => ({ id: s.id, title: s.title || 'Untitled lesson' }));
+  const boards = webinarBoards()
+    .filter((b) => b.teacherId === req.user.id)
+    .sort((a, b) => String(b.updatedAt).localeCompare(String(a.updatedAt)))
+    .map((b) => ({ id: b.id, title: b.title || 'Untitled board' }));
+  res.json({ lessons, boards });
+});
+
+app.post('/api/webinars', requireUser, (req, res) => {
+  if (!membership.effectiveLimits(req.user).whiteboardLive) {
+    return res.status(403).json({ error: 'Scheduling webinars is a Teams feature. Start a free Teams trial to schedule live sessions.' });
+  }
+  const kind = req.body.kind === 'whiteboard' ? 'whiteboard' : 'lesson';
+  const refId = String(req.body.refId || '').trim();
+  const title = String(req.body.title || '').trim().slice(0, 120);
+  const when = req.body.scheduledAt ? new Date(req.body.scheduledAt) : null;
+  if (!refId) return res.status(400).json({ error: 'Pick a lesson or whiteboard for the webinar.' });
+  if (!when || isNaN(when.getTime())) return res.status(400).json({ error: 'Pick a date and time.' });
+  const store = readStore();
+  let owns = false;
+  if (kind === 'lesson') owns = store.quizlets.some((s) => s.id === refId && s.ownerId === req.user.id);
+  else owns = webinarBoards().some((b) => b.id === refId && b.teacherId === req.user.id);
+  if (!owns) return res.status(404).json({ error: 'That content was not found in your library.' });
+  const webinar = { id: id('web'), ownerId: req.user.id, title, kind, refId,
+    scheduledAt: when.toISOString(), status: 'scheduled', createdAt: nowIso(), updatedAt: nowIso() };
+  store.webinars = store.webinars || [];
+  store.webinars.push(webinar);
+  writeStore(store);
+  res.json({ webinar: enrichWebinar(webinar, store, webinarBoards()) });
+});
+
+app.delete('/api/webinars/:id', requireUser, (req, res) => {
+  const store = readStore();
+  const w = (store.webinars || []).find((x) => x.id === req.params.id);
+  if (!w || w.ownerId !== req.user.id) return res.status(404).json({ error: 'Webinar not found.' });
+  store.webinars = (store.webinars || []).filter((x) => x.id !== req.params.id);
+  writeStore(store);
+  res.json({ ok: true });
+});
+
+// Start: flip the referenced content live + public and hand back the run link
+// (for the teacher) and the join link (to share with students).
+app.post('/api/webinars/:id/start', requireUser, (req, res) => {
+  if (!membership.effectiveLimits(req.user).whiteboardLive) {
+    return res.status(403).json({ error: 'Live sessions are a Teams feature.' });
+  }
+  const store = readStore();
+  const w = (store.webinars || []).find((x) => x.id === req.params.id);
+  if (!w || w.ownerId !== req.user.id) return res.status(404).json({ error: 'Webinar not found.' });
+
+  if (w.kind === 'lesson') {
+    const s = store.quizlets.find((x) => x.id === w.refId && x.ownerId === req.user.id);
+    if (!s) return res.status(404).json({ error: 'The lesson for this webinar no longer exists.' });
+    s.isLive = true; s.public = true; s.liveStartedAt = nowIso(); s.updatedAt = nowIso();
+    w.status = 'live'; w.updatedAt = nowIso();
+    writeStore(store);
+    return res.json({ webinar: w, runUrl: `/app?set=${s.id}`, joinUrl: `/l/${s.id}` });
+  }
+
+  const boardMod = require('./board');
+  const bstore = boardMod.readBoardStore();
+  const b = (bstore.boards || []).find((x) => x.id === w.refId && x.teacherId === req.user.id);
+  if (!b) return res.status(404).json({ error: 'The whiteboard for this webinar no longer exists.' });
+  bstore.boards.forEach((x) => { if (x.teacherId === req.user.id) x.isLive = false; });
+  b.isLive = true; b.shared = true; b.public = true;
+  if (!b.publicToken) b.publicToken = id('pub');
+  b.updatedAt = nowIso();
+  boardMod.writeBoardStore(bstore);
+  w.status = 'live'; w.updatedAt = nowIso();
+  writeStore(store);
+  return res.json({ webinar: w, runUrl: `/board/${b.id}`, joinUrl: `/board/${b.id}` });
+});
+
 // Unified Library: the teacher's boards + study sets in one list, each tagged
 // with a type so the client can render and filter them together.
 app.get('/api/library', requireUser, (req, res) => {  const store = readStore();
@@ -2169,6 +2280,10 @@ app.get('/app', requirePageUser, (req, res) => {
 
 app.get('/library', requirePageUser, (req, res) => {
   res.sendFile(path.join(PUBLIC_DIR, 'library.html'));
+});
+
+app.get('/webinars', requirePageUser, (req, res) => {
+  res.sendFile(path.join(PUBLIC_DIR, 'webinars.html'));
 });
 
 // In-app pricing / account page (distinct from the marketing #pricing anchor).
