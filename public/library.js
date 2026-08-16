@@ -199,9 +199,33 @@
       });
       $('#newLessonTopic')?.addEventListener('keydown', (e) => { if (e.key === 'Enter') $('#createLessonBtn').click(); });
     }
-    initCatalog();
-    loadScope();
+    setupTabs();
+    handleStartHandoff();   // /learning "Start …" deep-link opens the prefilled dialog
+    loadScope();            // default tab: Your boards & lessons
   })();
+
+  // ---- Page tabs: Your boards & lessons (default) | Curriculum ----
+  let catalogInited = false;
+  function switchTab(name) {
+    const isCur = name === 'curriculum';
+    const libP = $('#tab-library');
+    const curP = $('#tab-curriculum');
+    if (libP) libP.hidden = isCur;
+    if (curP) curP.hidden = !isCur;
+    $('#libTabs')?.querySelectorAll('.lib-tab').forEach((b) => {
+      const on = b.dataset.tab === name;
+      b.classList.toggle('active', on);
+      b.setAttribute('aria-selected', on ? 'true' : 'false');
+    });
+    if (isCur && !catalogInited) { catalogInited = true; initCatalog(); }
+  }
+  function setupTabs() {
+    $('#libTabs')?.querySelectorAll('.lib-tab').forEach((b) =>
+      b.addEventListener('click', () => switchTab(b.dataset.tab)));
+    // Allow /library?tab=curriculum to open the catalog directly.
+    const p = new URLSearchParams(location.search);
+    if (p.get('tab') === 'curriculum') switchTab('curriculum');
+  }
 
   // ---- New whiteboard dialog (ported from the retired /boards page) ----
   let getSelectedTemplate = null;
@@ -357,37 +381,37 @@
     setTimeout(() => $('#createLessonBtn')?.focus(), 50);
   }
 
-  // Initialise the catalog, and honour a ?start= handoff from /learning.
+  // Honour a ?start= handoff from the public Learning page. Runs on boot,
+  // independent of which tab is active — it just opens the prefilled dialog.
+  function handleStartHandoff() {
+    const p = new URLSearchParams(location.search);
+    const startAct = p.get('start');
+    if (startAct !== 'whiteboard' && startAct !== 'lesson') return;
+    const qGrade = Number(p.get('grade'));
+    const qSubject = (p.get('subject') || '').toLowerCase();
+    // Seed the catalog's default grade/subject so opening the tab later matches.
+    if (LC_GRADES.includes(qGrade)) lcGrade = qGrade;
+    if (qSubject === 'math' || qSubject === 'science') lcSubject = qSubject;
+    const topic = {
+      id: p.get('id') || '',
+      title: (p.get('topic') || '').trim(),
+      subject: (qSubject === 'math' || qSubject === 'science') ? qSubject : '',
+      grade: LC_GRADES.includes(qGrade) ? qGrade : '',
+      template: p.get('template') || null
+    };
+    if (!topic.title) return;
+    if (startAct === 'whiteboard') startTopicWhiteboard(topic);
+    else startTopicLesson(topic);
+    history.replaceState({}, '', '/library');   // clean the URL
+  }
+
+  // Initialise the Curriculum tab (lazy — only when first opened).
   async function initCatalog() {
     try {
       lcOverview = await api('/api/learning/overview');
-      if (lcOverview && lcOverview.minGrade) lcGrade = lcOverview.minGrade;
+      if (lcOverview && lcOverview.minGrade && !LC_GRADES.includes(lcGrade)) lcGrade = lcOverview.minGrade;
     } catch (_) { lcOverview = null; }
-
-    const p = new URLSearchParams(location.search);
-    const startAct = p.get('start');
-    const qGrade = Number(p.get('grade'));
-    const qSubject = (p.get('subject') || '').toLowerCase();
-    if (LC_GRADES.includes(qGrade)) lcGrade = qGrade;
-    if (qSubject === 'math' || qSubject === 'science') lcSubject = qSubject;
-
     lcRenderFilters();
     await lcLoadTopics();
-
-    // Deep-link from the public Learning page: open the prefilled dialog.
-    if (startAct === 'whiteboard' || startAct === 'lesson') {
-      const topic = {
-        id: p.get('id') || '',
-        title: (p.get('topic') || '').trim(),
-        subject: (qSubject === 'math' || qSubject === 'science') ? qSubject : '',
-        grade: LC_GRADES.includes(qGrade) ? qGrade : '',
-        template: p.get('template') || null
-      };
-      if (topic.title) {
-        if (startAct === 'whiteboard') startTopicWhiteboard(topic);
-        else startTopicLesson(topic);
-        history.replaceState({}, '', '/library');   // clean the URL
-      }
-    }
   }
 })();
