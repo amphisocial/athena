@@ -330,11 +330,11 @@
     const std = t.standard ? `<div class="lc-t-std">${escapeHtml(t.standard)}</div>` : '';
     const tmplBadge = t.template ? ' <span class="lc-badge">◆</span>' : '';
     return `<div class="lc-topic" data-id="${escapeHtml(t.id)}">
-      <div class="lc-t-main">
+      <div class="lc-t-head">
         <div class="lc-t-title">${escapeHtml(t.title)}</div>
         ${std}
       </div>
-      <div class="lc-t-right">
+      <div class="lc-t-foot">
         ${lcContentChips(t.id)}
         <div class="lc-t-actions">
           <button class="lc-btn wb" data-act="whiteboard" data-id="${escapeHtml(t.id)}" title="Start a whiteboard on this topic">Start whiteboard${tmplBadge}</button>

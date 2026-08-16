@@ -44,26 +44,29 @@
 .lc-topic-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 10px; }
 
 .lc-topic {
-  display: flex; align-items: center; justify-content: space-between; gap: 12px;
-  padding: 11px 13px; border-radius: 11px;
+  display: flex; flex-direction: column; gap: 12px;
+  padding: 14px; border-radius: 12px;
   border: 1px solid var(--line); background: #fff;
 }
 .lc-topic:hover { border-color: #c7d6ee; }
-.lc-topic .lc-t-main { min-width: 0; }
-.lc-topic .lc-t-title { font-size: 0.95rem; font-weight: 600; color: var(--text); line-height: 1.25; }
-.lc-topic .lc-t-std { font-family: "Space Mono", ui-monospace, monospace; font-size: 0.66rem; color: var(--muted); margin-top: 2px; }
-.lc-t-right { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; flex: none; }
-.lc-topic .lc-t-actions { display: flex; gap: 6px; flex: none; }
+.lc-t-head { min-width: 0; }
+.lc-t-title { font-size: 0.98rem; font-weight: 600; color: var(--text); line-height: 1.3; }
+.lc-t-std { font-family: "Space Mono", ui-monospace, monospace; font-size: 0.66rem; color: var(--muted); margin-top: 3px; }
+
+/* Footer: content chips on the left, Start actions on the right */
+.lc-t-foot { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.lc-topic .lc-t-actions { display: flex; gap: 8px; flex: none; }
 
 /* Slides / Flashcards / Quiz chips (existing saved content per topic) */
-.lc-t-content { display: flex; gap: 5px; }
+.lc-t-content { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .lc-content-chip {
-  font-size: 0.68rem; font-weight: 700; text-decoration: none;
-  padding: 2px 8px; border-radius: 999px; border: 1px solid var(--line);
-  color: var(--muted); background: #f7faff; white-space: nowrap;
+  display: inline-flex; align-items: center; align-self: center;
+  font-size: 0.7rem; font-weight: 700; line-height: 1.4; text-decoration: none;
+  padding: 3px 10px; border-radius: 999px; border: 1px solid var(--line);
+  color: var(--muted); background: #f6f9ff; white-space: nowrap;
 }
-.lc-content-chip.off { opacity: 0.55; }
-.lc-content-chip.on { cursor: pointer; border-color: var(--brand); color: var(--brand); background: #eef3ff; }
+.lc-content-chip.off { opacity: 0.5; }
+.lc-content-chip.on { cursor: pointer; border-color: var(--brand); color: var(--brand); background: #eaf1ff; }
 .lc-content-chip.on:hover { background: var(--brand); color: #fff; }
 
 .lc-btn {
@@ -86,6 +89,6 @@
 @keyframes lcsh { to { background-position: -200% 0; } }
 
 @media (max-width: 560px) {
-  .lc-topic { flex-direction: column; align-items: stretch; }
+  .lc-t-foot { align-items: stretch; }
   .lc-topic .lc-t-actions { justify-content: flex-end; }
 }
