@@ -100,11 +100,16 @@
 .lrn-topic .lt-std { font-family: "Space Mono", monospace; font-size: 0.7rem; color: var(--muted); }
 .lrn-topic .lt-actions { display: flex; gap: 8px; align-items: center; margin-top: 4px; flex-wrap: wrap; }
 .lrn-topic .lt-open {
-  font: inherit; font-size: 0.82rem; font-weight: 700; text-decoration: none;
+  font: inherit; font-size: 0.82rem; font-weight: 700; text-decoration: none; cursor: pointer;
   color: var(--brand); display: inline-flex; align-items: center; gap: 5px;
-  padding: 5px 11px; border-radius: 8px; border: 1px solid var(--line-2); background: var(--panel);
+  padding: 6px 12px; border-radius: 8px; border: 1px solid var(--line-2); background: var(--panel);
+  transition: all 0.12s ease;
 }
 .lrn-topic .lt-open:hover { background: var(--panel-2); }
+.lrn-topic .lt-open.wb { border-color: rgba(37,99,255,0.35); color: var(--brand); }
+.lrn-topic .lt-open.wb:hover { background: var(--brand); color: #fff; border-color: var(--brand); }
+.lrn-topic .lt-open.ls { border-color: rgba(18,181,166,0.4); color: #0f9c8f; }
+.lrn-topic .lt-open.ls:hover { background: var(--teal); color: #fff; border-color: var(--teal); }
 .lrn-topic .lt-open.live { color: #0f9c8f; }
 .lrn-topic .lt-open .lt-arrow { transition: transform 0.12s ease; }
 .lrn-topic .lt-open:hover .lt-arrow { transform: translateX(2px); }

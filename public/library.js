@@ -168,17 +168,17 @@
       const el = $(sel); if (el) el.addEventListener('input', applyFilters);
     });
     // New whiteboard: create dialog lives here now (the old /boards page is gone).
+    // The dialog handlers are always wired (the topic catalog can open the
+    // dialog too); only the top "+ New whiteboard" button is gated by access.
     const nb = $('#newWhiteboardBtn');
+    const canCreateBoard = Boolean(state.user.limits && state.user.limits.whiteboard);
     if (nb) {
-      const canCreate = Boolean(state.user.limits && state.user.limits.whiteboard);
-      if (!canCreate) nb.style.display = 'none';
-      else {
-        nb.addEventListener('click', openNewBoard);
-        $('#createBoardBtn')?.addEventListener('click', createBoard);
-        $('#templateClose')?.addEventListener('click', () => $('#templateDialog').close());
-        $('#newBoardName')?.addEventListener('keydown', (e) => { if (e.key === 'Enter') createBoard(); });
-      }
+      if (!canCreateBoard) nb.style.display = 'none';
+      else nb.addEventListener('click', openNewBoard);
     }
+    $('#createBoardBtn')?.addEventListener('click', createBoard);
+    $('#templateClose')?.addEventListener('click', () => $('#templateDialog').close());
+    $('#newBoardName')?.addEventListener('keydown', (e) => { if (e.key === 'Enter') createBoard(); });
     // New lesson: collect metadata first (parity with New whiteboard), then
     // hand off to /app with those fields prefilled.
     const nl = $('#newLessonBtn');
@@ -199,11 +199,13 @@
       });
       $('#newLessonTopic')?.addEventListener('keydown', (e) => { if (e.key === 'Enter') $('#createLessonBtn').click(); });
     }
+    initCatalog();
     loadScope();
   })();
 
   // ---- New whiteboard dialog (ported from the retired /boards page) ----
   let getSelectedTemplate = null;
+  let markTemplate = null;   // set by buildTemplatePicker; preselects a tile by id
   function buildTemplatePicker() {
     const groups = {};
     (window.BOARD_TEMPLATES || []).forEach((t) => { (groups[t.subject] ||= []).push(t); });
@@ -220,9 +222,14 @@
     const box = $('#templateGroups'); if (box) box.innerHTML = html;
     let selected = 'blank';
     const tiles = box ? box.querySelectorAll('.template-tile') : [];
-    const mark = (id) => { selected = id; tiles.forEach((el) => el.classList.toggle('selected', el.dataset.id === id)); };
+    const mark = (id) => {
+      const has = Array.from(tiles).some((el) => el.dataset.id === id);
+      selected = has ? id : 'blank';
+      tiles.forEach((el) => el.classList.toggle('selected', el.dataset.id === selected));
+    };
     mark('blank');
     tiles.forEach((el) => el.addEventListener('click', () => mark(el.dataset.id)));
+    markTemplate = mark;
     return () => selected;
   }
   function openNewBoard() {
@@ -246,6 +253,141 @@
     } catch (error) {
       setStatus(error.message, 'error');
       $('#createBoardBtn').disabled = false;
+    }
+  }
+
+  // =====================================================================
+  //  "Start from a topic" — the Massachusetts curriculum catalog.
+  //  Each topic opens the existing New whiteboard / New lesson dialog with
+  //  grade, subject and topic prefilled; the normal create flow then saves.
+  // =====================================================================
+  const SUBJECT_LABEL = { math: 'Math', science: 'Science' };
+  const LC_GRADES = [5, 6, 7, 8, 9, 10];
+  let lcOverview = null;
+  let lcGrade = 5;
+  let lcSubject = 'math';
+
+  function lcRenderFilters() {
+    const gc = $('#lcGradeChips');
+    if (gc) {
+      gc.innerHTML = LC_GRADES.map((g) => `<button class="lc-chip grade${g === lcGrade ? ' on' : ''}" data-grade="${g}">Grade ${g}</button>`).join('');
+      gc.querySelectorAll('.lc-chip').forEach((b) => b.addEventListener('click', () => { lcGrade = Number(b.dataset.grade); lcRenderFilters(); lcLoadTopics(); }));
+    }
+    const sc = $('#lcSubjectChips');
+    if (sc) {
+      sc.innerHTML = ['math', 'science'].map((s) => `<button class="lc-chip subj ${s}${s === lcSubject ? ' on ' + s : ''}" data-subject="${s}">${SUBJECT_LABEL[s]}</button>`).join('');
+      sc.querySelectorAll('.lc-chip').forEach((b) => b.addEventListener('click', () => { lcSubject = b.dataset.subject; lcRenderFilters(); lcLoadTopics(); }));
+    }
+  }
+
+  function lcTopicRow(t) {
+    const std = t.standard ? `<div class="lc-t-std">${escapeHtml(t.standard)}</div>` : '';
+    const tmplBadge = t.template ? ' <span class="lc-badge">◆</span>' : '';
+    return `<div class="lc-topic" data-id="${escapeHtml(t.id)}">
+      <div class="lc-t-main">
+        <div class="lc-t-title">${escapeHtml(t.title)}</div>
+        ${std}
+      </div>
+      <div class="lc-t-actions">
+        <button class="lc-btn wb" data-act="whiteboard" data-id="${escapeHtml(t.id)}" title="Start a whiteboard on this topic">Start whiteboard${tmplBadge}</button>
+        <button class="lc-btn ls" data-act="lesson" data-id="${escapeHtml(t.id)}" title="Start a lesson on this topic">Start lesson</button>
+      </div>
+    </div>`;
+  }
+
+  let lcTopicIndex = {};   // id -> topic (with grade/subject attached)
+  function lcRenderTopics(data) {
+    lcTopicIndex = {};
+    const box = $('#lcTopics');
+    if (!box) return;
+    if (!data.strands || !data.strands.length) { box.innerHTML = '<p class="lc-empty">No topics for that selection yet.</p>'; return; }
+    box.innerHTML = data.strands.map((strand) => {
+      const rows = strand.topics.map((t) => {
+        lcTopicIndex[t.id] = { ...t, grade: data.grade, subject: data.subject };
+        return lcTopicRow(t);
+      }).join('');
+      return `<div class="lc-strand">
+        <div class="lc-strand-head"><h3>${escapeHtml(strand.strand)}</h3><span class="lc-strand-count">${strand.topics.length} topic${strand.topics.length === 1 ? '' : 's'}</span></div>
+        <div class="lc-topic-grid">${rows}</div>
+      </div>`;
+    }).join('');
+    box.querySelectorAll('.lc-btn').forEach((b) => b.addEventListener('click', () => {
+      const topic = lcTopicIndex[b.dataset.id];
+      if (!topic) return;
+      if (b.dataset.act === 'whiteboard') startTopicWhiteboard(topic);
+      else startTopicLesson(topic);
+    }));
+    const cnt = $('#lcCount');
+    if (cnt) cnt.textContent = `${data.topicCount} topics · ${data.strands.length} strands`;
+  }
+
+  async function lcLoadTopics() {
+    const box = $('#lcTopics');
+    if (box) box.innerHTML = '<div class="lc-skel">' + Array.from({ length: 6 }).map(() => '<div class="sk"></div>').join('') + '</div>';
+    try {
+      const data = await api(`/api/learning/topics?grade=${lcGrade}&subject=${lcSubject}`);
+      lcRenderTopics(data);
+    } catch (e) {
+      if (box) box.innerHTML = `<p class="lc-empty">${escapeHtml(e.message || 'Could not load topics.')}</p>`;
+    }
+  }
+
+  function gradeToLabel(g) { return g ? String(g) : ''; }
+
+  // Prefill + open the New whiteboard dialog for a topic.
+  function startTopicWhiteboard(topic) {
+    if (!getSelectedTemplate) getSelectedTemplate = buildTemplatePicker();
+    if ($('#newBoardName')) $('#newBoardName').value = topic.title || '';
+    if ($('#newBoardSubject')) $('#newBoardSubject').value = topic.subject || '';
+    if ($('#newBoardGrade')) $('#newBoardGrade').value = gradeToLabel(topic.grade);
+    if ($('#newBoardTopic')) $('#newBoardTopic').value = topic.title || '';
+    if ($('#newBoardPublic')) $('#newBoardPublic').checked = false;
+    if (markTemplate) markTemplate(topic.template || 'blank');
+    $('#templateDialog').showModal();
+    setTimeout(() => $('#newBoardName')?.focus(), 50);
+  }
+
+  // Prefill + open the New lesson dialog for a topic.
+  function startTopicLesson(topic) {
+    if ($('#newLessonSubject')) $('#newLessonSubject').value = topic.subject || '';
+    if ($('#newLessonGrade')) $('#newLessonGrade').value = gradeToLabel(topic.grade);
+    if ($('#newLessonTopic')) $('#newLessonTopic').value = topic.title || '';
+    if ($('#newLessonPublic')) $('#newLessonPublic').checked = false;
+    $('#lessonDialog').showModal();
+    setTimeout(() => $('#createLessonBtn')?.focus(), 50);
+  }
+
+  // Initialise the catalog, and honour a ?start= handoff from /learning.
+  async function initCatalog() {
+    try {
+      lcOverview = await api('/api/learning/overview');
+      if (lcOverview && lcOverview.minGrade) lcGrade = lcOverview.minGrade;
+    } catch (_) { lcOverview = null; }
+
+    const p = new URLSearchParams(location.search);
+    const startAct = p.get('start');
+    const qGrade = Number(p.get('grade'));
+    const qSubject = (p.get('subject') || '').toLowerCase();
+    if (LC_GRADES.includes(qGrade)) lcGrade = qGrade;
+    if (qSubject === 'math' || qSubject === 'science') lcSubject = qSubject;
+
+    lcRenderFilters();
+    await lcLoadTopics();
+
+    // Deep-link from the public Learning page: open the prefilled dialog.
+    if (startAct === 'whiteboard' || startAct === 'lesson') {
+      const topic = {
+        id: p.get('id') || '',
+        title: (p.get('topic') || '').trim(),
+        subject: (qSubject === 'math' || qSubject === 'science') ? qSubject : '',
+        grade: LC_GRADES.includes(qGrade) ? qGrade : '',
+        template: p.get('template') || null
+      };
+      if (topic.title) {
+        if (startAct === 'whiteboard') startTopicWhiteboard(topic);
+        else startTopicLesson(topic);
+        history.replaceState({}, '', '/library');   // clean the URL
+      }
     }
   }
 })();

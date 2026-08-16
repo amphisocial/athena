@@ -13,6 +13,7 @@
   <link rel="stylesheet" href="/styles.css?v=boardsy13" />
   <link rel="stylesheet" href="/theme-light.css?v=boardsy13" />
   <link rel="stylesheet" href="/lessons.css?v=boardsy13" />
+  <link rel="stylesheet" href="/library-topics.css?v=boardsy13" />
 </head>
 <body data-page="library">
   <div class="shell">
@@ -33,6 +34,29 @@
     </header>
 
     <main class="app-page">
+      <section class="panel topic-catalog-panel">
+        <div class="panel-header">
+          <div>
+            <span class="section-kicker">Massachusetts curriculum</span>
+            <h2>Start from a topic</h2>
+          </div>
+        </div>
+        <p class="boards-hint">Pick a grade and subject, then start a whiteboard or a lesson on any topic — it opens prefilled with the grade, subject and topic, and saves to your library automatically.</p>
+        <div class="lc-filters" id="lcFilters">
+          <div class="lc-group" role="group" aria-label="Grade">
+            <span class="lc-label">Grade</span>
+            <div class="lc-chips" id="lcGradeChips"></div>
+          </div>
+          <div class="lc-group" role="group" aria-label="Subject">
+            <span class="lc-label">Subject</span>
+            <div class="lc-chips" id="lcSubjectChips"></div>
+          </div>
+          <span class="lc-spacer"></span>
+          <span class="lc-count" id="lcCount"></span>
+        </div>
+        <div class="lc-topics" id="lcTopics"></div>
+      </section>
+
       <section class="panel library-panel">
         <div class="panel-header">
           <div>

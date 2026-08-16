@@ -1,0 +1,69 @@
+/* library-topics.css — the "Start from a topic" catalog on the Library page.
+   Uses theme-light.css tokens (--brand, --brand-2, --text, --muted, --line). */
+
+.topic-catalog-panel { margin-bottom: 20px; }
+
+/* Filter bar (grade chips + subject chips) */
+.lc-filters {
+  display: flex; align-items: center; gap: 18px; flex-wrap: wrap;
+  padding: 12px 14px; margin: 4px 0 16px;
+  background: var(--bg-2, #f3f7ff); border: 1px solid var(--line); border-radius: 12px;
+}
+.lc-group { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.lc-label { font-size: 0.68rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.lc-chips { display: flex; gap: 6px; flex-wrap: wrap; }
+.lc-spacer { flex: 1; }
+.lc-count { font-size: 0.82rem; color: var(--muted); white-space: nowrap; }
+
+.lc-chip {
+  font: inherit; font-size: 0.88rem; font-weight: 600; cursor: pointer;
+  padding: 5px 12px; border-radius: 999px;
+  border: 1px solid var(--line); background: #fff; color: var(--text);
+  transition: all 0.12s ease;
+}
+.lc-chip:hover { border-color: var(--brand); color: var(--brand); }
+.lc-chip.on { background: var(--brand); border-color: var(--brand); color: #fff; }
+.lc-chip.subj.on.science { background: var(--brand-2); border-color: var(--brand-2); }
+
+/* Strand groups + topic rows */
+.lc-strand { margin-bottom: 20px; }
+.lc-strand-head { display: flex; align-items: baseline; gap: 10px; margin: 0 0 10px; padding-bottom: 6px; border-bottom: 1px solid var(--line); }
+.lc-strand-head h3 { font-size: 1.02rem; margin: 0; color: var(--text); }
+.lc-strand-head .lc-strand-count { font-size: 0.78rem; color: var(--muted); }
+
+.lc-topic-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 10px; }
+
+.lc-topic {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 11px 13px; border-radius: 11px;
+  border: 1px solid var(--line); background: #fff;
+}
+.lc-topic:hover { border-color: #c7d6ee; }
+.lc-topic .lc-t-main { min-width: 0; }
+.lc-topic .lc-t-title { font-size: 0.95rem; font-weight: 600; color: var(--text); line-height: 1.25; }
+.lc-topic .lc-t-std { font-family: "Space Mono", ui-monospace, monospace; font-size: 0.66rem; color: var(--muted); margin-top: 2px; }
+.lc-topic .lc-t-actions { display: flex; gap: 6px; flex: none; }
+
+.lc-btn {
+  font: inherit; font-size: 0.78rem; font-weight: 700; cursor: pointer; white-space: nowrap;
+  padding: 6px 10px; border-radius: 8px; border: 1px solid var(--line); background: #fff; color: var(--text);
+  transition: all 0.12s ease;
+}
+.lc-btn:hover { border-color: var(--brand); color: var(--brand); }
+.lc-btn.wb { border-color: rgba(37,99,255,0.35); color: var(--brand); }
+.lc-btn.wb:hover { background: var(--brand); color: #fff; border-color: var(--brand); }
+.lc-btn.ls { border-color: rgba(18,181,166,0.4); color: #0f9c8f; }
+.lc-btn.ls:hover { background: var(--brand-2); color: #fff; border-color: var(--brand-2); }
+.lc-btn .lc-badge { font-size: 0.6rem; }
+
+.lc-empty, .lc-loading { color: var(--muted); padding: 18px 0; }
+
+/* Skeleton */
+.lc-skel { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 10px; }
+.lc-skel .sk { height: 54px; border-radius: 11px; background: linear-gradient(100deg, #f3f7ff 30%, #eaf1ff 50%, #f3f7ff 70%); background-size: 200% 100%; animation: lcsh 1.2s infinite; }
+@keyframes lcsh { to { background-position: -200% 0; } }
+
+@media (max-width: 560px) {
+  .lc-topic { flex-direction: column; align-items: stretch; }
+  .lc-topic .lc-t-actions { justify-content: flex-end; }
+}

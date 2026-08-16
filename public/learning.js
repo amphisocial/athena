@@ -26,6 +26,7 @@
   let overview = null;              // { grades:[...], subjects:[...] }
   let selectedGrade = null;         // number or null
   let selectedSubject = null;       // 'math' | 'science' | null
+  let loggedIn = false;             // set at boot from AppCommon.state.user
 
   // ---- URL <-> state -------------------------------------------------------
   function readUrl() {
@@ -121,36 +122,63 @@
   }
 
   // ---- Topics --------------------------------------------------------------
-  function topicHref(subject, template) {
-    // Every topic opens on the no-login sandbox board, preset to the subject.
-    // When the topic maps to a curated, seedable template, seed it so the
-    // teacher lands on a live, ready-to-analyze canvas.
+  function sandboxHref(subject, template) {
     const params = new URLSearchParams({ subject });
     if (template && SEEDABLE.has(template)) params.set('template', template);
     return `/sandbox?${params.toString()}`;
   }
 
-  function topicCard(t, subject) {
+  // Where a topic action should go, depending on auth:
+  //  - signed in  -> the Library, which opens the prefilled New form and saves.
+  //  - signed out -> whiteboard opens the no-login sandbox (not saved);
+  //                  lesson needs an account, so we prompt sign-up.
+  function libraryStartHref(kind, t, subject, grade) {
+    const p = new URLSearchParams({ start: kind, grade: String(grade), subject });
+    if (t.title) p.set('topic', t.title);
+    if (t.id) p.set('id', t.id);
+    if (kind === 'whiteboard' && t.template) p.set('template', t.template);
+    return `/library?${p.toString()}`;
+  }
+
+  function topicCard(t, subject, grade) {
     const hasTemplate = Boolean(t.template) && SEEDABLE.has(t.template);
     const std = t.standard ? `<span class="lt-std">${escapeHtml(t.standard)}</span>` : '';
     const blurb = t.blurb ? `<p class="lt-blurb">${escapeHtml(t.blurb)}</p>` : '';
     const badge = hasTemplate ? '<span class="lt-badge">Live board</span>' : '';
-    const openLabel = hasTemplate ? 'Open live board' : 'Start a board';
-    return `<article class="lrn-topic">
+    const wbMark = t.template ? ' <span class="lt-arrow">◆</span>' : '';
+    // Buttons carry data so a single delegated handler can route them.
+    return `<article class="lrn-topic" data-title="${escapeHtml(t.title)}" data-id="${escapeHtml(t.id)}" data-template="${escapeHtml(t.template || '')}">
       ${badge}
       <h3>${escapeHtml(t.title)}</h3>
       ${blurb}
       ${std}
       <div class="lt-actions">
-        <a class="lt-open${hasTemplate ? ' live' : ''}" href="${topicHref(subject, t.template)}">
-          ${openLabel} <span class="lt-arrow">→</span>
-        </a>
+        <button class="lt-open wb" data-act="whiteboard">Start whiteboard${wbMark}</button>
+        <button class="lt-open ls" data-act="lesson">Start lesson</button>
       </div>
     </article>`;
   }
 
+  function onTopicAction(act, card, subject, grade) {
+    const t = { id: card.dataset.id, title: card.dataset.title, template: card.dataset.template || null };
+    if (loggedIn) {
+      // Hand off to the Library; it opens the prefilled dialog and saves.
+      window.location.href = libraryStartHref(act, t, subject, grade);
+      return;
+    }
+    if (act === 'whiteboard') {
+      // No-login sandbox board, preset to subject (+ seeded template if any).
+      window.location.href = sandboxHref(subject, t.template);
+    } else {
+      // A saved lesson needs an account — invite sign-up (topic carries over
+      // once they land in the Library).
+      try { C.openAuth('signup'); } catch (_) { window.location.href = '/?login=0'; }
+    }
+  }
+
   function renderTopics(data) {
     const subject = data.subject;
+    const grade = data.grade;
     const cls = subject === 'science' ? ' science' : '';
     el.topics.innerHTML = data.strands.map((strand) => `
       <div class="lrn-strand${cls}">
@@ -159,9 +187,13 @@
           <span class="strand-count">${strand.topics.length} topic${strand.topics.length === 1 ? '' : 's'}</span>
         </div>
         <div class="lrn-topic-grid">
-          ${strand.topics.map((t) => topicCard(t, subject)).join('')}
+          ${strand.topics.map((t) => topicCard(t, subject, grade)).join('')}
         </div>
       </div>`).join('');
+    el.topics.querySelectorAll('.lt-open').forEach((btn) => btn.addEventListener('click', () => {
+      const card = btn.closest('.lrn-topic');
+      onTopicAction(btn.dataset.act, card, subject, grade);
+    }));
   }
 
   function skeleton() {
@@ -216,9 +248,13 @@
 
   (async () => {
     try { await C.initCommon(); } catch (_) {}
+    loggedIn = Boolean(C.state && C.state.user);
     // Mirror the homepage: signed-in users see "My library" instead of Sign in.
     const nav = $('#navPlans');
-    if (C.state && C.state.user && nav) { nav.textContent = 'My library'; nav.setAttribute('href', '/library'); }
+    if (nav) {
+      if (loggedIn) { nav.textContent = 'My library'; nav.setAttribute('href', '/library'); }
+      else { nav.addEventListener('click', (e) => { e.preventDefault(); try { C.openAuth('login'); } catch (_) { location.href = '/?login=1'; } }); }
+    }
 
     readUrl();
     try {

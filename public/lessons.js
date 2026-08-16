@@ -109,7 +109,13 @@
   (async () => {
     try { await C.initCommon(); } catch (_) {}
     user = C.state && C.state.user;
-    if (user) $('#plSignin').style.display = 'none';
+    // Top-right reflects auth: signed-in teachers get "My library", everyone
+    // else gets "Sign in" (which opens the auth modal in place).
+    const nav = $('#navPlans');
+    if (nav) {
+      if (user) { nav.textContent = 'My library'; nav.setAttribute('href', '/library'); }
+      else { nav.addEventListener('click', (e) => { e.preventDefault(); C.openAuth('login'); }); }
+    }
     if (user) {
       try { const bm = await api('/api/bookmarks'); (bm.items || []).forEach((i) => bookmarks.add(i.type + ':' + i.id)); } catch (_) {}
     }
