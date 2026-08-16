@@ -320,8 +320,8 @@
     const cells = defs.map(([k, label]) => {
       const item = c[k] || c.mixed;   // a "mixed" set counts toward all three
       return item
-        ? `<a class="lc-content-chip ${k} on" href="/app?set=${encodeURIComponent(item.id)}" title="Open your ${label.toLowerCase()} for this topic">${label}</a>`
-        : `<span class="lc-content-chip ${k} off" title="None yet — Start lesson to create">${label}</span>`;
+        ? `<a class="lc-content-chip on" data-fmt="${k}" href="/app?set=${encodeURIComponent(item.id)}" title="Open your ${label.toLowerCase()} for this topic">${label}</a>`
+        : `<span class="lc-content-chip off" data-fmt="${k}" title="None yet — Start lesson to create">${label}</span>`;
     }).join('');
     return `<div class="lc-t-content">${cells}</div>`;
   }

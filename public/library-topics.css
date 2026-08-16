@@ -60,7 +60,7 @@
 /* Slides / Flashcards / Quiz chips (existing saved content per topic) */
 .lc-t-content { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .lc-content-chip {
-  display: inline-flex; align-items: center; align-self: center;
+  display: inline-flex; align-items: center; align-self: center; height: auto;
   font-size: 0.7rem; font-weight: 700; line-height: 1.4; text-decoration: none;
   padding: 3px 10px; border-radius: 999px; border: 1px solid var(--line);
   color: var(--muted); background: #f6f9ff; white-space: nowrap;
