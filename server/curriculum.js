@@ -34,90 +34,16 @@ const slug = (s) => String(s || '')
 
 const gradeText = (g) => (g ? (/^grade/i.test(String(g)) ? String(g) : `Grade ${g}`) : '');
 const cap = (s) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s);
+const topicExamples = require('./topic-examples');
 
-// A strong, teacher-ready STARTING POINT for a topic's paste-content, built
-// from its metadata. This is deliberately structured the way a teacher would
-// lay out a lesson (goal → key ideas → worked examples → misconceptions →
-// checks → practice) so it generates good slides/quizzes/flashcards straight
-// away, and is fully editable. The AI backfill (see backfillContent) can later
-// replace this with researched, topic-specific content stored in the DB — so
-// the runtime never has to call AI for a curriculum topic.
+// A concrete, slide-ready STARTING POINT for a topic's paste-content: a
+// definition slide, a concept slide, and real WORKED EXAMPLES with actual
+// numbers, plus a common-mistake slide and practice. Common topics get
+// hand-written correct examples (see topic-examples.js); the rest get a
+// slide-structured template. The AI backfill can replace any of it with
+// fully-researched content stored in the DB.
 function scaffoldContent({ grade, subject, title, strand, standard }) {
-  const g = gradeText(grade);
-  const subj = cap(String(subject || '').toLowerCase() || 'the subject');
-  const head = [g, subj, strand].filter(Boolean).join(' · ') + (standard ? ` · ${standard}` : '');
-  const isSci = String(subject || '').toLowerCase() === 'science';
-  const lower = String(title || 'this topic').replace(/\.$/, '');
-
-  if (isSci) {
-    return `# ${title}
-${head}
-
-## Lesson goal
-Students can explain ${lower} and use evidence and models to reason about it.
-
-## Anchor the lesson
-Open with a phenomenon or question students can observe: "Why/what happens when …?" tied to ${lower}. Let students share what they already think.
-
-## Key ideas to teach
-- Define ${lower} in plain language, then in science terms.
-- Build or show a model/diagram that makes the idea visible.
-- Connect cause and effect: what changes, and what it affects.
-- Link to the bigger unit: ${strand || subj}.
-
-## Show these (great for slides)
-1. A labeled diagram or model of ${lower}.
-2. A worked example or demonstration walked through step by step.
-3. A real-world example students recognize.
-
-## Vocabulary
-- Key terms for ${lower} (define each with a student-friendly sentence and an example).
-
-## Common misconceptions to address
-- A likely wrong idea about ${lower} — and how to correct it with evidence.
-
-## Quick checks (turn into quiz / flashcards)
-- What is ${lower}, in your own words?
-- Give an example and explain why it fits.
-- Predict what happens if one variable changes.
-
-## Practice / apply
-- 4–6 questions ranging from recall to applying ${lower} in a new situation.`;
-  }
-
-  return `# ${title}
-${head}
-
-## Lesson goal
-Students can ${lower} and explain their reasoning.
-
-## Why it matters
-Connect ${lower} to earlier work in ${strand || subj} and to where it's used next.
-
-## Key ideas to teach
-- State the idea in student-friendly language, then formally.
-- Show the method/steps with a clearly labeled example.
-- Represent it more than one way (words, numbers, a picture or graph).
-- Name the connection to prior skills in ${strand || subj}.
-
-## Worked examples (great for slides)
-1. A straightforward example with every step shown.
-2. A harder example (multi-step, or with a common twist).
-3. A word problem applying ${lower}.
-
-## Vocabulary
-- Key terms for ${lower} (define each with a quick example).
-
-## Common mistakes to address
-- A typical error students make with ${lower} — and how to fix the thinking.
-
-## Quick checks (turn into quiz / flashcards)
-- Explain ${lower} in your own words.
-- Solve a short example and justify each step.
-- Spot-the-error: find the mistake in a worked solution.
-
-## Practice set
-- 4–6 problems, easy → challenge, on ${lower}.`;
+  return topicExamples.buildContent({ grade, subject, title, strand, standard });
 }
 
 // Flatten the nested catalog into flat topic rows with stable ids and ordering.
@@ -209,12 +135,13 @@ async function ensureAndSeed(db) {
     if (ids.length) {
       await client.query(`DELETE FROM curriculum_topics WHERE NOT (id = ANY($1::text[]))`, [ids]);
     }
-    // Give every topic a strong starting-point content scaffold if it has none
-    // yet. Never overwrites AI-backfilled content (content_source='ai').
+    // Give every topic concrete, slide-ready content. Regenerates the built-in
+    // scaffold each boot (so improvements ship on deploy) but never touches
+    // AI-backfilled content (content_source='ai').
     const need = await client.query(
       `SELECT id, grade, subject, strand, title, standard_code
          FROM curriculum_topics
-        WHERE content_source = 'none' OR seed_content = ''`
+        WHERE content_source <> 'ai'`
     );
     for (const t of need.rows) {
       const content = scaffoldContent({
@@ -226,7 +153,7 @@ async function ensureAndSeed(db) {
       );
     }
     await client.query('COMMIT');
-    console.log(`[curriculum] seeded ${rows.length} topics (${need.rows.length} content scaffolds added).`);
+    console.log(`[curriculum] seeded ${rows.length} topics (${need.rows.length} content scaffolds built).`);
   } catch (e) {
     await client.query('ROLLBACK').catch(() => {});
     console.error('[curriculum] seed failed:', e.message);
