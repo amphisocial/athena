@@ -52,7 +52,19 @@
 .lc-topic .lc-t-main { min-width: 0; }
 .lc-topic .lc-t-title { font-size: 0.95rem; font-weight: 600; color: var(--text); line-height: 1.25; }
 .lc-topic .lc-t-std { font-family: "Space Mono", ui-monospace, monospace; font-size: 0.66rem; color: var(--muted); margin-top: 2px; }
+.lc-t-right { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; flex: none; }
 .lc-topic .lc-t-actions { display: flex; gap: 6px; flex: none; }
+
+/* Slides / Flashcards / Quiz chips (existing saved content per topic) */
+.lc-t-content { display: flex; gap: 5px; }
+.lc-content-chip {
+  font-size: 0.68rem; font-weight: 700; text-decoration: none;
+  padding: 2px 8px; border-radius: 999px; border: 1px solid var(--line);
+  color: var(--muted); background: #f7faff; white-space: nowrap;
+}
+.lc-content-chip.off { opacity: 0.55; }
+.lc-content-chip.on { cursor: pointer; border-color: var(--brand); color: var(--brand); background: #eef3ff; }
+.lc-content-chip.on:hover { background: var(--brand); color: #fff; }
 
 .lc-btn {
   font: inherit; font-size: 0.78rem; font-weight: 700; cursor: pointer; white-space: nowrap;

@@ -5,7 +5,7 @@
   const study = { set: null, index: 0, flipped: false, answers: {} };
   const creator = { activeTab: 'paste', chatMessages: [], chatReady: false, chatSeed: null, plan: null };
   // Metadata carried over from the "New lesson" dialog on the Library page.
-  let pendingLessonMeta = { topic: '', public: false };
+  let pendingLessonMeta = { topic: '', topicId: '', public: false };
 
   const normalize = (value) => String(value || '').trim().toLowerCase().replace(/\s+/g, ' ');
 
@@ -135,17 +135,19 @@
       state.usage = data.usage;
       updateUsagePill();
       const newSet = data.set || data.quizlet;
-      // Carry over topic/public chosen in the "New lesson" dialog.
-      if (newSet && (pendingLessonMeta.topic || pendingLessonMeta.public)) {
+      // Carry over topic/topicId/public chosen in the "New lesson" dialog.
+      if (newSet && (pendingLessonMeta.topic || pendingLessonMeta.topicId || pendingLessonMeta.public)) {
         try {
           await api(`/api/sets/${newSet.id}/meta`, { method: 'POST', body: JSON.stringify({
             topic: pendingLessonMeta.topic || undefined,
+            topicId: pendingLessonMeta.topicId || undefined,
             public: pendingLessonMeta.public || undefined
           }) });
           if (pendingLessonMeta.topic) newSet.topic = pendingLessonMeta.topic;
+          if (pendingLessonMeta.topicId) newSet.topicId = pendingLessonMeta.topicId;
           if (pendingLessonMeta.public) newSet.public = true;
         } catch (_) {}
-        pendingLessonMeta = { topic: '', public: false };
+        pendingLessonMeta = { topic: '', topicId: '', public: false };
       }
       loadSetIntoStudy(newSet);
       setStatus('Study set created and saved to Your Library.', 'success');
@@ -1094,15 +1096,51 @@
     });
   }
 
-  // Prefill from the "New lesson" dialog (Library) query params, then clean the
-  // URL so a refresh doesn't re-apply them.
-  function applyNewLessonPrefill() {
+  // Prefill from the "New lesson" / "Start lesson" dialog (Library) or the
+  // public Learning hand-off. Category always defaults to General learning;
+  // grade/subject/topic come from the previous dialog. Then we fill the
+  // "Paste content" box: a curriculum topic (topicId) uses stored content and
+  // defaults to Slides; an arbitrary typed topic is drafted by AI.
+  async function applyNewLessonPrefill() {
     const p = new URLSearchParams(location.search);
-    if (![...p.keys()].some((k) => ['subject', 'grade', 'topic', 'public'].includes(k))) return;
+    const keys = [...p.keys()];
+    if (!keys.some((k) => ['subject', 'grade', 'topic', 'topicId', 'public'].includes(k))) return;
+
+    // 1) Category always General learning for lessons started this way.
+    if ($('#category')) $('#category').value = 'General learning';
+
+    // 2) Grade / subject come straight from the previous dialog.
     if (p.get('subject') && $('#subject')) $('#subject').value = p.get('subject');
     if (p.get('grade') && $('#grade')) $('#grade').value = /^\d+$/.test(p.get('grade')) ? `Grade ${p.get('grade')}` : p.get('grade');
-    pendingLessonMeta = { topic: (p.get('topic') || '').trim(), public: p.get('public') === '1' };
+
+    const topic = (p.get('topic') || '').trim();
+    const topicId = (p.get('topicId') || '').trim();
+    pendingLessonMeta = { topic, topicId, public: p.get('public') === '1' };
     try { history.replaceState(null, '', location.pathname); } catch (_) {}
+
+    const pasteEl = $('#pasteContent');
+    if (!pasteEl || pasteEl.value.trim()) return;   // don't clobber typed content
+
+    if (topicId) {
+      // Curriculum topic: stored content, default to Slides.
+      if ($('#format')) $('#format').value = 'slides';
+      pasteEl.placeholder = 'Loading a ready-made starting point for this topic…';
+      try {
+        const t = await api(`/api/learning/topic-content?id=${encodeURIComponent(topicId)}`);
+        if (t && t.content && !pasteEl.value.trim()) pasteEl.value = t.content;
+        if (t && t.subject && $('#subject') && !$('#subject').value) $('#subject').value = t.subject;
+      } catch (_) { /* leave blank; teacher can paste their own */ }
+    } else if (topic) {
+      // Arbitrary typed topic (New lesson): draft with AI (falls back to a scaffold).
+      pasteEl.placeholder = 'Drafting a starting point for “' + topic + '”…';
+      try {
+        const d = await api('/api/lesson/draft-content', { method: 'POST', body: JSON.stringify({
+          topic, grade: $('#grade')?.value || '', subject: $('#subject')?.value || ''
+        }) });
+        if (d && d.content && !pasteEl.value.trim()) pasteEl.value = d.content;
+      } catch (_) { /* leave blank */ }
+    }
+    pasteEl.placeholder = 'Paste your material here. Example: FinOps principles, a chapter summary, interview notes, SAT topic notes...';
   }
 
   async function init() {

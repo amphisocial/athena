@@ -1261,7 +1261,7 @@ app.get('/auth/google/callback', async (req, res) => {
   }
 });
 
-function buildStudySetObject(user, { title, cards, category, subject, grade, topic, isPublic, format, sourceType, extra }) {
+function buildStudySetObject(user, { title, cards, category, subject, grade, topic, topicId, isPublic, format, sourceType, extra }) {
   return {
     id: id('set'),
     ownerId: user.id,
@@ -1272,6 +1272,7 @@ function buildStudySetObject(user, { title, cards, category, subject, grade, top
     subject: String(subject || '').trim(),
     grade: String(grade || '').trim(),
     topic: String(topic || '').trim(),
+    topicId: String(topicId || '').trim(),   // links a set to a curriculum topic (optional)
     public: Boolean(isPublic),
     rating: { sum: 0, count: 0 },
     format,
@@ -1332,6 +1333,8 @@ app.post('/api/generate', requireUser, async (req, res) => {
       category: req.body.category,
       subject: req.body.subject,
       grade: req.body.grade,
+      topic: req.body.topic,
+      topicId: req.body.topicId,
       format,
       sourceType: req.body.sourceType
     });
@@ -1784,6 +1787,7 @@ app.post(['/api/sets/:id/meta', '/api/quizlets/:id/meta'], requireUser, (req, re
   if (req.body.subject !== undefined) { const s = String(req.body.subject).toLowerCase(); set.subject = ['math', 'science'].includes(s) ? s : ''; }
   if (req.body.grade !== undefined) set.grade = String(req.body.grade).trim().slice(0, 40);
   if (req.body.topic !== undefined) set.topic = String(req.body.topic).trim().slice(0, 80);
+  if (req.body.topicId !== undefined) set.topicId = String(req.body.topicId).trim().slice(0, 120);
   if (req.body.public !== undefined) set.public = Boolean(req.body.public);
   set.updatedAt = nowIso();
   writeStore(store);
@@ -2111,8 +2115,8 @@ app.get('/api/bookmarks', requireUser, (req, res) => {
   res.json({ items });
 });
 
-// ---- Learning: the public Massachusetts curriculum browser ---------------
-// Grade (5–10) × Subject (math|science) -> every MA topic, grouped by strand.
+// ---- Learning: the public curriculum browser ------------------------------
+// Grade (5–10) × Subject (math|science) -> every topic, grouped by strand.
 // Public on purpose (acquisition + genuinely useful), no auth.
 app.get('/api/learning/overview', async (req, res) => {
   try {
@@ -2133,6 +2137,83 @@ app.get('/api/learning/topics', async (req, res) => {
   } catch (e) {
     console.error('learning topics failed:', e.message);
     res.status(500).json({ error: 'Could not load topics.' });
+  }
+});
+
+// One topic + its stored, ready-to-use lesson content (for Start Lesson).
+// Content is pre-built and stored in the DB, so no AI call happens here.
+app.get('/api/learning/topic-content', async (req, res) => {
+  try {
+    const t = await curriculum.getTopicContent(db, req.query.id);
+    if (!t) return res.status(404).json({ error: 'Topic not found.' });
+    res.json(t);
+  } catch (e) {
+    console.error('topic-content failed:', e.message);
+    res.status(500).json({ error: 'Could not load topic content.' });
+  }
+});
+
+// Which curriculum topics the signed-in teacher already has saved content for,
+// grouped by format — powers the Slides / Flashcards / Quiz chips on each topic.
+app.get('/api/learning/my-topic-content', requireUser, (req, res) => {
+  try {
+    const store = readStore();
+    const byTopic = {};
+    const fmtKey = (f) => (f === 'slides' ? 'slides' : f === 'quiz' ? 'quiz' : f === 'flashcard' ? 'flashcard' : 'mixed');
+    (store.quizlets || []).forEach((s) => {
+      if (s.ownerId !== req.user.id || !s.topicId) return;
+      const bucket = (byTopic[s.topicId] ||= { slides: null, quiz: null, flashcard: null, mixed: null });
+      const k = fmtKey(s.format);
+      // Keep the most recent per format.
+      if (!bucket[k] || String(s.updatedAt || '') > String(bucket[k].updatedAt || '')) {
+        bucket[k] = { id: s.id, title: s.title, updatedAt: s.updatedAt || s.createdAt };
+      }
+    });
+    res.json({ topics: byTopic });
+  } catch (e) {
+    console.error('my-topic-content failed:', e.message);
+    res.status(500).json({ error: 'Could not load your topic content.' });
+  }
+});
+
+// Draft teacher-ready paste-content for an ARBITRARY topic (the "New lesson"
+// path, where the teacher can type any topic). This one uses AI. Falls back to
+// the structured scaffold if no provider is configured or the call fails.
+app.post('/api/lesson/draft-content', requireUser, async (req, res) => {
+  const topic = String(req.body.topic || '').trim().slice(0, 200);
+  const grade = String(req.body.grade || '').trim().slice(0, 40);
+  const subject = String(req.body.subject || '').trim().slice(0, 40);
+  if (!topic) return res.status(400).json({ error: 'A topic is required.' });
+  const fallback = () => curriculum.scaffoldContent({ grade, subject, title: topic, strand: '', standard: '' });
+  try {
+    const prompt = `You are a veteran ${subject || 'K-12'} teacher preparing to make slides, a quiz, and flashcards for students. Write practical, accurate, grade-appropriate teacher content for this topic. Be specific (real definitions, real worked examples with numbers, real misconceptions) — not generic filler.
+
+Topic: ${topic}${grade ? `\nGrade / level: ${grade}` : ''}${subject ? `\nSubject: ${subject}` : ''}
+
+Return classroom-ready Markdown with: Lesson goal; Key ideas (bulleted, specific); Vocabulary (term — definition); Worked examples (2–3 with actual numbers/steps); Common misconceptions (with corrections); Quick checks (3–5 Q&A); Practice (4–6 problems). Keep it concise.`;
+    let text = '';
+    try { text = String(await callProviderRaw(prompt) || '').trim(); } catch (_) { text = ''; }
+    if (text.length < 120) return res.json({ content: fallback(), source: 'scaffold' });
+    res.json({ content: text, source: 'ai' });
+  } catch (e) {
+    res.json({ content: fallback(), source: 'scaffold' });
+  }
+});
+
+// Admin: upgrade stored curriculum content from scaffold → AI-researched.
+// Run once (or in batches) on the server that has an AI key configured.
+//   POST /api/admin/curriculum/backfill { limit?, force? }
+app.post('/api/admin/curriculum/backfill', requireUser, async (req, res) => {
+  if (membership.role(req.user) !== 'admin') return res.status(403).json({ error: 'Admins only.' });
+  try {
+    const out = await curriculum.backfillContent(db, callProviderRaw, {
+      limit: Number(req.body.limit) || 25,
+      force: Boolean(req.body.force)
+    });
+    res.json(out);
+  } catch (e) {
+    console.error('backfill failed:', e.message);
+    res.status(500).json({ error: e.message });
   }
 });
 

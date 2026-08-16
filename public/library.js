@@ -183,7 +183,11 @@
     // hand off to /app with those fields prefilled.
     const nl = $('#newLessonBtn');
     if (nl) {
-      nl.addEventListener('click', () => { $('#lessonDialog').showModal(); setTimeout(() => $('#newLessonTopic')?.focus(), 50); });
+      nl.addEventListener('click', () => {
+        pendingLessonTopicId = '';   // typed-from-scratch lesson → AI drafts content
+        $('#lessonDialog').showModal();
+        setTimeout(() => $('#newLessonTopic')?.focus(), 50);
+      });
       $('#lessonClose')?.addEventListener('click', () => $('#lessonDialog').close());
       $('#createLessonBtn')?.addEventListener('click', () => {
         const q = new URLSearchParams();
@@ -193,6 +197,7 @@
         if (subj) q.set('subject', subj);
         if (grade) q.set('grade', grade);
         if (topic) q.set('topic', topic);
+        if (pendingLessonTopicId) q.set('topicId', pendingLessonTopicId);   // curriculum topic → stored content
         if ($('#newLessonPublic')?.checked) q.set('public', '1');
         const qs = q.toString();
         window.location.href = qs ? `/app?${qs}` : '/app';
@@ -290,6 +295,8 @@
   let lcOverview = null;
   let lcGrade = 5;
   let lcSubject = 'math';
+  let pendingLessonTopicId = '';   // set when a curriculum topic drives the lesson
+  let myTopicContent = {};         // topicId -> { slides, flashcard, quiz, mixed }
 
   function lcRenderFilters() {
     const gc = $('#lcGradeChips');
@@ -304,6 +311,21 @@
     }
   }
 
+  // Slides / Flashcards / Quiz chips: active (link to the saved set) when the
+  // teacher already has that format for this topic; muted otherwise. A topic
+  // can have many sets per format (1-to-many) — the chip opens the newest.
+  function lcContentChips(id) {
+    const c = myTopicContent[id] || {};
+    const defs = [['slides', 'Slides'], ['flashcard', 'Flashcards'], ['quiz', 'Quiz']];
+    const cells = defs.map(([k, label]) => {
+      const item = c[k] || c.mixed;   // a "mixed" set counts toward all three
+      return item
+        ? `<a class="lc-content-chip ${k} on" href="/app?set=${encodeURIComponent(item.id)}" title="Open your ${label.toLowerCase()} for this topic">${label}</a>`
+        : `<span class="lc-content-chip ${k} off" title="None yet — Start lesson to create">${label}</span>`;
+    }).join('');
+    return `<div class="lc-t-content">${cells}</div>`;
+  }
+
   function lcTopicRow(t) {
     const std = t.standard ? `<div class="lc-t-std">${escapeHtml(t.standard)}</div>` : '';
     const tmplBadge = t.template ? ' <span class="lc-badge">◆</span>' : '';
@@ -312,9 +334,12 @@
         <div class="lc-t-title">${escapeHtml(t.title)}</div>
         ${std}
       </div>
-      <div class="lc-t-actions">
-        <button class="lc-btn wb" data-act="whiteboard" data-id="${escapeHtml(t.id)}" title="Start a whiteboard on this topic">Start whiteboard${tmplBadge}</button>
-        <button class="lc-btn ls" data-act="lesson" data-id="${escapeHtml(t.id)}" title="Start a lesson on this topic">Start lesson</button>
+      <div class="lc-t-right">
+        ${lcContentChips(t.id)}
+        <div class="lc-t-actions">
+          <button class="lc-btn wb" data-act="whiteboard" data-id="${escapeHtml(t.id)}" title="Start a whiteboard on this topic">Start whiteboard${tmplBadge}</button>
+          <button class="lc-btn ls" data-act="lesson" data-id="${escapeHtml(t.id)}" title="Start a lesson on this topic">Start lesson</button>
+        </div>
       </div>
     </div>`;
   }
@@ -373,6 +398,7 @@
 
   // Prefill + open the New lesson dialog for a topic.
   function startTopicLesson(topic) {
+    pendingLessonTopicId = topic.id || '';   // curriculum topic -> stored content on /app
     if ($('#newLessonSubject')) $('#newLessonSubject').value = topic.subject || '';
     if ($('#newLessonGrade')) $('#newLessonGrade').value = gradeToLabel(topic.grade);
     if ($('#newLessonTopic')) $('#newLessonTopic').value = topic.title || '';
@@ -411,6 +437,11 @@
       lcOverview = await api('/api/learning/overview');
       if (lcOverview && lcOverview.minGrade && !LC_GRADES.includes(lcGrade)) lcGrade = lcOverview.minGrade;
     } catch (_) { lcOverview = null; }
+    // Which topics the teacher already has content for (drives the chips).
+    try {
+      const mc = await api('/api/learning/my-topic-content');
+      myTopicContent = (mc && mc.topics) || {};
+    } catch (_) { myTopicContent = {}; }
     lcRenderFilters();
     await lcLoadTopics();
   }
