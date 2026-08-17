@@ -243,6 +243,53 @@ textarea { min-height: 180px; line-height: 1.55; }
 }
 
 .study-panel { position: sticky; top: 86px; }
+
+/* ---- Live lesson annotation layer ---- */
+.lesson-stage { position: relative; }
+.lesson-anno-canvas, .lesson-laser-canvas {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  pointer-events: none; z-index: 4;
+}
+/* Only the ink canvas ever takes pointer input, and only while the teacher has
+   a drawing tool engaged. Laser never intercepts taps. */
+.lesson-anno-canvas.drawing { pointer-events: auto; cursor: crosshair; touch-action: none; }
+
+.lesson-annobar {
+  position: absolute; left: 50%; bottom: 12px; transform: translateX(-50%);
+  display: flex; align-items: center; gap: 6px; padding: 7px 10px;
+  border-radius: 999px; background: rgba(15,30,53,0.92); border: 1px solid var(--line);
+  box-shadow: var(--shadow); z-index: 7;
+}
+.lesson-annobar[hidden] { display: none; }
+.anno-btn {
+  width: 34px; height: 34px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.14);
+  background: rgba(255,255,255,0.06); color: #fff; font-size: 0.98rem; cursor: pointer;
+  display: grid; place-items: center;
+}
+.anno-btn:hover { background: rgba(255,255,255,0.14); }
+.anno-btn.active { background: linear-gradient(135deg, var(--brand), var(--brand-2)); border-color: transparent; }
+.anno-swatch {
+  width: 22px; height: 22px; border-radius: 999px; border: 2px solid rgba(255,255,255,0.25);
+  background: var(--sw,#fff); cursor: pointer; padding: 0;
+}
+.anno-swatch.active { border-color: #fff; box-shadow: 0 0 0 3px rgba(37,99,255,0.4); }
+.anno-sep { width: 1px; height: 22px; background: rgba(255,255,255,0.18); margin: 0 2px; }
+
+/* ---- Persistent join QR (shared look with the whiteboard dock) ---- */
+.session-qr {
+  position: absolute; bottom: 12px; left: 12px; display: flex; align-items: center; gap: 10px;
+  padding: 10px; border-radius: 16px; background: #fff; border: 1px solid var(--line);
+  box-shadow: var(--shadow); z-index: 8;
+}
+.session-qr[hidden] { display: none; }
+.session-qr-img { width: 88px; height: 88px; border-radius: 8px; display: block; background: #fff; }
+.session-qr-meta { display: flex; flex-direction: column; gap: 2px; padding-right: 4px; }
+.session-qr-label { font-size: 0.82rem; font-weight: 700; color: var(--text); }
+.session-qr-host { font-size: 0.72rem; color: var(--muted); font-family: ui-monospace, "SF Mono", Menlo, monospace; word-break: break-all; max-width: 130px; }
+.session-qr-collapse { position: absolute; top: -8px; right: -8px; width: 22px; height: 22px; border-radius: 999px; border: 1px solid var(--line); background: #fff; color: var(--muted); cursor: pointer; font-size: 0.9rem; line-height: 1; display: grid; place-items: center; }
+.session-qr-reopen { position: absolute; bottom: 12px; left: 12px; z-index: 8; }
+.session-qr-reopen[hidden] { display: none; }
+
 .flashcard {
   height: 360px;
   perspective: 1400px;

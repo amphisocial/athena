@@ -7,6 +7,201 @@
   // Metadata carried over from the "New lesson" dialog on the Library page.
   let pendingLessonMeta = { topic: '', topicId: '', public: false };
 
+  // ===================== Live annotation over lessons =====================
+  // The teacher draws over the current card/slide with pen, highlighter, or a
+  // laser pointer, and every mark streams to students in real time. Strokes are
+  // keyed by card index, so moving to the next slide reveals that slide's own
+  // annotations (and comes back to these if the teacher navigates back).
+  // Coordinates are normalised to the stage (0..1) so a phone and a projector
+  // land the ink in the same place. Defined here (before renderStudy runs) so
+  // the render hook can call it safely; DOM refs are grabbed lazily.
+  const Anno = (() => {
+    let inited = false, canvas, lctx, laser, ctx, stage;
+    let tool = 'off', color = '#ff5a5a';
+    let drawing = false, curId = null, pending = null, rafQueued = false;
+    const store = new Map();               // index -> [ {id,tool,color,points:[{x,y}]} ]
+    const strokesFor = (i) => { if (!store.has(i)) store.set(i, []); return store.get(i); };
+    const isTeacher = () => (typeof Live !== 'undefined') && Live.on && Live.role === 'teacher';
+    const uid = () => `a_${Math.random().toString(16).slice(2)}${Date.now().toString(16)}`;
+
+    function grab() {
+      if (inited) return true;
+      canvas = document.getElementById('lessonAnnoCanvas');
+      laser = document.getElementById('lessonLaserCanvas');
+      stage = document.getElementById('lessonStage');
+      if (!canvas || !laser || !stage) return false;
+      ctx = canvas.getContext('2d'); lctx = laser.getContext('2d');
+      canvas.addEventListener('pointerdown', onDown);
+      canvas.addEventListener('pointermove', onMove);
+      window.addEventListener('pointerup', onUp);
+      canvas.addEventListener('pointercancel', onUp);
+      inited = true;
+      return true;
+    }
+
+    function resize() {
+      if (!grab()) return;
+      const dpr = window.devicePixelRatio || 1;
+      const r = stage.getBoundingClientRect();
+      [canvas, laser].forEach((c) => {
+        c.width = Math.max(1, Math.round(r.width * dpr));
+        c.height = Math.max(1, Math.round(r.height * dpr));
+        c.style.width = `${r.width}px`; c.style.height = `${r.height}px`;
+      });
+      paint();
+    }
+
+    // Normalised (0..1) point from a pointer event, clamped to the stage.
+    function norm(e) {
+      const r = stage.getBoundingClientRect();
+      return {
+        x: Math.min(1, Math.max(0, (e.clientX - r.left) / (r.width || 1))),
+        y: Math.min(1, Math.max(0, (e.clientY - r.top) / (r.height || 1)))
+      };
+    }
+
+    function strokeStyleFor(ctx2, s) {
+      const w = canvas.width, h = canvas.height, dpr = window.devicePixelRatio || 1;
+      ctx2.lineCap = 'round'; ctx2.lineJoin = 'round';
+      if (s.tool === 'highlighter') {
+        ctx2.globalCompositeOperation = 'multiply';
+        ctx2.globalAlpha = 0.4;
+        ctx2.strokeStyle = s.color;
+        ctx2.lineWidth = 18 * dpr;
+      } else {
+        ctx2.globalCompositeOperation = 'source-over';
+        ctx2.globalAlpha = 1;
+        ctx2.strokeStyle = s.color;
+        ctx2.lineWidth = 3.2 * dpr;
+      }
+      return { w, h };
+    }
+
+    function drawStroke(s) {
+      if (!s.points || s.points.length === 0) return;
+      const { w, h } = strokeStyleFor(ctx, s);
+      ctx.beginPath();
+      s.points.forEach((p, i) => { const x = p.x * w, y = p.y * h; i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); });
+      if (s.points.length === 1) { const p = s.points[0]; ctx.lineTo(p.x * w + 0.1, p.y * h + 0.1); }
+      ctx.stroke();
+    }
+
+    function paint() {
+      if (!ctx) return;
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      strokesFor(study.index).forEach((s) => { ctx.save(); drawStroke(s); ctx.restore(); });
+    }
+
+    function drawLaserAt(p) {
+      lctx.setTransform(1, 0, 0, 1, 0, 0);
+      lctx.clearRect(0, 0, laser.width, laser.height);
+      if (!p) return;
+      const dpr = window.devicePixelRatio || 1;
+      const x = p.x * laser.width, y = p.y * laser.height, rad = 16 * dpr;
+      const g = lctx.createRadialGradient(x, y, 0, x, y, rad);
+      g.addColorStop(0, 'rgba(255,70,80,0.95)');
+      g.addColorStop(1, 'rgba(255,70,80,0)');
+      lctx.fillStyle = g; lctx.beginPath(); lctx.arc(x, y, rad, 0, Math.PI * 2); lctx.fill();
+    }
+
+    // ---- Teacher pointer handling ----
+    function onDown(e) {
+      if (!isTeacher() || tool === 'off') return;
+      e.preventDefault();
+      canvas.setPointerCapture?.(e.pointerId);
+      drawing = true;
+      const p = norm(e);
+      if (tool === 'laser') { drawLaserAt(p); liveSend({ type: 'laser', index: study.index, x: p.x, y: p.y, active: true }); return; }
+      curId = uid();
+      const s = { id: curId, tool, color, points: [p] };
+      strokesFor(study.index).push(s);
+      paint();
+      liveSend({ type: 'anno:start', index: study.index, id: curId, tool, color, x: p.x, y: p.y });
+    }
+    function onMove(e) {
+      if (!drawing || !isTeacher()) return;
+      const p = norm(e);
+      if (tool === 'laser') {
+        drawLaserAt(p);
+        pending = p; queueFlush('laser');
+        return;
+      }
+      const arr = strokesFor(study.index); const s = arr[arr.length - 1];
+      if (!s || s.id !== curId) return;
+      s.points.push(p); paint();
+      pending = p; queueFlush('pt');
+    }
+    function onUp() {
+      if (!drawing) return;
+      drawing = false;
+      if (tool === 'laser') { drawLaserAt(null); liveSend({ type: 'laser', index: study.index, active: false }); }
+      else if (curId) { liveSend({ type: 'anno:end', index: study.index, id: curId }); }
+      curId = null; pending = null;
+    }
+    // Coalesce move events to one message per frame to keep the socket light.
+    function queueFlush(kind) {
+      if (rafQueued) return;
+      rafQueued = true;
+      requestAnimationFrame(() => {
+        rafQueued = false;
+        if (!pending) return;
+        if (kind === 'laser') liveSend({ type: 'laser', index: study.index, x: pending.x, y: pending.y, active: true });
+        else liveSend({ type: 'anno:point', index: study.index, id: curId, x: pending.x, y: pending.y });
+      });
+    }
+
+    // ---- Inbound (students apply teacher marks; teacher applies its own echo-free) ----
+    function apply(m) {
+      if (m.type === 'anno:start') {
+        const arr = strokesFor(m.index);
+        if (!arr.some((s) => s.id === m.id)) arr.push({ id: m.id, tool: m.tool, color: m.color, points: [{ x: m.x, y: m.y }] });
+        if (m.index === study.index) paint();
+      } else if (m.type === 'anno:point') {
+        const s = strokesFor(m.index).find((x) => x.id === m.id);
+        if (s) { s.points.push({ x: m.x, y: m.y }); if (m.index === study.index) paint(); }
+      } else if (m.type === 'anno:end') {
+        /* nothing to finalise — points already stored */
+      } else if (m.type === 'anno:clear') {
+        store.set(m.index, []);
+        if (m.index === study.index) paint();
+      } else if (m.type === 'laser') {
+        if (m.index !== study.index) return;
+        drawLaserAt(m.active === false ? null : { x: m.x, y: m.y });
+      }
+    }
+
+    // Seed everything a late-joining student receives on sync.
+    function loadAll(annotations) {
+      store.clear();
+      if (annotations) Object.keys(annotations).forEach((k) => store.set(Number(k), annotations[k] || []));
+      paint();
+    }
+
+    function clearCurrent() {
+      store.set(study.index, []);
+      paint();
+      if (isTeacher()) liveSend({ type: 'anno:clear', index: study.index });
+    }
+
+    function setTool(name) {
+      tool = name;
+      canvas.classList.toggle('drawing', name !== 'off' && name !== undefined && (typeof Live !== 'undefined') && Live.on && Live.role === 'teacher');
+      // Laser is transient; drop any dot when switching away.
+      if (name !== 'laser') drawLaserAt(null);
+    }
+    function setColor(c) { color = c; }
+    function currentTool() { return tool; }
+
+    function reset() { store.clear(); tool = 'off'; if (canvas) { canvas.classList.remove('drawing'); paint(); drawLaserAt(null); } }
+
+    function onNavigate() { resize(); if (lctx) drawLaserAt(null); paint(); }
+
+    window.addEventListener('resize', () => { if (inited) resize(); });
+
+    return { grab, resize, paint, apply, loadAll, clearCurrent, setTool, setColor, currentTool, reset, onNavigate };
+  })();
+
   const normalize = (value) => String(value || '').trim().toLowerCase().replace(/\s+/g, ' ');
 
   /* ---------- Creator ---------- */
@@ -345,6 +540,7 @@
     }
     renderCardList(set);
     if (sat.sessionId) renderSatStageBar();
+    if (typeof Anno !== 'undefined') Anno.onNavigate();
   }
 
   const SLIDE_ICONS = {
@@ -762,16 +958,21 @@
     ws.onclose = () => { Live.on = false; renderLiveChrome(); };
     ws.onmessage = (ev) => { let m; try { m = JSON.parse(ev.data); } catch { return; } handleLive(m); };
   }
-  function closeLive() { if (Live.ws) { try { Live.ws.close(); } catch (_) {} } Live.ws = null; Live.on = false; }
+  function closeLive() { if (Live.ws) { try { Live.ws.close(); } catch (_) {} } Live.ws = null; Live.on = false; Anno.reset(); }
 
   function handleLive(m) {
     if (m.type === 'sync') {
       if (m.youAre) Live.youAre = m.youAre;
       if (Live.role === 'student' && m.set) loadSetIntoStudy(m.set);
       applyRemoteState(m.state);
+      Anno.loadAll(m.annotations);
       if (Live.role === 'student' && m.audioOn) joinStudentAudio(Live.setId, Live.youAre);
     } else if (m.type === 'nav') {
       applyRemoteState({ index: m.index, flipped: m.flipped });
+    } else if (m.type === 'anno:start' || m.type === 'anno:point' || m.type === 'anno:end' || m.type === 'anno:clear' || m.type === 'laser') {
+      // The teacher's own marks are drawn locally as they happen, so ignore the
+      // server echo; students apply everything.
+      if (Live.role === 'student') Anno.apply(m);
     } else if (m.type === 'audio') {
       if (Live.role === 'student') { if (m.on) joinStudentAudio(Live.setId, Live.youAre); else stopAudio(); }
     } else if (m.type === 'reaction') {
@@ -804,6 +1005,7 @@
     try { await api(`/api/sets/${set.id}/go-live`, { method: 'POST' }); }
     catch (e) { setStatus(e.message, 'error'); return; }
     if (study.set) study.set.isLive = true;
+    Live.shareUrl = null;   // QR re-fetches the join link for this set
     connectLive(set.id, 'teacher');
     // Optional audio: only if the teacher ticked "with audio" and it's available.
     if (Audio.enabled && document.getElementById('audioOpt') && document.getElementById('audioOpt').checked) {
@@ -973,6 +1175,9 @@
     const isTeacher = Live.role === 'teacher';
     const ownsSet = study.set && state.user && study.set.ownerId === state.user.id;
 
+    // Annotation toolbar + persistent QR are teacher-only, live-only.
+    updateLessonAnnoChrome(isTeacher && Live.on);
+
     // Not connected: teacher (owner) sees "Go live" + "Share"; if the lesson is
     // already live, show "End live" so they always have the control.
     if (!Live.on) {
@@ -1062,6 +1267,69 @@
     // Lock nav for students.
     document.body.classList.toggle('live-student', Live.on && Live.role === 'student');
     document.body.classList.toggle('live-on', Live.on);
+  }
+
+  // ---- Live annotation toolbar + persistent QR (teacher) ----
+  let annoBarWired = false;
+  let lessonQrCollapsed = false;
+  function wireAnnoBar() {
+    if (annoBarWired) return;
+    const bar = document.getElementById('lessonAnnobar');
+    if (!bar) return;
+    annoBarWired = true;
+    bar.querySelectorAll('.anno-btn[data-annotool]').forEach((b) => b.addEventListener('click', () => {
+      const t = b.dataset.annotool;
+      Anno.setTool(t);
+      bar.querySelectorAll('.anno-btn[data-annotool]').forEach((x) => x.classList.toggle('active', x === b));
+    }));
+    bar.querySelectorAll('.anno-swatch').forEach((b) => b.addEventListener('click', () => {
+      Anno.setColor(b.dataset.annocolor);
+      bar.querySelectorAll('.anno-swatch').forEach((x) => x.classList.toggle('active', x === b));
+    }));
+    document.getElementById('annoClearBtn')?.addEventListener('click', () => Anno.clearCurrent());
+    document.getElementById('lessonQrCollapse')?.addEventListener('click', () => { lessonQrCollapsed = true; renderLessonQr(); });
+    document.getElementById('lessonQrReopen')?.addEventListener('click', () => { lessonQrCollapsed = false; renderLessonQr(); });
+  }
+
+  function updateLessonAnnoChrome(showTeacher) {
+    const bar = document.getElementById('lessonAnnobar');
+    if (bar) {
+      wireAnnoBar();
+      bar.hidden = !showTeacher;
+      if (showTeacher) {
+        Anno.resize();
+        // Default to the "hand" (interact) tool so the first live moment doesn't
+        // trap taps behind a drawing surface.
+        if (!bar.querySelector('.anno-btn.active')) {
+          const off = bar.querySelector('.anno-btn[data-annotool="off"]');
+          if (off) off.classList.add('active');
+          Anno.setTool('off');
+        }
+      } else {
+        Anno.setTool('off');
+      }
+    }
+    renderLessonQr(showTeacher);
+  }
+
+  async function renderLessonQr(showTeacher) {
+    const dock = document.getElementById('lessonSessionQr');
+    const reopen = document.getElementById('lessonQrReopen');
+    if (!dock || !reopen) return;
+    const show = showTeacher === undefined ? !dock.hidden : showTeacher;
+    if (!show) { dock.hidden = true; reopen.hidden = true; return; }
+    // Make sure we have a public join link for the QR; reuse the share token.
+    if (!Live.shareUrl && study.set) {
+      try { const d = await api(`/api/sets/${study.set.id}/share-link`, { method: 'POST' }); Live.shareUrl = `${window.location.origin}/l/${d.token}`; }
+      catch (_) { /* leave QR hidden if we can't get a link */ }
+    }
+    if (!Live.shareUrl) { dock.hidden = true; reopen.hidden = true; return; }
+    const img = document.getElementById('lessonQrImg');
+    if (img && img.dataset.url !== Live.shareUrl) { img.src = `/qr?d=${encodeURIComponent(Live.shareUrl)}`; img.dataset.url = Live.shareUrl; }
+    const host = document.getElementById('lessonQrHost');
+    if (host) host.textContent = Live.shareUrl.replace(/^https?:\/\//, '');
+    dock.hidden = lessonQrCollapsed;
+    reopen.hidden = !lessonQrCollapsed;
   }
 
   // Share a lesson by link + QR + email (parity with the whiteboard share).

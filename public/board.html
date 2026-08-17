@@ -54,6 +54,7 @@
             <!-- Primary tools: the five a teacher reaches for constantly. -->
             <div class="tool-group" role="group" aria-label="Tools">
               <button class="tool-btn active" data-tool="pen" title="Pen">✏️</button>
+              <button class="tool-btn" data-tool="highlighter" title="Highlighter">🖊️</button>
               <button class="tool-btn" data-tool="shape" title="Draw &amp; snap shape">◻︎</button>
               <button class="tool-btn" data-tool="eraser" title="Eraser">🧽</button>
               <button class="tool-btn" data-tool="select" title="Select region">⬚</button>
@@ -88,6 +89,19 @@
         <div class="objects-layer" id="objectsLayer"></div>
         <canvas id="laserCanvas" class="laser-canvas"></canvas>
         <div class="reactions-layer" id="reactionsLayer"></div>
+
+        <!-- Persistent join QR: visible for the whole live session so students
+             can join at any time by scanning (mirrors the projected QR pattern
+             teachers expect from live tools). Collapses to a small chip. -->
+        <div class="session-qr" id="sessionQr" hidden>
+          <button class="session-qr-collapse" id="sessionQrCollapse" title="Hide QR" aria-label="Hide QR">–</button>
+          <img class="session-qr-img" id="sessionQrImg" alt="Scan to join this session" width="128" height="128" />
+          <div class="session-qr-meta">
+            <span class="session-qr-label">Scan to join</span>
+            <span class="session-qr-host" id="sessionQrHost"></span>
+          </div>
+        </div>
+        <button class="session-qr-reopen" id="sessionQrReopen" hidden title="Show join QR">📱 Join QR</button>
 
         <div class="board-readonly-banner" id="readonlyBanner" style="display:none">
           <span id="readonlyBannerText">Viewing live. Only the teacher can draw.</span>

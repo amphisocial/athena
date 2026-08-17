@@ -21,18 +21,18 @@ function ok(name, cond, detail) {
 console.log('tools survive the restructure');
 {
   const tools = (html.match(/data-tool="([a-z]+)"/g) || []).map((m) => m.match(/"([a-z]+)"/)[1]);
-  const expected = ['pen', 'shape', 'eraser', 'select', 'text', 'pan', 'move', 'connect', 'laser', 'note'];
+  const expected = ['pen', 'highlighter', 'shape', 'eraser', 'select', 'text', 'pan', 'move', 'connect', 'laser', 'note'];
   expected.forEach((t) => ok(`${t} still present`, tools.includes(t)));
   ok('no duplicate tool buttons', new Set(tools).size === tools.length,
     `saw ${tools.length}, unique ${new Set(tools).size}`);
-  ok('exactly the 10 known tools', tools.length === expected.length, `got ${tools.length}`);
+  ok('exactly the 11 known tools', tools.length === expected.length, `got ${tools.length}`);
 }
 
 console.log('\nprimary vs. secondary split');
 {
   const primaryBlock = html.slice(html.indexOf('aria-label="Tools"'), html.indexOf('id="moreTools"'));
   const primary = (primaryBlock.match(/data-tool="([a-z]+)"/g) || []).length;
-  ok('primary group holds 5 essential tools', primary === 5, `got ${primary}`);
+  ok('primary group holds 6 essential tools', primary === 6, `got ${primary}`);
 
   const moreBlock = html.slice(html.indexOf('id="moreTools"'));
   const moreEnd = moreBlock.indexOf('</div>');

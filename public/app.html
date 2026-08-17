@@ -144,6 +144,7 @@
             </div>
           </div>
 
+          <div class="lesson-stage" id="lessonStage">
           <div class="flashcard" id="flashcard" tabindex="0" role="button" aria-label="Flip card">
             <div class="flashcard-inner">
               <div class="card-face card-front">
@@ -161,6 +162,13 @@
               </div>
             </div>
           </div>
+
+          <!-- Live annotation overlay: the teacher draws over the current card
+               or slide with pen / highlighter / laser and it streams to every
+               student. Inert (pointer-events:none) until a tool is picked, so
+               flipping cards and tapping answers keeps working. -->
+          <canvas class="lesson-anno-canvas" id="lessonAnnoCanvas"></canvas>
+          <canvas class="lesson-laser-canvas" id="lessonLaserCanvas"></canvas>
 
           <div class="slide-view" id="slideView" style="display:none">
             <div class="slide-stage" id="slideStage">
@@ -186,6 +194,36 @@
               <small class="slide-credit" id="slideCredit"></small>
             </div>
           </div>
+
+          <!-- Floating annotation toolbar (teacher, live only). Mirrors the
+               whiteboard's tools so the muscle memory carries across. -->
+          <div class="lesson-annobar" id="lessonAnnobar" hidden>
+            <button class="anno-btn" data-annotool="off" title="Stop annotating (interact normally)">🖐️</button>
+            <button class="anno-btn" data-annotool="pen" title="Pen">✏️</button>
+            <button class="anno-btn" data-annotool="highlighter" title="Highlighter">🖊️</button>
+            <button class="anno-btn" data-annotool="laser" title="Laser pointer">🔴</button>
+            <span class="anno-sep"></span>
+            <button class="anno-swatch active" data-annocolor="#ff5a5a" style="--sw:#ff5a5a" title="Red"></button>
+            <button class="anno-swatch" data-annocolor="#2563ff" style="--sw:#2563ff" title="Blue"></button>
+            <button class="anno-swatch" data-annocolor="#12b5a6" style="--sw:#12b5a6" title="Teal"></button>
+            <button class="anno-swatch" data-annocolor="#ffb020" style="--sw:#ffb020" title="Amber"></button>
+            <button class="anno-swatch" data-annocolor="#0f1e35" style="--sw:#0f1e35" title="Ink"></button>
+            <span class="anno-sep"></span>
+            <button class="anno-btn" id="annoClearBtn" title="Clear this slide's annotations">🧽</button>
+          </div>
+          </div><!-- /lesson-stage -->
+
+          <!-- Persistent join QR for the live lesson (teacher view). Stays up
+               the whole session so a late student can scan in anytime. -->
+          <div class="session-qr" id="lessonSessionQr" hidden>
+            <button class="session-qr-collapse" id="lessonQrCollapse" title="Hide QR" aria-label="Hide QR">–</button>
+            <img class="session-qr-img" id="lessonQrImg" alt="Scan to join this lesson" width="128" height="128" />
+            <div class="session-qr-meta">
+              <span class="session-qr-label">Scan to join</span>
+              <span class="session-qr-host" id="lessonQrHost"></span>
+            </div>
+          </div>
+          <button class="session-qr-reopen" id="lessonQrReopen" hidden title="Show join QR">📱 Join QR</button>
 
           <div class="sat-stage-bar" id="satStageBar" style="display:none">
             <span id="satStageLabel"></span>

@@ -178,11 +178,18 @@
     if (stroke.tool === 'eraser') {
       ctx.globalCompositeOperation = 'destination-out';
       ctx.strokeStyle = 'rgba(0,0,0,1)';
+    } else if (stroke.tool === 'highlighter') {
+      // Highlighter: translucent, wide, and blended so overlapping strokes and
+      // the ink underneath both show through — the "marker over text" look.
+      ctx.globalCompositeOperation = 'multiply';
+      ctx.globalAlpha = 0.4;
+      ctx.strokeStyle = stroke.color || '#ffcc66';
     } else {
       ctx.globalCompositeOperation = 'source-over';
       ctx.strokeStyle = stroke.color || '#eef6ff';
     }
-    ctx.lineWidth = stroke.size || 3;
+    // A highlighter always reads as broad even at small slider sizes.
+    ctx.lineWidth = stroke.tool === 'highlighter' ? Math.max(14, (stroke.size || 3) * 4) : (stroke.size || 3);
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
     if (stroke.shape) drawShape(stroke.shape);
@@ -2174,6 +2181,28 @@
     else { b.textContent = 'Private'; b.className = 'board-badge'; }
     $('#shareToggleBtn').textContent = 'Share';
     $('#liveToggleBtn').textContent = board.isLive ? 'Stop live' : 'Go live';
+    updateSessionQr();
+  }
+
+  // ---- Persistent join QR -------------------------------------------------
+  // A live session should be joinable at any moment, so once the board is live
+  // (or shared with a public token) the teacher gets a QR docked on the canvas
+  // for the whole session — no need to reopen the Share dialog to let a late
+  // student in. Students never see it; they're already in.
+  let sessionQrCollapsed = false;
+  function updateSessionQr() {
+    const dock = $('#sessionQr');
+    const reopen = $('#sessionQrReopen');
+    if (!dock || !reopen) return;
+    const showable = isOwner && board && (board.isLive || board.shared) && board.publicToken;
+    if (!showable) { dock.hidden = true; reopen.hidden = true; return; }
+    const url = `${window.location.origin}/s/${board.publicToken}`;
+    const img = $('#sessionQrImg');
+    if (img && img.dataset.url !== url) { img.src = `/qr?d=${encodeURIComponent(url)}`; img.dataset.url = url; }
+    const host = $('#sessionQrHost');
+    if (host) host.textContent = url.replace(/^https?:\/\//, '');
+    dock.hidden = sessionQrCollapsed;
+    reopen.hidden = !sessionQrCollapsed;
   }
 
   // ---- Bindings -----------------------------------------------------------
@@ -2337,6 +2366,13 @@
       if (!b.dataset.tool) return;
       tool.name = b.dataset.tool;
       $$('.tool-btn[data-tool]').forEach((x) => x.classList.toggle('active', x === b));
+      // A white highlighter on a white board is invisible — the moment someone
+      // picks the highlighter with the default (near-white) ink, move them to a
+      // marker-friendly colour so their first stroke actually shows.
+      if (tool.name === 'highlighter' && (tool.color === '#eef6ff' || !tool.color)) {
+        const yellow = $$('.swatch').find((s) => s.dataset.color === '#ffcc66');
+        if (yellow) { tool.color = '#ffcc66'; $$('.swatch').forEach((x) => x.classList.toggle('active', x === yellow)); }
+      }
       if (tool.name !== 'select') { selectionRect = null; $('#plotSelectionBtn').style.display = 'none'; redraw(); }
     }));
     $$('.swatch').forEach((b) => b.addEventListener('click', () => {
@@ -2478,6 +2514,9 @@
 
     $('#liveAnalyzeBtn')?.addEventListener('click', toggleLiveAnalyze);
 
+    $('#sessionQrCollapse')?.addEventListener('click', () => { sessionQrCollapsed = true; updateSessionQr(); });
+    $('#sessionQrReopen')?.addEventListener('click', () => { sessionQrCollapsed = false; updateSessionQr(); });
+
     $('#questionsBtn')?.addEventListener('click', () => {
       const p = $('#questionsPanel');
       const showing = p.style.display !== 'none';
@@ -2491,7 +2530,9 @@
     $('#liveToggleBtn').addEventListener('click', async () => {
       try {
         const d = await api(`/api/board/${boardIdValue}/${board.isLive ? 'stop-live' : 'go-live'}`, { method: 'POST', body: JSON.stringify({}) });
-        board.isLive = d.board.isLive; board.shared = d.board.shared; updateBadge();
+        board.isLive = d.board.isLive; board.shared = d.board.shared;
+        if (d.board.publicToken) board.publicToken = d.board.publicToken;
+        updateBadge();
         send({ type: 'live:changed', isLive: board.isLive });
         if (!board.isLive && Audio.on) await stopAudio(true); // ending live ends audio
         updateAudioBtn();

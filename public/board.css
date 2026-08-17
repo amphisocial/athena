@@ -87,6 +87,17 @@ body[data-page="board"] { overflow: hidden; }
 .react-btn:hover { transform: translateY(-2px); }
 #lostBtn.active { background: rgba(255,204,102,0.25); border-color: #ffcc66; color: #ffcc66; }
 
+/* ---- Persistent join QR ---- */
+.session-qr { position: absolute; bottom: 14px; left: 14px; display: flex; align-items: center; gap: 10px; padding: 10px; border-radius: 16px; background: rgba(255,255,255,0.96); border: 1px solid var(--line); box-shadow: var(--shadow); z-index: 6; }
+.session-qr[hidden] { display: none; }
+.session-qr-img { width: 88px; height: 88px; border-radius: 8px; display: block; background: #fff; }
+.session-qr-meta { display: flex; flex-direction: column; gap: 2px; padding-right: 4px; }
+.session-qr-label { font-size: 0.82rem; font-weight: 700; color: var(--text); }
+.session-qr-host { font-size: 0.72rem; color: var(--muted); font-family: ui-monospace, "SF Mono", Menlo, monospace; word-break: break-all; max-width: 130px; }
+.session-qr-collapse { position: absolute; top: -8px; right: -8px; width: 22px; height: 22px; border-radius: 999px; border: 1px solid var(--line); background: var(--panel); color: var(--muted); cursor: pointer; font-size: 0.9rem; line-height: 1; display: grid; place-items: center; }
+.session-qr-reopen { position: absolute; bottom: 14px; left: 14px; z-index: 6; }
+.session-qr-reopen[hidden] { display: none; }
+
 .reactions-layer { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
 .flying-emoji { position: absolute; font-size: 1.8rem; animation: floatUp 3s ease-out forwards; }
 @keyframes floatUp {

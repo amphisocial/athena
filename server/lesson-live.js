@@ -29,8 +29,21 @@ function attachLessonWebSocket(httpServer, deps) {
   // setId -> { teacher, students:Set, state:{index,flipped}, answers:Map, nextLabel }
   const rooms = new Map();
   function roomFor(id) {
-    if (!rooms.has(id)) rooms.set(id, { teacher: null, students: new Set(), state: { index: 0, flipped: false }, answers: new Map(), nextLabel: 0 });
+    if (!rooms.has(id)) rooms.set(id, { teacher: null, students: new Set(), state: { index: 0, flipped: false }, answers: new Map(), nextLabel: 0, annotations: new Map() });
     return rooms.get(id);
+  }
+  // Live annotations, keyed by card index, so a late-joining student can be
+  // caught up to whatever the teacher has already drawn on each slide.
+  const MAX_STROKES_PER_INDEX = 400;
+  const MAX_POINTS_PER_STROKE = 1000;
+  function strokesForIndex(room, index) {
+    if (!room.annotations.has(index)) room.annotations.set(index, []);
+    return room.annotations.get(index);
+  }
+  function annotationsPayload(room) {
+    const out = {};
+    room.annotations.forEach((arr, idx) => { if (arr && arr.length) out[idx] = arr; });
+    return out;
   }
   const send = (ws, obj) => { try { if (ws.readyState === ws.OPEN) ws.send(JSON.stringify(obj)); } catch (_) {} };
   function toStudents(room, obj) { room.students.forEach((c) => send(c.ws, obj)); }
@@ -104,7 +117,7 @@ function attachLessonWebSocket(httpServer, deps) {
       // Public projection of the set — no owner internals.
       const publicSet = { id: set.id, title: set.title, cards: set.cards || [], format: set.format,
         subject: set.subject || '', grade: set.grade || '', topic: set.topic || '' };
-      send(ws, { type: 'sync', set: publicSet, state: room.state, role: isTeacher ? 'teacher' : 'student', youAre: client.label || null, audioOn: Boolean(room.audioOn) });
+      send(ws, { type: 'sync', set: publicSet, state: room.state, role: isTeacher ? 'teacher' : 'student', youAre: client.label || null, audioOn: Boolean(room.audioOn), annotations: annotationsPayload(room) });
       if (isTeacher) {
         // Replay current aggregates so a reconnecting teacher isn't blank.
         [...room.answers.keys()].forEach((i) => send(ws, { type: 'quiz:aggregate', ...aggregateFor(room, set, i) }));
@@ -131,6 +144,43 @@ function attachLessonWebSocket(httpServer, deps) {
             toStudents(room, { type: 'audio', on: room.audioOn });
             return;
           }
+
+          // ---- Live annotation (pen / highlighter) + laser ----
+          // Marks are kept server-side per card index and relayed to students.
+          // Coordinates are already normalised (0..1) on the client.
+          if (msg.type === 'anno:start') {
+            const idx = Math.max(0, Number(msg.index) || 0);
+            const arr = strokesForIndex(room, idx);
+            const tool = msg.tool === 'highlighter' ? 'highlighter' : 'pen';
+            const color = String(msg.color || '#ff5a5a').slice(0, 9);
+            arr.push({ id: String(msg.id || '').slice(0, 40), tool, color, points: [{ x: +msg.x || 0, y: +msg.y || 0 }] });
+            if (arr.length > MAX_STROKES_PER_INDEX) arr.splice(0, arr.length - MAX_STROKES_PER_INDEX);
+            toStudents(room, { type: 'anno:start', index: idx, id: msg.id, tool, color, x: +msg.x || 0, y: +msg.y || 0 });
+            return;
+          }
+          if (msg.type === 'anno:point') {
+            const idx = Math.max(0, Number(msg.index) || 0);
+            const s = strokesForIndex(room, idx).find((x) => x.id === msg.id);
+            if (s && s.points.length < MAX_POINTS_PER_STROKE) s.points.push({ x: +msg.x || 0, y: +msg.y || 0 });
+            toStudents(room, { type: 'anno:point', index: idx, id: msg.id, x: +msg.x || 0, y: +msg.y || 0 });
+            return;
+          }
+          if (msg.type === 'anno:end') {
+            toStudents(room, { type: 'anno:end', index: Math.max(0, Number(msg.index) || 0), id: msg.id });
+            return;
+          }
+          if (msg.type === 'anno:clear') {
+            const idx = Math.max(0, Number(msg.index) || 0);
+            room.annotations.set(idx, []);
+            toStudents(room, { type: 'anno:clear', index: idx });
+            return;
+          }
+          if (msg.type === 'laser') {
+            // Laser is transient pointer position — relayed, never stored.
+            toStudents(room, { type: 'laser', index: Math.max(0, Number(msg.index) || 0), x: +msg.x || 0, y: +msg.y || 0, active: msg.active !== false });
+            return;
+          }
+
           if (msg.type === 'question:clear') { toAll(room, { type: 'question:cleared', id: msg.id }); return; }
           if (msg.type === 'end') {
             const s2 = readStore(); const st = (s2.quizlets || []).find((x) => x.id === setId);
