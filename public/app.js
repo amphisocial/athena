@@ -329,6 +329,15 @@
     $('#setTitle').textContent = set.title;
     $('#cardCounter').textContent = `${study.index + 1} / ${set.cards.length}`;
 
+    const exportBtn = $('#exportPdfBtn');
+    if (exportBtn) {
+      exportBtn.style.display = set.cards.length ? '' : 'none';
+      if (!exportBtn._wired) {
+        exportBtn._wired = true;
+        exportBtn.addEventListener('click', () => { try { window.ExportPdf.export(study.set); } catch (_) { alert('Export unavailable.'); } });
+      }
+    }
+
     if (isSlide(card)) {
       renderSlide(card);
     } else {
@@ -437,17 +446,18 @@
 
     const media = $('#slideMedia');
     const usesMedia = layout !== 'quote' && layout !== 'chart';
-    if (usesMedia && card.imageUrl) {
+    const hasImage = usesMedia && card.imageUrl;
+    if (hasImage) {
       media.style.display = '';
       media.style.backgroundImage = `url("${card.imageUrl}")`;
       $('#mediaIcon').style.display = 'none';
-    } else if (usesMedia) {
-      media.style.display = '';
-      media.style.backgroundImage = '';
-      $('#mediaIcon').style.display = '';
-      $('#mediaIcon').textContent = SLIDE_ICONS[layout] || '💡';
+      stage.classList.remove('no-media');
     } else {
+      // No image → full-width slide (no empty half-panel, no placeholder icon).
       media.style.display = 'none';
+      media.style.backgroundImage = '';
+      $('#mediaIcon').style.display = 'none';
+      stage.classList.add('no-media');
     }
 
     $('#slideNotes').textContent = card.explanation || '';

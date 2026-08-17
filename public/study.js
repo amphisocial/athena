@@ -75,8 +75,6 @@
   function renderCards(set) {
     const cards = Array.isArray(set.cards) ? set.cards : [];
     if (!cards.length) { $('#studyCards').innerHTML = '<p class="pl-empty">This lesson has no items yet.</p>'; return; }
-    const cards = Array.isArray(set.cards) ? set.cards : [];
-    if (!cards.length) { $('#studyCards').innerHTML = '<p class="pl-empty">This lesson has no items yet.</p>'; return; }
     $('#studyCards').innerHTML = cards.map((c, i) => {
       const type = c.type || (Array.isArray(c.choices) && c.choices.length >= 2 ? 'quiz' : 'flashcard');
       if (type === 'slide') return slideHtml(c, i);
@@ -154,7 +152,9 @@
         <span class="eyebrow">Public lesson</span>
         <h1>${esc(set.title)} ${subj}</h1>
         <p class="pl-by">${esc([set.grade ? 'Grade ' + set.grade : '', set.topic].filter(Boolean).join(' • '))}
-          ${set.creator ? '• by ' + esc(set.creator) : ''}</p>`;
+          ${set.creator ? '• by ' + esc(set.creator) : ''}</p>
+        <div class="study-actions"><button class="btn small ghost" id="exportPdfBtn">⬇ Export PDF</button></div>`;
+      $('#exportPdfBtn')?.addEventListener('click', () => { try { window.ExportPdf.export(set); } catch (e) { alert('Export unavailable.'); } });
       const isDeck = set.format === 'slides' ||
         (Array.isArray(set.cards) && set.cards.length && set.cards.every((c) => c.type === 'slide'));
       if (isDeck) renderDeck(set); else renderCards(set);

@@ -17,9 +17,10 @@ Extra instructions: {{notes}}
 - Keep every number and step mathematically/scientifically correct.
 
 ## Images (very important)
-- Slide images come from a stock-photo search, so a photo can only ever show a real-world object — it CANNOT show math, steps, equations, or a worked solution.
-- Therefore: for concept, definition, and worked-example slides (especially math), set `"imageQuery": ""` (empty). The math shown on the slide IS the visual. A decorative stock photo on a teaching slide is noise and is not allowed.
-- Only include an `imageQuery` when a real photograph genuinely helps a student understand a real-world context or an observable phenomenon (e.g. a title slide, a physics setup like `"pendulum swinging"`, `"plant cells under microscope"`, `"bridge truss structure"`). When you do, make it a specific depiction of the slide's actual subject — never a vague mood photo, brand, logo, or named person.
+Slide images come from a stock-photo search, so a photo can only show a real-world OBJECT or scene — never math, equations, or a worked solution. Choose per slide:
+- **Science and real-world/depictable topics** — put a SPECIFIC, relevant `imageQuery` on most slides so the deck is visual (this is expected, like a great classroom deck). The query must name the actual subject of the slide, concretely: e.g. `"sun surface close up"`, `"night sky stars milky way"`, `"flashlight beam dark hallway"`, `"red giant star space"`, `"plant cell microscope"`, `"pendulum swinging"`, `"volcano erupting"`. Avoid vague/mood queries (`"space"`, `"learning"`) — they return junk.
+- **Pure-math working slides** — a photo can't show `10/12 = 5/6`, so set `"imageQuery": ""` (empty) and let the worked math fill the slide full-width. Do NOT attach a decorative stock photo to a math working slide.
+- Never a brand, logo, chart/graph screenshot request, or a named real person. A slide with an empty imageQuery renders clean and full-width — that is correct, never a blank half-panel.
 
 ## Deck structure
 Design a real lesson arc, not a flat list. Use these exact layout values:
