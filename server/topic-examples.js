@@ -182,12 +182,21 @@ const LIB = {
   },
 
   ratios: {
-    def: 'A **ratio** compares two quantities; a **unit rate** is a ratio with a denominator of 1 (a per-one amount).',
-    idea: 'Divide to find the unit rate. Equivalent ratios scale up or down by multiplying both parts by the same number.',
-    examples: [{ title: 'Find the unit price: 12 apples cost $3', body: '$3 ÷ 12 apples = **$0.25 per apple**' }, { title: 'A car goes 150 miles in 3 hours — find the speed', body: '150 ÷ 3 = **50 miles per hour**' }],
-    practice: ['8 pens for $6 — price per pen?  ($0.75)', '210 words in 3 min — words per min?  (70)', 'Recipe uses 2 cups flour : 3 eggs. For 9 eggs?  (6 cups)'],
-    vocab: ['ratio a:b', 'rate — ratio of different units', 'unit rate — per one'],
-    checks: [{ q: 'Unit rate for 240 miles on 8 gallons?', a: '30 miles per gallon.' }]
+    def: 'A **ratio** compares two quantities and can be written a:b or as the fraction a/b. A **unit rate** is a rate for exactly one unit (denominator 1).',
+    idea: 'Simplify a ratio like a fraction by dividing both parts by their common factor. Find a unit rate by dividing the first quantity by the second.',
+    examples: [{
+      title: 'Simplify the ratio 10 : 12',
+      body: 'Write as a fraction and divide both parts by the common factor 2:\n10 : 12 = 10/12 = (10÷2)/(12÷2) = **5/6**  (i.e. 5 : 6)'
+    }, {
+      title: 'Find the unit price: 12 apples cost $3',
+      body: 'Unit rate = cost ÷ apples = 3/12 = $3 ÷ 12 = **$0.25 per apple**'
+    }, {
+      title: 'A car travels 150 miles in 3 hours — find the speed',
+      body: 'Speed = distance ÷ time = 150/3 = **50 miles per hour**'
+    }],
+    practice: ['Simplify 15 : 20  (=3 : 4)', '8 pens for $6 — price per pen?  ($0.75)', '210 words in 3 min — words per min?  (70)', 'Recipe 2 cups flour : 3 eggs. For 9 eggs?  (6 cups)'],
+    vocab: ['ratio a:b', 'rate — a ratio of different units', 'unit rate — an amount per one', 'simplify — divide both parts by a common factor'],
+    checks: [{ q: 'Write 6 : 8 in simplest form.', a: '3 : 4 (divide both by 2).' }, { q: 'Unit rate for 240 miles on 8 gallons?', a: '30 miles per gallon.' }]
   },
 
   proportion: {

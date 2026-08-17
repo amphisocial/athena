@@ -670,7 +670,7 @@ function fallbackGenerateCards({ content, cardCount, format, subject, category, 
         answerIndex: -1,
         stat: isStat && numberMatch ? { value: numberMatch[0], label: numberSentence.slice(0, 140) } : null,
         quote: null,
-        imageQuery: layout === 'content' || layout === 'title' ? topic : '',
+        imageQuery: layout === 'title' ? topic : '',
         imageUrl: null,
         imageCredit: null,
         imageCreditUrl: null,
@@ -719,7 +719,7 @@ function buildGenerationPrompt({ content, cardCount, format, category, grade, su
     subject: subject || 'Not specified',
     section: subject || 'Reading and Writing',
     format: format || 'mixed',
-    notes: notes || (isSlides ? 'Make it clear, credible, and visually compelling.' : 'Make it clear, useful, and exam/interview ready.'),
+    notes: notes || (isSlides ? 'Teach the concept for the stated grade and show every step of the working.' : 'Make it clear, useful, and exam/interview ready.'),
     material: compactText(content, 15000),
     difficultySkew: difficultySkew || 'roughly 30% easy, 40% medium, 30% hard'
   };
@@ -729,8 +729,10 @@ function buildGenerationPrompt({ content, cardCount, format, category, grade, su
   let prompt = renderTemplate(baseTemplate, vars);
 
   if (!isSatPrep) {
-    const skills = loadSkills(isSlides ? 'SLIDE_SKILLS' : 'CARD_SKILLS', isSlides ? 'action-titles,mece-structure,data-viz' : 'mece-structure');
-    if (skills) prompt += `\n\n---\nAdditional house style rules to follow:\n${skills}`;
+    // Slides use only clean-bullet discipline (mece); the deck template already
+    // enforces the teaching approach. Study cards keep their structure skill.
+    const skills = loadSkills(isSlides ? 'SLIDE_SKILLS' : 'CARD_SKILLS', 'mece-structure');
+    if (skills) prompt += `\n\n---\nAdditional style rules to follow:\n${skills}`;
   }
 
   const secretSauce = loadSecretSauce();
