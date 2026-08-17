@@ -273,9 +273,29 @@ function downgradeExpiredTrial(user) {
   return fresh;
 }
 
+// Admin-granted complimentary licenses (e.g. "3 free months of Teams") carry a
+// compEndsAt. When it lapses, drop the user back to free. Called alongside the
+// trial check before plan-sensitive reads.
+function downgradeExpiredComp(user) {
+  if (!user || user.subscriptionStatus !== 'comp' || !user.compEndsAt) return user;
+  if (new Date(user.compEndsAt) > new Date()) return user;
+  const store = readStore();
+  const fresh = store.users.find((c) => c.id === user.id);
+  if (!fresh || fresh.subscriptionStatus !== 'comp') return fresh || user;
+  if (new Date(fresh.compEndsAt) > new Date()) return fresh;
+  fresh.plan = 'free';
+  fresh.subscriptionStatus = 'free';
+  fresh.compEndsAt = null;
+  fresh.compGrantedBy = null;
+  fresh.updatedAt = nowIso();
+  writeStore(store);
+  return fresh;
+}
+
 function publicUser(user) {
   if (!user) return null;
   user = downgradeExpiredTrial(user);
+  user = downgradeExpiredComp(user);
   const role = membership.role(user);              // admin | founder | member
   const privileged = membership.isPrivileged(user.email);
   const effPlan = membership.effectivePlan(user);  // privileged -> 'team'
@@ -2223,6 +2243,183 @@ app.post('/api/admin/curriculum/backfill', requireUser, async (req, res) => {
 app.get('/learning', (req, res) => res.sendFile(path.join(PUBLIC_DIR, 'learning.html')));
 app.get('/lessons', (req, res) => res.sendFile(path.join(PUBLIC_DIR, 'lessons.html')));
 app.get('/l/:id', (req, res) => res.sendFile(path.join(PUBLIC_DIR, 'app.html')));
+
+// ============================ SUPERADMIN =================================
+// A superadmin (role 'admin') can manage users, licenses, and delete any
+// content. Bootstrap the first one with SQL (see /admin page help), then use
+// the admin UI to promote others.
+function requireAdmin(req, res, next) {
+  const user = getCurrentUser(req);
+  if (!user) return res.status(401).json({ error: 'Please sign in first.' });
+  if (membership.role(user) !== 'admin') return res.status(403).json({ error: 'Superadmin only.' });
+  req.user = user;
+  next();
+}
+
+const ADMIN_PLANS = ['free', 'starter', 'team'];   // starter = "Pro", team = "Teams"
+const ADMIN_ROLES = ['member', 'founder', 'admin']; // founder = "Founding teacher"
+
+function adminUserRow(u, counts) {
+  const eff = membership.effectivePlan(u);
+  return {
+    id: u.id,
+    email: u.email,
+    name: [u.firstName, u.lastName].filter(Boolean).join(' ') || u.email,
+    role: membership.role(u),
+    envPrivileged: membership.isPrivileged(u.email),   // set via .env, can't be changed here
+    plan: u.plan || 'free',
+    planLabel: PLAN_LIMITS[u.plan || 'free']?.label || 'Free',
+    effectivePlan: eff,
+    subscriptionStatus: u.subscriptionStatus || 'free',
+    compEndsAt: u.compEndsAt || null,
+    trial: isTrialActive(u) ? { plan: u.trialPlan, endsAt: u.trialEndsAt } : null,
+    createdAt: u.createdAt || null,
+    sets: counts ? counts.sets : undefined,
+    boards: counts ? counts.boards : undefined
+  };
+}
+
+// List / search users.
+app.get('/api/admin/users', requireAdmin, (req, res) => {
+  const q = String(req.query.q || '').trim().toLowerCase();
+  const store = readStore();
+  let users = store.users || [];
+  if (q) {
+    users = users.filter((u) =>
+      String(u.email || '').toLowerCase().includes(q) ||
+      String(u.firstName || '').toLowerCase().includes(q) ||
+      String(u.lastName || '').toLowerCase().includes(q));
+  }
+  users = users.slice().sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || ''))).slice(0, 200);
+  const boards = (() => { try { return require('./board').readBoardStore().boards || []; } catch (_) { return []; } })();
+  const rows = users.map((u) => adminUserRow(u, {
+    sets: (store.quizlets || []).filter((s) => s.ownerId === u.id).length,
+    boards: boards.filter((b) => b.teacherId === u.id).length
+  }));
+  res.json({ users: rows, total: (store.users || []).length, plans: ADMIN_PLANS, roles: ADMIN_ROLES });
+});
+
+function findUserById(store, id) { return (store.users || []).find((u) => u.id === id); }
+
+// Set a user's role: member | founder ("founding teacher") | admin (superadmin).
+app.post('/api/admin/users/:id/role', requireAdmin, async (req, res) => {
+  const role = String(req.body.role || '').trim();
+  if (!ADMIN_ROLES.includes(role)) return res.status(400).json({ error: 'Invalid role.' });
+  const store = readStore();
+  const u = findUserById(store, req.params.id);
+  if (!u) return res.status(404).json({ error: 'User not found.' });
+  if (membership.isPrivileged(u.email)) return res.status(400).json({ error: 'This user is set via .env and can\'t be changed here.' });
+  if (u.id === req.user.id && role !== 'admin') return res.status(400).json({ error: 'You can\'t remove your own admin role.' });
+  u.appRole = role === 'member' ? null : role;
+  u.updatedAt = nowIso();
+  writeStore(store);
+  try { await membership.reconcile(u); } catch (_) {}
+  res.json({ ok: true, user: adminUserRow(u) });
+});
+
+// Set a user's license/plan. months>0 grants a complimentary license that
+// expires after that many months; months=0 (or free) is permanent until changed.
+app.post('/api/admin/users/:id/plan', requireAdmin, async (req, res) => {
+  const plan = String(req.body.plan || '').trim();
+  const months = Math.max(0, Math.min(60, Number(req.body.months) || 0));
+  if (!ADMIN_PLANS.includes(plan)) return res.status(400).json({ error: 'Invalid plan.' });
+  const store = readStore();
+  const u = findUserById(store, req.params.id);
+  if (!u) return res.status(404).json({ error: 'User not found.' });
+  if (plan === 'free') {
+    u.plan = 'free';
+    u.subscriptionStatus = 'free';
+    u.compEndsAt = null;
+    u.compGrantedBy = null;
+  } else {
+    u.plan = plan;
+    if (months > 0) {
+      const end = new Date();
+      end.setMonth(end.getMonth() + months);
+      // Extend from an existing comp end date if it's further out.
+      if (u.subscriptionStatus === 'comp' && u.compEndsAt && new Date(u.compEndsAt) > end) { /* keep longer */ }
+      else u.compEndsAt = end.toISOString();
+      u.subscriptionStatus = 'comp';
+      u.compGrantedBy = req.user.email;
+    } else {
+      // Permanent complimentary access (no end date).
+      u.subscriptionStatus = 'comp';
+      u.compEndsAt = null;
+      u.compGrantedBy = req.user.email;
+    }
+  }
+  // Clear any active trial so it doesn't fight the granted plan.
+  u.trialPlan = null; u.trialEndsAt = null; u.trialStartedAt = null;
+  u.updatedAt = nowIso();
+  writeStore(store);
+  try { await membership.reconcile(u); } catch (_) {}
+  res.json({ ok: true, user: adminUserRow(u) });
+});
+
+// Grant a 7-day trial of a paid plan (admin override — ignores trialsUsed).
+app.post('/api/admin/users/:id/trial', requireAdmin, (req, res) => {
+  const plan = String(req.body.plan || 'starter').trim();
+  if (!TRIALABLE_PLANS.includes(plan)) return res.status(400).json({ error: 'Trials are for Pro or Teams.' });
+  const store = readStore();
+  const u = findUserById(store, req.params.id);
+  if (!u) return res.status(404).json({ error: 'User not found.' });
+  const end = new Date(Date.now() + TRIAL_LENGTH_DAYS * 24 * 60 * 60 * 1000);
+  u.trialPlan = plan;
+  u.trialStartedAt = nowIso();
+  u.trialEndsAt = end.toISOString();
+  u.plan = plan;
+  u.subscriptionStatus = 'trialing';
+  u.trialsUsed = Array.from(new Set([...(u.trialsUsed || []), plan]));
+  u.updatedAt = nowIso();
+  writeStore(store);
+  res.json({ ok: true, user: adminUserRow(u) });
+});
+
+// A user's content (sets + boards), for review/deletion.
+app.get('/api/admin/content', requireAdmin, (req, res) => {
+  const ownerId = String(req.query.ownerId || '').trim();
+  const store = readStore();
+  const boards = (() => { try { return require('./board').readBoardStore().boards || []; } catch (_) { return []; } })();
+  const sets = (store.quizlets || [])
+    .filter((s) => !ownerId || s.ownerId === ownerId)
+    .map((s) => ({ id: s.id, title: s.title, format: s.format, ownerId: s.ownerId, ownerEmail: s.ownerEmail, topic: s.topic || '', updatedAt: s.updatedAt || s.createdAt }));
+  const bds = boards
+    .filter((b) => !ownerId || b.teacherId === ownerId)
+    .map((b) => ({ id: b.id, title: b.title || b.name || 'Untitled board', ownerId: b.teacherId, updatedAt: b.updatedAt || b.createdAt }));
+  res.json({ sets, boards: bds });
+});
+
+// Delete ANY study set (lesson / slides / flashcards / quiz).
+app.delete('/api/admin/set/:id', requireAdmin, (req, res) => {
+  const store = readStore();
+  const before = (store.quizlets || []).length;
+  store.quizlets = (store.quizlets || []).filter((s) => s.id !== req.params.id);
+  if (store.quizlets.length === before) return res.status(404).json({ error: 'Set not found.' });
+  writeStore(store);
+  res.json({ ok: true });
+});
+
+// Delete ANY whiteboard.
+app.delete('/api/admin/board/:id', requireAdmin, (req, res) => {
+  try {
+    const bmod = require('./board');
+    const bstore = bmod.readBoardStore();
+    const before = (bstore.boards || []).length;
+    bstore.boards = (bstore.boards || []).filter((b) => b.id !== req.params.id);
+    if (bstore.boards.length === before) return res.status(404).json({ error: 'Board not found.' });
+    bmod.writeBoardStore(bstore);
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Admin page (gated).
+app.get('/admin', (req, res) => {
+  const user = getCurrentUser(req);
+  if (!user || membership.role(user) !== 'admin') return res.redirect('/');
+  res.sendFile(path.join(PUBLIC_DIR, 'admin.html'));
+});
 
 // Optional LiveKit audio for live sessions (teacher broadcast + granted mics).
 // No-ops gracefully unless LIVEKIT_* env is set. Publishing is Teams-gated.

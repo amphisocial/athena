@@ -48,16 +48,23 @@ function isPrivileged(email) {
 function attachMembership(db, deps) {
   const { PLAN_LIMITS } = deps;
 
-  // Effective plan for a user: privileged accounts always resolve to 'team'
-  // (full access) regardless of what they've paid.
+  // Effective plan for a user: privileged accounts (env OR a DB-granted
+  // admin/founder role) always resolve to 'team' (full access) regardless of
+  // what they've paid.
   function effectivePlan(user) {
     if (!user) return 'free';
     if (isPrivileged(user.email)) return 'team';
+    if (user.appRole === 'admin' || user.appRole === 'founder') return 'team';
     return user.plan || 'free';
   }
 
+  // Role resolution order: .env (source of truth for the bootstrap admin) →
+  // the DB-stored appRole set from the admin page or via SQL → 'member'.
   function role(user) {
-    return envRole(user && user.email) || 'member';
+    const env = envRole(user && user.email);
+    if (env) return env;
+    const r = user && user.appRole;
+    return (r === 'admin' || r === 'founder') ? r : 'member';
   }
 
   function isFounder(user) {
@@ -84,9 +91,9 @@ function attachMembership(db, deps) {
   async function reconcile(user) {
     if (!user || !user.email) return;
     const email = user.email.toLowerCase();
-    const r = envRole(email);
-    const role = r || 'member';
-    const founder = r === 'founder';
+    const envR = envRole(email);
+    const roleVal = role(user);               // env → appRole → member
+    const founder = roleVal === 'founder';
     const plan = effectivePlan(user);
     try {
       // Remove any pending seed row for this email so we don't keep two.
@@ -99,7 +106,7 @@ function attachMembership(db, deps) {
            email = EXCLUDED.email, role = EXCLUDED.role, plan = EXCLUDED.plan,
            is_founder = EXCLUDED.is_founder, granted_by_env = EXCLUDED.granted_by_env,
            updated_at = now()`,
-        [user.id, email, role, plan, founder, Boolean(r)]
+        [user.id, email, roleVal, plan, founder, Boolean(envR)]
       );
     } catch (e) {
       console.error('[membership] reconcile failed:', e.message);

@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="robots" content="noindex" />
+  <title>Superadmin · Boardsy</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@600;700&family=Space+Mono&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/theme-light.css?v=boardsy22" />
+  <link rel="stylesheet" href="/admin.css?v=boardsy22" />
+</head>
+<body data-page="app">
+  <header class="adm-top">
+    <a class="adm-brand" href="/library">Board<span>sy</span> · <strong>Superadmin</strong></a>
+    <span class="adm-spacer"></span>
+    <span class="adm-me" id="admMe"></span>
+    <a class="adm-link" href="/library">← Library</a>
+  </header>
+
+  <main class="adm-main">
+    <section class="adm-card">
+      <div class="adm-search-row">
+        <input type="search" id="admSearch" placeholder="Search users by name or email…" autocomplete="off" />
+        <span class="adm-total" id="admTotal"></span>
+      </div>
+      <div class="adm-status" id="admStatus" hidden></div>
+      <div class="adm-users" id="admUsers"></div>
+    </section>
+  </main>
+
+  <!-- Content drawer (a user's sets & boards) -->
+  <dialog id="contentDialog" class="adm-dialog">
+    <div class="adm-dialog-head">
+      <h3 id="contentTitle">Content</h3>
+      <button class="adm-x" id="contentClose">✕</button>
+    </div>
+    <div id="contentBody" class="adm-content-body"></div>
+  </dialog>
+
+  <div class="adm-toast" id="admToast"></div>
+
+  <script src="/common.js?v=boardsy22"></script>
+  <script src="/admin.js?v=boardsy22"></script>
+</body>
+</html>
