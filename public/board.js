@@ -409,6 +409,22 @@
       ctx.stroke();
     });
 
+    // Intersection markers: a dot + coordinate label where two curves cross.
+    if (Array.isArray(obj.intersections) && obj.intersections.length) {
+      ctx.font = '600 11px Inter, sans-serif';
+      obj.intersections.forEach((pt) => {
+        if (pt.x < xMin || pt.x > xMax || pt.y < yMin || pt.y > yMax) return;
+        const sx = px(pt.x), sy = py(pt.y);
+        ctx.fillStyle = '#ffffff';
+        ctx.strokeStyle = '#0a1526';
+        ctx.lineWidth = 2 / view.scale;
+        ctx.beginPath(); ctx.arc(sx, sy, 4 / view.scale, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+        const lbl = `(${(Math.round(pt.x * 100) / 100)}, ${(Math.round(pt.y * 100) / 100)})`;
+        ctx.fillStyle = 'rgba(238,246,255,0.92)';
+        ctx.fillText(lbl, sx + 6 / view.scale, sy - 6 / view.scale);
+      });
+    }
+
     // Labels: expression(s) at top; a compact transform readout below them.
     ctx.font = '600 12px Inter, sans-serif';
     curves.forEach((c, i) => {
@@ -1258,8 +1274,12 @@
 
   function renderInsight(a, opts = {}) {
     const body = $('#infoBody');
+    // Live-analyze refreshes every couple of seconds; keep just ONE live card
+    // instead of stacking a new one each cycle.
+    if (opts.live) { const prev = document.getElementById('liveAnalyzeNote'); if (prev) prev.remove(); }
     const card = document.createElement('div');
     card.className = 'insight-card';
+    if (opts.live) card.id = 'liveAnalyzeNote';
     const steps = Array.isArray(a.steps) ? a.steps : [];
     const facts = Array.isArray(a.facts) ? a.facts : [];
     const formulas = Array.isArray(a.formulas) ? a.formulas : [];
@@ -1524,6 +1544,134 @@
     activeGraph = obj;
     openGraphControls(obj);
   }
+
+  // ---- Live-analyze: one shared graph for all equations ------------------
+  // The auto-analyzer collects every equation on the board into a SINGLE graph
+  // object (one coordinate system) whose curves are refreshed in place. This
+  // both fixes the "same equation plotted over and over" bug and lets curves
+  // overlap so their intersections are visible.
+  let analysisGraphId = null;
+  function normExpr(e) { return String(e || '').replace(/\s+/g, '').toLowerCase(); }
+
+  function syncAnalysisGraph(rawExprs) {
+    // Keep only distinct, plottable expressions (skip anything the parser can't
+    // compile, e.g. implicit forms the analyzer didn't solve for y).
+    const seen = new Set();
+    const exprs = [];
+    (rawExprs || []).forEach((e) => {
+      const expr = String(e || '').trim();
+      if (!expr) return;
+      const key = normExpr(expr);
+      if (seen.has(key)) return;
+      const params = detectParams(expr);
+      try { compileExpression(expr, params); } catch (_) { return; }
+      seen.add(key);
+      exprs.push({ expression: expr, color: CURVE_COLORS[exprs.length % CURVE_COLORS.length] });
+    });
+    if (!exprs.length) return;
+
+    let obj = analysisGraphId ? page().objects.find((o) => o.id === analysisGraphId && o.type === 'graph') : null;
+    if (!obj) {
+      const b = visibleWorldBounds();
+      const w = 380, h = 300;
+      obj = {
+        id: `obj_${Math.random().toString(16).slice(2)}`, type: 'graph', analysisGraph: true,
+        x: b.x1 + (b.x2 - b.x1) / 2 - w / 2, y: b.y1 + (b.y2 - b.y1) / 2 - h / 2, w, h,
+        curves: exprs, params: {}, transform: { shiftX: 0, shiftY: 0 }, xMin: -10, xMax: 10
+      };
+      analysisGraphId = obj.id;
+      obj.intersections = computeIntersections(obj);
+      addObject(obj);
+    } else {
+      // Refresh curves in place, preserving colors for expressions that stayed.
+      const prev = new Map((obj.curves || []).map((c) => [normExpr(c.expression), c.color]));
+      obj.curves = exprs.map((c, i) => ({ expression: c.expression, color: prev.get(normExpr(c.expression)) || CURVE_COLORS[i % CURVE_COLORS.length] }));
+      obj.intersections = computeIntersections(obj);
+      redraw();
+      send({ type: 'object:update', pageId: pageId(), object: obj });
+    }
+    renderIntersectionNote(obj);
+  }
+
+  // Numeric intersection finder: for each pair of curves, scan the graph's
+  // domain for sign changes of f-g and refine each with a few bisections. Honors
+  // the graph's shift transform so the points match what's drawn.
+  function computeIntersections(obj) {
+    const curves = graphCurves(obj);
+    if (curves.length < 2) return [];
+    const tf = graphTransform(obj);
+    const xMin = obj.xMin ?? -10, xMax = obj.xMax ?? 10;
+    const fns = curves.map((c, ci) => { try { return ci === 0 ? graphFn(obj, c.expression) : compileExpression(c.expression, obj.params || {}); } catch { return null; } });
+    const evalAt = (fn, x) => sampleCurve(fn, x, tf);
+    const out = [];
+    const N = 480;
+    for (let i = 0; i < fns.length; i += 1) {
+      for (let j = i + 1; j < fns.length; j += 1) {
+        if (!fns[i] || !fns[j]) continue;
+        const d = (x) => { const a = evalAt(fns[i], x), b = evalAt(fns[j], x); return (Number.isFinite(a) && Number.isFinite(b)) ? a - b : NaN; };
+        let prevX = xMin, prevD = d(xMin);
+        for (let k = 1; k <= N; k += 1) {
+          const x = xMin + ((xMax - xMin) * k) / N;
+          const dv = d(x);
+          if (Number.isFinite(prevD) && Number.isFinite(dv)) {
+            if (prevD === 0) pushPt(out, prevX, evalAt(fns[i], prevX), i, j);
+            else if (prevD * dv < 0) {
+              let lo = prevX, hi = x, flo = prevD;
+              for (let it = 0; it < 40; it += 1) {
+                const mid = (lo + hi) / 2, fm = d(mid);
+                if (!Number.isFinite(fm)) break;
+                if (flo * fm <= 0) hi = mid; else { lo = mid; flo = fm; }
+              }
+              const rx = (lo + hi) / 2;
+              pushPt(out, rx, evalAt(fns[i], rx), i, j);
+            }
+          }
+          prevX = x; prevD = dv;
+        }
+      }
+    }
+    return out;
+  }
+  function pushPt(out, x, y, i, j) {
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return;
+    const rx = Math.round(x * 1000) / 1000, ry = Math.round(y * 1000) / 1000;
+    if (out.some((p) => Math.abs(p.x - rx) < 0.02 && Math.abs(p.y - ry) < 0.02)) return;
+    out.push({ x: rx, y: ry, i, j });
+  }
+
+  // A single, self-replacing AI Note that names the intersection point(s) and
+  // how they were found. Removed/re-added each refresh so it never stacks.
+  function renderIntersectionNote(obj) {
+    const body = $('#infoBody');
+    if (!body) return;
+    const existing = document.getElementById('intersectionNote');
+    if (existing) existing.remove();
+    const curves = graphCurves(obj);
+    if (curves.length < 2) return;
+    const pts = obj.intersections || [];
+    const card = document.createElement('div');
+    card.className = 'insight-card';
+    card.id = 'intersectionNote';
+    const eqList = curves.map((c) => `<span class="insight-formula" style="border-left-color:${c.color}">${escapeHtml(c.expression)}</span>`).join('');
+    let ptsHtml;
+    if (!pts.length) {
+      ptsHtml = '<p>No intersection within the plotted window (-10 to 10). The curves don\'t cross here.</p>';
+    } else {
+      ptsHtml = `<div class="insight-facts">${pts.map((p) => {
+        const a = curves[p.i] ? curves[p.i].expression : '';
+        const b = curves[p.j] ? curves[p.j].expression : '';
+        return `<div class="insight-fact"><span>${escapeHtml(a)} \u2229 ${escapeHtml(b)}</span><span>( ${fmtNum(p.x)}, ${fmtNum(p.y)} )</span></div>`;
+      }).join('')}</div>`;
+    }
+    card.innerHTML = `
+      <span class="insight-kind">intersection</span>
+      <h4>Where these curves meet</h4>
+      ${eqList}
+      ${ptsHtml}
+      <div class="insight-method">Method: set the two expressions equal - f(x) = g(x) - and solve for x. Here that root is found numerically (scan the -10 to 10 window for a sign change of f(x) - g(x), then bisect to pinpoint it); y is read back from either curve. Points are marked on the graph.</div>`;
+    body.insertBefore(card, body.firstChild);
+  }
+  function fmtNum(n) { const r = Math.round(n * 100) / 100; return Object.is(r, -0) ? '0' : String(r); }
 
   // ---- Snapshots / export -------------------------------------------------
   // Renders a page to an offscreen canvas at fixed size, independent of the
@@ -2377,9 +2525,11 @@
         const snapshot = snapshotPage(pageIndex);
         const data = await postAnalyze(snapshot);
         lastAnalysis = data.analysis;
-        renderInsight(data.analysis);
-        // Auto-plot any functions the analysis surfaced, next to the work.
-        (data.analysis.plots || []).forEach((expr) => plotOnBoard(expr));
+        renderInsight(data.analysis, { live: true });
+        // Put EVERY equation the analysis found into ONE shared coordinate
+        // system (so curves overlap and intersect), and refresh that same graph
+        // on each cycle instead of spawning a new one per equation per tick.
+        syncAnalysisGraph(data.analysis.plots || []);
       } catch (e) { /* stay quiet on the auto path */ }
       finally { liveAnalyzeBusy = false; }
     }, 2200);
@@ -2652,6 +2802,22 @@
       } catch (e) { setStatus(e.message, 'error'); }
     });
     $('#audioToggleBtn')?.addEventListener('click', teacherToggleAudio);
+
+    // Exit: for a live teacher, stop the session for everyone first (like the
+    // lesson's Exit), then follow the link. Students/non-live just navigate.
+    $('#exitLink')?.addEventListener('click', async (e) => {
+      if (!isOwner || !board || !board.isLive) return; // default navigation
+      e.preventDefault();
+      const href = e.currentTarget.getAttribute('href') || '/boards';
+      if (!confirm('End the live session for everyone and exit?')) return;
+      try {
+        const d = await api(`/api/board/${boardIdValue}/stop-live`, { method: 'POST', body: JSON.stringify({}) });
+        board.isLive = d.board.isLive;
+        send({ type: 'live:changed', isLive: false });
+        if (Audio.on) await stopAudio(true);
+      } catch (_) { /* leave anyway */ }
+      window.location.href = href;
+    });
   }
 
   function cropSelection() {

@@ -155,5 +155,16 @@ console.log('\nwhiteboard fixes: activities reach code-joined students, fullscre
   ok('viewers panel lifted above the join QR', /\.viewers-panel\s*\{\s*z-index:\s*30\s*!important/.test(css));
 }
 
+console.log('\nwhiteboard graph rework + Exit-ends-live');
+{
+  const bjs = read('public/board.js');
+  ok('live-analyze refreshes ONE shared graph (no per-cycle duplicates)', /syncAnalysisGraph\(data\.analysis\.plots/.test(bjs) && !/plots \|\| \[\]\)\.forEach\(\(expr\) => plotOnBoard/.test(bjs));
+  ok('a single analysis graph is tracked + reused', /analysisGraphId/.test(bjs) && /page\(\)\.objects\.find\(\(o\) => o\.id === analysisGraphId/.test(bjs));
+  ok('intersections are computed and drawn', /function computeIntersections/.test(bjs) && /obj\.intersections/.test(bjs));
+  ok('an AI note explains the intersection method', /function renderIntersectionNote/.test(bjs) && /set the two expressions equal/.test(bjs));
+  ok('live-analyze note is self-replacing (no stacking)', /id="liveAnalyzeNote"|liveAnalyzeNote/.test(bjs) && /opts\.live/.test(bjs));
+  ok('board Exit stops live before leaving', /#exitLink[\s\S]{0,400}stop-live/.test(bjs));
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
