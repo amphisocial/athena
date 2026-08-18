@@ -271,8 +271,29 @@ body.presenting .slide-stage { min-height: min(78vh, 860px); }
 body.presenting .slide-content { padding: clamp(32px, 4vw, 72px); }
 body.presenting .slide-content h2 { font-size: clamp(2.2rem, 4.4vw, 4.4rem); }
 body.presenting .slide-bullets li { font-size: clamp(1.2rem, 2.2vw, 1.7rem); }
-body.presenting .slide-footer { color: rgba(60,72,95,0.7); }
+body.presenting .slide-footer { color: rgba(234,241,255,0.6); }
 body.presenting .card-face p { font-size: clamp(1.3rem, 2.1vw, 2rem); }
+/* The slide/flashcard cards normally use translucent-white backgrounds that
+   only read as light because they sit on a white page. On the dark stage they
+   would go dark and their dark text would vanish — so give them an opaque
+   light base here. The coloured accent overlays still tint them. */
+body.presenting .slide-stage {
+  background: linear-gradient(150deg, #f1ecff, #ffffff) !important;
+  box-shadow: 0 30px 80px rgba(0,0,0,0.45) !important;
+}
+body.presenting .card-face {
+  background:
+    radial-gradient(circle at top right, rgba(20,217,196,0.16), transparent 18rem),
+    linear-gradient(145deg, #ffffff, #f5f8ff) !important;
+}
+body.presenting .card-back {
+  background:
+    radial-gradient(circle at top left, rgba(255,204,102,0.16), transparent 18rem),
+    linear-gradient(145deg, #ffffff, #fff8ec) !important;
+}
+/* Card text stays on its normal dark ink against the now-light card. */
+body.presenting .card-face, body.presenting .card-face p, body.presenting .slide-content { color: var(--text, #0f1e35); }
+body.presenting .card-face small { color: var(--muted, #5a6b85); }
 
 /* Annotation toolbar sits at the bottom-centre of the stage. */
 body.presenting .lesson-annobar { bottom: 18px; }
