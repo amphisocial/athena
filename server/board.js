@@ -1070,6 +1070,14 @@ function attachBoardWebSocket(httpServer, deps) {
     }
   });
 
+  // Non-owner viewers currently connected to a board's live room. Used to
+  // report live seat occupancy for public webinars.
+  wss.getLiveCount = (boardIdValue) => {
+    const room = rooms.get(boardIdValue);
+    if (!room) return 0;
+    return Array.from(room).filter((c) => !c.isOwner).length;
+  };
+
   return wss;
 }
 

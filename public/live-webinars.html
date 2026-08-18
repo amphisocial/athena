@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <link rel="icon" type="image/png" href="/favicon.png" />
+  <link rel="apple-touch-icon" href="/img/boardsy-logo.png?v=boardsy13" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Live webinars | Boardsy</title>
+  <meta name="description" content="Join a live Boardsy webinar, or sign up for an upcoming session on a Math or Science topic. Free, no account needed to attend." />
+  <meta property="og:title" content="Live webinars | Boardsy" />
+  <meta property="og:description" content="Join a live class, or sign up for an upcoming session on a Math or Science topic." />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/styles.css?v=boardsy20" />
+  <link rel="stylesheet" href="/theme-light.css?v=boardsy20" />
+  <link rel="stylesheet" href="/lessons.css?v=boardsy20" />
+</head>
+<body data-page="live-webinars">
+  <div class="shell">
+    <header class="topbar">
+      <a class="brand" href="/" aria-label="Boardsy home">
+        <span class="brand-mark">Boardsy</span>
+        <span>Board<span class="brand-suffix">sy</span></span>
+      </a>
+      <nav class="nav-links">
+        <a href="/learning">Learning</a>
+        <a href="/lessons">Public Lessons</a>
+        <a href="/live" class="active">Webinars</a>
+        <a href="/#pricing">Pricing</a>
+      </nav>
+      <div class="auth-area" id="authArea"></div>
+    </header>
+
+    <main class="app-page">
+      <section class="panel library-panel">
+        <div class="panel-header">
+          <div>
+            <span class="section-kicker">Live</span>
+            <h2>Webinars</h2>
+            <p class="panel-sub">Join a class that's live now, or sign up for an upcoming session on a topic you care about. Free to attend — each session seats up to 50.</p>
+          </div>
+          <div class="boards-controls">
+            <a class="btn ghost" href="/webinars" id="hostLink">Host a webinar →</a>
+          </div>
+        </div>
+
+        <div id="liveWebList" class="webinar-list">
+          <p class="info-empty" id="liveWebEmpty">Loading…</p>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <dialog id="signupDialog" class="modal template-modal">
+    <div class="modal-card template-card">
+      <button class="modal-close" id="signupClose" aria-label="Close">×</button>
+      <h2 id="signupTitle">Sign up</h2>
+      <p class="template-help" id="signupSub">We'll email you the join link before it starts.</p>
+      <label class="board-name-label">Your email
+        <input id="signupEmail" type="email" placeholder="you@school.edu" />
+      </label>
+      <div class="template-actions">
+        <button class="btn primary" id="signupConfirm">Save my seat</button>
+      </div>
+      <p class="form-status" id="signupErr" style="display:none"></p>
+    </div>
+  </dialog>
+
+  <div class="toast" id="toast"></div>
+
+  <script src="/common.js?v=boardsy20"></script>
+  <script src="/live-webinars.js?v=boardsy20"></script>
+</body>
+</html>

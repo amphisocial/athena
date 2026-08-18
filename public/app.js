@@ -1267,6 +1267,42 @@
     // Lock nav for students.
     document.body.classList.toggle('live-student', Live.on && Live.role === 'student');
     document.body.classList.toggle('live-on', Live.on);
+    // Full-screen presentation mode: identical for teacher, students, and
+    // webinar attendees the moment a session is live.
+    document.body.classList.toggle('presenting', Live.on);
+    if (Live.on) mountPresentControls();
+  }
+
+  // A small, always-visible control cluster for presentation mode: exit/leave
+  // and (teacher only) a fullscreen toggle. Injected once into the stage.
+  function mountPresentControls() {
+    const stage = document.getElementById('studyPanel');
+    if (!stage || document.getElementById('presentTopBar')) { syncPresentControls(); return; }
+    const bar = document.createElement('div');
+    bar.id = 'presentTopBar';
+    bar.className = 'present-topbar';
+    bar.innerHTML = `
+      <span class="present-title" id="presentTitle"></span>
+      <span class="present-spacer"></span>
+      <button class="present-btn" id="presentFsBtn" title="Toggle fullscreen">⛶ Fullscreen</button>
+      <button class="present-btn danger" id="presentExitBtn"></button>`;
+    stage.appendChild(bar);
+    document.getElementById('presentFsBtn').addEventListener('click', () => {
+      const el = document.documentElement;
+      if (!document.fullscreenElement) el.requestFullscreen?.().catch(() => {});
+      else document.exitFullscreen?.().catch(() => {});
+    });
+    document.getElementById('presentExitBtn').addEventListener('click', () => {
+      if (Live.role === 'teacher') teacherEndLive();
+      else { closeLive(); renderLiveChrome(); }   // student/webinar attendee just leaves
+    });
+    syncPresentControls();
+  }
+  function syncPresentControls() {
+    const t = document.getElementById('presentTitle');
+    if (t) t.textContent = study.set ? study.set.title : '';
+    const x = document.getElementById('presentExitBtn');
+    if (x) x.textContent = Live.role === 'teacher' ? '■ End live' : '✕ Leave';
   }
 
   // ---- Live annotation toolbar + persistent QR (teacher) ----
@@ -1382,7 +1418,7 @@
   async function applyNewLessonPrefill() {
     const p = new URLSearchParams(location.search);
     const keys = [...p.keys()];
-    if (!keys.some((k) => ['subject', 'grade', 'topic', 'topicId', 'public'].includes(k))) return;
+    if (!keys.some((k) => ['subject', 'grade', 'topic', 'topicId', 'public', 'format'].includes(k))) return;
 
     // 1) Category always General learning for lessons started this way.
     if ($('#category')) $('#category').value = 'General learning';
@@ -1390,6 +1426,10 @@
     // 2) Grade / subject come straight from the previous dialog.
     if (p.get('subject') && $('#subject')) $('#subject').value = p.get('subject');
     if (p.get('grade') && $('#grade')) $('#grade').value = /^\d+$/.test(p.get('grade')) ? `Grade ${p.get('grade')}` : p.get('grade');
+
+    // Explicit format chosen on /learning (Slides / Flashcards / Quiz) wins.
+    const fmt = (p.get('format') || '').trim();
+    if (fmt && $('#format') && ['slides', 'flashcard', 'quiz', 'mixed'].includes(fmt)) $('#format').value = fmt;
 
     const topic = (p.get('topic') || '').trim();
     const topicId = (p.get('topicId') || '').trim();
@@ -1400,8 +1440,9 @@
     if (!pasteEl || pasteEl.value.trim()) return;   // don't clobber typed content
 
     if (topicId) {
-      // Curriculum topic: stored content, default to Slides.
-      if ($('#format')) $('#format').value = 'slides';
+      // Curriculum topic: stored content, default to Slides unless the teacher
+      // explicitly picked a format on the way in.
+      if ($('#format') && !fmt) $('#format').value = 'slides';
       pasteEl.placeholder = 'Loading a ready-made starting point for this topic…';
       try {
         const t = await api(`/api/learning/topic-content?id=${encodeURIComponent(topicId)}`);

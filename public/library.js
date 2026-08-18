@@ -198,6 +198,7 @@
         if (grade) q.set('grade', grade);
         if (topic) q.set('topic', topic);
         if (pendingLessonTopicId) q.set('topicId', pendingLessonTopicId);   // curriculum topic → stored content
+        if (pendingLessonFormat) q.set('format', pendingLessonFormat);
         if ($('#newLessonPublic')?.checked) q.set('public', '1');
         const qs = q.toString();
         window.location.href = qs ? `/app?${qs}` : '/app';
@@ -296,6 +297,7 @@
   let lcGrade = 5;
   let lcSubject = 'math';
   let pendingLessonTopicId = '';   // set when a curriculum topic drives the lesson
+  let pendingLessonFormat = '';    // Slides/Flashcards/Quiz chosen on /learning
   let myTopicContent = {};         // topicId -> { slides, flashcard, quiz, mixed }
 
   function lcRenderFilters() {
@@ -426,6 +428,7 @@
       template: p.get('template') || null
     };
     if (!topic.title) return;
+    pendingLessonFormat = (p.get('format') || '').trim();   // Slides/Flashcards/Quiz chosen on /learning
     if (startAct === 'whiteboard') startTopicWhiteboard(topic);
     else startTopicLesson(topic);
     history.replaceState({}, '', '/library');   // clean the URL

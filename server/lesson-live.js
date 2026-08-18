@@ -225,6 +225,13 @@ function attachLessonWebSocket(httpServer, deps) {
     }
   });
 
+  // How many students are connected to a set's live room right now (excludes
+  // the teacher). Used to report live seat occupancy for public webinars.
+  wss.getLiveCount = (setId) => {
+    const room = rooms.get(setId);
+    return room ? room.students.size : 0;
+  };
+
   return wss;
 }
 

@@ -132,10 +132,11 @@
   //  - signed in  -> the Library, which opens the prefilled New form and saves.
   //  - signed out -> whiteboard opens the no-login sandbox (not saved);
   //                  lesson needs an account, so we prompt sign-up.
-  function libraryStartHref(kind, t, subject, grade) {
+  function libraryStartHref(kind, t, subject, grade, format) {
     const p = new URLSearchParams({ start: kind, grade: String(grade), subject });
     if (t.title) p.set('topic', t.title);
     if (t.id) p.set('id', t.id);
+    if (format) p.set('format', format);
     if (kind === 'whiteboard' && t.template) p.set('template', t.template);
     return `/library?${p.toString()}`;
   }
@@ -146,12 +147,17 @@
     const blurb = t.blurb ? `<p class="lt-blurb">${escapeHtml(t.blurb)}</p>` : '';
     const badge = hasTemplate ? '<span class="lt-badge">Live board</span>' : '';
     const wbMark = t.template ? ' <span class="lt-arrow">◆</span>' : '';
+    // Format chips mirror the Library's Curriculum tab: pick how a lesson on
+    // this topic should start (Slides / Flashcards / Quiz).
+    const chips = [['slides', 'Slides'], ['flashcard', 'Flashcards'], ['quiz', 'Quiz']]
+      .map(([fmt, label]) => `<button class="lt-fmt" data-fmt="${fmt}" title="Start a ${label.toLowerCase()} lesson on this topic">${label}</button>`).join('');
     // Buttons carry data so a single delegated handler can route them.
     return `<article class="lrn-topic" data-title="${escapeHtml(t.title)}" data-id="${escapeHtml(t.id)}" data-template="${escapeHtml(t.template || '')}">
       ${badge}
       <h3>${escapeHtml(t.title)}</h3>
       ${blurb}
       ${std}
+      <div class="lt-formats" role="group" aria-label="Lesson format">${chips}</div>
       <div class="lt-actions">
         <button class="lt-open wb" data-act="whiteboard">Start whiteboard${wbMark}</button>
         <button class="lt-open ls" data-act="lesson">Start lesson</button>
@@ -159,11 +165,11 @@
     </article>`;
   }
 
-  function onTopicAction(act, card, subject, grade) {
+  function onTopicAction(act, card, subject, grade, format) {
     const t = { id: card.dataset.id, title: card.dataset.title, template: card.dataset.template || null };
     if (loggedIn) {
       // Hand off to the Library; it opens the prefilled dialog and saves.
-      window.location.href = libraryStartHref(act, t, subject, grade);
+      window.location.href = libraryStartHref(act, t, subject, grade, format);
       return;
     }
     if (act === 'whiteboard') {
@@ -193,6 +199,10 @@
     el.topics.querySelectorAll('.lt-open').forEach((btn) => btn.addEventListener('click', () => {
       const card = btn.closest('.lrn-topic');
       onTopicAction(btn.dataset.act, card, subject, grade);
+    }));
+    el.topics.querySelectorAll('.lt-fmt').forEach((btn) => btn.addEventListener('click', () => {
+      const card = btn.closest('.lrn-topic');
+      onTopicAction('lesson', card, subject, grade, btn.dataset.fmt);
     }));
   }
 

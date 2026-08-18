@@ -16,13 +16,14 @@
   }
 
   function row(w) {
-    const kindLabel = w.kind === 'whiteboard' ? '🖊 Whiteboard' : '📚 Lesson';
+    const kindLabel = w.kind === 'whiteboard' ? '🖊 Whiteboard' : `📚 Lesson${w.formatLabel && w.formatLabel !== 'Mixed' ? ` (${w.formatLabel})` : ''}`;
     const missing = w.exists ? '' : ' <span class="web-missing">(content deleted)</span>';
+    const pub = w.public ? ` <span class="web-pill pubtag">Public · ${w.signupCount || 0}/${w.capacity || 50} signed up</span>` : '';
     const joinAbs = `${location.origin}${w.joinUrl}`;
     return `<div class="webinar-row" data-id="${w.id}">
       <div class="web-main">
         <div class="web-title">${escapeHtml(w.title)}${missing}</div>
-        <div class="web-meta">${kindLabel} · ${escapeHtml(fmtWhen(w.scheduledAt))} ${statusPill(w)}</div>
+        <div class="web-meta">${kindLabel} · ${escapeHtml(fmtWhen(w.scheduledAt))} ${statusPill(w)}${pub}</div>
         ${(w.status === 'live' || w.contentLive) ? `<div class="web-join">Join link: <a href="${w.joinUrl}" target="_blank" rel="noopener">${escapeHtml(joinAbs)}</a> <button class="btn ghost xs web-copy" data-url="${escapeHtml(joinAbs)}">Copy</button></div>` : ''}
       </div>
       <div class="web-actions">
@@ -76,7 +77,7 @@
     const kind = $('#webKind').value;
     const list = kind === 'whiteboard' ? options.boards : options.lessons;
     $('#webContent').innerHTML = '<option value="">—</option>' +
-      list.map((o) => `<option value="${o.id}">${escapeHtml(o.title)}</option>`).join('');
+      list.map((o) => `<option value="${o.id}">${escapeHtml(o.title)}${o.formatLabel ? ` — ${escapeHtml(o.formatLabel)}` : ''}</option>`).join('');
   }
 
   async function openDialog() {
@@ -89,6 +90,7 @@
     $('#webDate').value = d.toISOString().slice(0, 10);
     $('#webTime').value = d.toTimeString().slice(0, 5);
     $('#webErr').style.display = 'none';
+    if ($('#webPublic')) $('#webPublic').checked = false;
     $('#webinarDialog').showModal();
   }
 
@@ -102,10 +104,11 @@
     if (!refId) { err.textContent = 'Pick a lesson or whiteboard.'; err.style.display = ''; return; }
     if (!date || !time) { err.textContent = 'Pick a date and time.'; err.style.display = ''; return; }
     const scheduledAt = new Date(`${date}T${time}`).toISOString();
+    const isPublic = $('#webPublic') ? $('#webPublic').checked : false;
     const btn = $('#webCreate');
     btn.disabled = true; btn.textContent = 'Scheduling…';
     try {
-      await api('/api/webinars', { method: 'POST', body: JSON.stringify({ kind, refId, title, scheduledAt }) });
+      await api('/api/webinars', { method: 'POST', body: JSON.stringify({ kind, refId, title, scheduledAt, public: isPublic }) });
       $('#webinarDialog').close();
       await load();
     } catch (e) {

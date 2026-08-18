@@ -98,6 +98,21 @@ function notifyAdminOfReward({ founderEmail, referredEmail }) {
     .catch((e) => { console.warn('Reward notification email failed:', e.message); return { sent: false }; });
 }
 
+// Send a webinar seat confirmation to a public sign-up, with the join link and
+// the scheduled time. Best-effort — never blocks the signup response.
+function sendWebinarSignupEmail({ to, title, scheduledAt, joinUrl, live }) {
+  const when = (() => { const d = new Date(scheduledAt); return isNaN(d.getTime()) ? '' : d.toLocaleString('en-US', { dateStyle: 'full', timeStyle: 'short' }); })();
+  const subject = live ? `You're in: "${title}" is live now` : `Your seat is reserved: "${title}"`;
+  const whenLine = when ? (live ? `It's live right now.` : `Scheduled for ${when}.`) : '';
+  const text = `Your seat for "${title}" on Boardsy is confirmed.\n\n${whenLine}\n\nJoin here when it starts: ${joinUrl}\n\nSee you there!`;
+  const html = `<p>Your seat for <strong>"${title}"</strong> on Boardsy is confirmed.</p>
+    ${whenLine ? `<p>${whenLine}</p>` : ''}
+    <p><a href="${joinUrl}">Join the session</a> when it starts.</p>
+    <p style="color:#5a6b85;font-size:13px">If the button doesn't work, paste this link into your browser:<br>${joinUrl}</p>`;
+  return sendMail({ to, subject, text, html })
+    .catch((e) => { console.warn('Webinar signup email failed:', e.message); return { sent: false }; });
+}
+
 // Send a referral invitation email on behalf of a member.
 function sendReferralInvite({ fromName, toEmail, link }) {
   const subject = `${fromName} invited you to Boardsy`;
@@ -1825,17 +1840,48 @@ function webinarBoards() {
 }
 function webinarJoinUrl(w) { return w.kind === 'whiteboard' ? `/board/${w.refId}` : `/l/${w.refId}`; }
 function webinarRunUrl(w) { return w.kind === 'whiteboard' ? `/board/${w.refId}` : `/app?set=${w.refId}`; }
+const WEBINAR_CAPACITY = 50;   // max signups per webinar (server compute limit)
+const WEBINAR_FMT = { slides: 'Slides', flashcard: 'Flashcards', quiz: 'Quiz', mixed: 'Mixed' };
+// How many people are connected to this webinar's live room right now. The
+// WebSocket servers are created later in this file; by request time the
+// bindings are live, so the closure lookup is safe.
+function webinarLiveCount(w) {
+  try {
+    if (w.kind === 'whiteboard') return (typeof boardWss !== 'undefined' && boardWss.getLiveCount) ? boardWss.getLiveCount(w.refId) : 0;
+    return (typeof lessonWss !== 'undefined' && lessonWss.getLiveCount) ? lessonWss.getLiveCount(w.refId) : 0;
+  } catch (_) { return 0; }
+}
 function enrichWebinar(w, store, boards) {
-  let title = w.title; let exists = false; let contentLive = false;
+  let title = w.title; let exists = false; let contentLive = false; let formatLabel = '';
   if (w.kind === 'lesson') {
     const s = store.quizlets.find((x) => x.id === w.refId);
     exists = !!s; contentLive = !!(s && s.isLive); if (!title && s) title = s.title;
+    formatLabel = s ? (WEBINAR_FMT[s.format] || 'Mixed') : '';
   } else {
     const b = (boards || []).find((x) => x.id === w.refId);
     exists = !!b; contentLive = !!(b && b.isLive); if (!title && b) title = b.title;
+    formatLabel = 'Whiteboard';
   }
-  return { ...w, title: title || 'Untitled webinar', exists, contentLive,
+  const reserved = (w.signups || []).length;          // seats reserved via signup
+  const attendingNow = contentLive ? webinarLiveCount(w) : 0;   // people in the room now
+  const seatsLeft = Math.max(0, WEBINAR_CAPACITY - reserved);   // seats left to reserve
+  const liveSeatsLeft = Math.max(0, WEBINAR_CAPACITY - attendingNow); // seats left to join live
+  return { ...w, title: title || 'Untitled webinar', exists, contentLive, formatLabel,
+    public: Boolean(w.public),
+    capacity: WEBINAR_CAPACITY, reserved, attendingNow, seatsLeft, liveSeatsLeft,
+    signupCount: reserved,   // back-compat alias
     joinUrl: webinarJoinUrl(w), runUrl: webinarRunUrl(w) };
+}
+
+// A public webinar is "showable" while it is either upcoming or currently
+// live. Once it's over (past its time and not live), it drops off the public
+// board — completed webinars don't clutter the list.
+function webinarShowablePublic(w, store, boards) {
+  if (!w.public) return false;
+  const e = enrichWebinar(w, store, boards);
+  if (!e.exists) return false;
+  if (e.contentLive) return true;
+  return new Date(w.scheduledAt).getTime() > Date.now();
 }
 
 app.get('/api/webinars', requireUser, (req, res) => {
@@ -1851,14 +1897,15 @@ app.get('/api/webinars', requireUser, (req, res) => {
 // Content the teacher can attach to a webinar (their lessons + whiteboards).
 app.get('/api/webinars/options', requireUser, (req, res) => {
   const store = readStore();
+  const FMT = { slides: 'Slides', flashcard: 'Flashcards', quiz: 'Quiz', mixed: 'Mixed' };
   const lessons = store.quizlets
     .filter((s) => s.ownerId === req.user.id)
     .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)))
-    .map((s) => ({ id: s.id, title: s.title || 'Untitled lesson' }));
+    .map((s) => ({ id: s.id, title: s.title || 'Untitled lesson', format: s.format || 'mixed', formatLabel: FMT[s.format] || 'Mixed' }));
   const boards = webinarBoards()
     .filter((b) => b.teacherId === req.user.id)
     .sort((a, b) => String(b.updatedAt).localeCompare(String(a.updatedAt)))
-    .map((b) => ({ id: b.id, title: b.title || 'Untitled board' }));
+    .map((b) => ({ id: b.id, title: b.title || 'Untitled board', format: 'whiteboard', formatLabel: 'Whiteboard' }));
   res.json({ lessons, boards });
 });
 
@@ -1878,11 +1925,61 @@ app.post('/api/webinars', requireUser, (req, res) => {
   else owns = webinarBoards().some((b) => b.id === refId && b.teacherId === req.user.id);
   if (!owns) return res.status(404).json({ error: 'That content was not found in your library.' });
   const webinar = { id: id('web'), ownerId: req.user.id, title, kind, refId,
-    scheduledAt: when.toISOString(), status: 'scheduled', createdAt: nowIso(), updatedAt: nowIso() };
+    scheduledAt: when.toISOString(), status: 'scheduled',
+    public: Boolean(req.body.public), signups: [],
+    createdAt: nowIso(), updatedAt: nowIso() };
   store.webinars = store.webinars || [];
   store.webinars.push(webinar);
   writeStore(store);
   res.json({ webinar: enrichWebinar(webinar, store, webinarBoards()) });
+});
+
+// ---- Public webinar board: anyone can see upcoming/live public webinars,
+// sign up for a topic (capped), or join a live one if seats remain. ----------
+app.get('/api/public/webinars', (req, res) => {
+  const store = readStore();
+  const boards = webinarBoards();
+  const list = (store.webinars || [])
+    .filter((w) => webinarShowablePublic(w, store, boards))
+    .sort((a, b) => String(a.scheduledAt).localeCompare(String(b.scheduledAt)))
+    .map((w) => {
+      const e = enrichWebinar(w, store, boards);
+      // Public projection only — never leak the signup roster or owner id.
+      return { id: e.id, title: e.title, kind: e.kind, formatLabel: e.formatLabel,
+        scheduledAt: e.scheduledAt, live: e.contentLive, joinUrl: e.joinUrl,
+        capacity: e.capacity, reserved: e.reserved, attendingNow: e.attendingNow,
+        seatsLeft: e.seatsLeft, liveSeatsLeft: e.liveSeatsLeft,
+        signupCount: e.reserved };   // back-compat
+    });
+  res.json({ webinars: list });
+});
+
+app.post('/api/public/webinars/:id/signup', (req, res) => {
+  const email = String(req.body.email || '').trim().toLowerCase();
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return res.status(400).json({ error: 'Enter a valid email so we can send you the join link.' });
+  const store = readStore();
+  const boards = webinarBoards();
+  const w = (store.webinars || []).find((x) => x.id === req.params.id);
+  if (!w || !webinarShowablePublic(w, store, boards)) return res.status(404).json({ error: 'That webinar is not open for signups.' });
+  w.signups = w.signups || [];
+  const already = w.signups.some((s) => s.email === email);
+  if (!already) {
+    if (w.signups.length >= WEBINAR_CAPACITY) return res.status(409).json({ error: 'This webinar is full (50 seats). Try another session.' });
+    w.signups.push({ email, at: nowIso() });
+    w.updatedAt = nowIso();
+    writeStore(store);
+  }
+  const e = enrichWebinar(w, store, boards);
+  const joinAbs = `${APP_BASE_URL}${e.joinUrl}`;
+  // Confirmation email (best-effort): sent on first signup, and again if they
+  // re-signup while it's live so they have the join link in hand.
+  if (!already || e.contentLive) {
+    sendWebinarSignupEmail({ to: email, title: e.title, scheduledAt: e.scheduledAt, joinUrl: joinAbs, live: e.contentLive });
+  }
+  res.json({ ok: true, alreadySignedUp: already, emailed: true,
+    reserved: e.reserved, seatsLeft: e.seatsLeft, capacity: e.capacity,
+    attendingNow: e.attendingNow, liveSeatsLeft: e.liveSeatsLeft,
+    live: e.contentLive, joinUrl: e.joinUrl });
 });
 
 app.delete('/api/webinars/:id', requireUser, (req, res) => {
@@ -2241,6 +2338,7 @@ app.post('/api/admin/curriculum/backfill', requireUser, async (req, res) => {
 
 // Public pages (no auth).
 app.get('/learning', (req, res) => res.sendFile(path.join(PUBLIC_DIR, 'learning.html')));
+app.get('/live', (req, res) => res.sendFile(path.join(PUBLIC_DIR, 'live-webinars.html')));
 app.get('/lessons', (req, res) => res.sendFile(path.join(PUBLIC_DIR, 'lessons.html')));
 app.get('/l/:id', (req, res) => res.sendFile(path.join(PUBLIC_DIR, 'app.html')));
 

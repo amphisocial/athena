@@ -207,21 +207,124 @@ body[data-page="app"] .audio-opt {
 body[data-page="app"] .live-audio { gap: 10px; }
 body[data-page="app"] .live-audio .btn { align-self: flex-start; }
 
-/* ===== Live session: keep controls in view so teachers don't scroll ===== */
-body[data-page="app"].live-on .app-grid[data-view="study"] { padding-bottom: 8px; }
-body[data-page="app"].live-on .app-grid[data-view="study"] .study-actions {
-  position: sticky; bottom: 84px; z-index: 31;
-  background: #ffffff; border: 1px solid var(--line, #dce6f5); border-radius: 14px;
-  padding: 10px; box-shadow: 0 8px 24px rgba(15,30,53,0.10);
+/* ===== Live session (non-presenting fallback kept minimal) ===== */
+body[data-page="app"].live-on:not(.presenting) .app-grid[data-view="study"] { padding-bottom: 8px; }
+
+/* ================= Full-screen presentation mode =================
+   The moment a lesson is live, teacher, students, and webinar attendees all
+   drop into the same clean, full-screen stage: the slide/card centred, the
+   annotation toolbar docked bottom-centre, the attendee/questions rail on the
+   right, and the join QR bottom-left. No scrolling, no builder chrome. */
+body.presenting { overflow: hidden; }
+body.presenting .topbar,
+body.presenting .app-viewtabs,
+body.presenting .creator-panel,
+body.presenting .study-panel .panel-header,
+body.presenting #cardList,
+body.presenting .sat-stage-bar,
+body.presenting .sat-results,
+body.presenting #exportPdfBtn,
+body.presenting .public-lesson-bar,
+body.presenting .usage-pill,
+body.presenting .max-btn { display: none !important; }
+
+body.presenting .shell,
+body.presenting .app-page,
+body.presenting .app-grid { display: block; padding: 0; margin: 0; max-width: none; }
+
+body.presenting .study-panel {
+  position: fixed; inset: 0; top: 0; margin: 0; z-index: 1000; border-radius: 0;
+  background: radial-gradient(130% 120% at 50% -10%, #17253f 0%, #0b1424 70%);
+  display: flex; flex-direction: column; padding: 0; overflow: hidden;
 }
-body[data-page="app"].live-on .app-grid[data-view="study"] .live-strip {
-  position: sticky; bottom: 12px; z-index: 30; max-height: 42vh; overflow: auto;
-  background: #ffffff; border: 1px solid var(--line, #dce6f5); border-radius: 16px;
-  padding: 14px 16px; box-shadow: 0 -6px 30px rgba(15,30,53,0.12);
+
+/* Top bar: lesson title + fullscreen + exit/leave. */
+.present-topbar {
+  display: flex; align-items: center; gap: 12px; order: -1; flex: 0 0 auto;
+  padding: 12px 18px; color: #eaf1ff;
+  background: rgba(9,17,31,0.55); backdrop-filter: blur(6px);
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+body:not(.presenting) .present-topbar { display: none; }
+.present-title { font-weight: 800; font-size: 1.02rem; letter-spacing: -0.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.present-spacer { flex: 1; }
+.present-btn {
+  border: 1px solid rgba(255,255,255,0.16); background: rgba(255,255,255,0.06); color: #eaf1ff;
+  border-radius: 10px; padding: 8px 12px; font: inherit; font-weight: 700; font-size: 0.85rem; cursor: pointer; white-space: nowrap;
+}
+.present-btn:hover { background: rgba(255,255,255,0.14); }
+.present-btn.danger { border-color: rgba(226,59,59,0.5); color: #ff9ea4; }
+.present-btn.danger:hover { background: rgba(226,59,59,0.18); }
+
+/* Central stage: card/slide centred, with room for the right rail. */
+body.presenting .lesson-stage {
+  flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center;
+  padding: clamp(14px, 2.6vw, 34px); padding-right: clamp(14px, 2.6vw, 34px);
+  position: relative;
+}
+@media (min-width: 900px) {
+  body.presenting .lesson-stage { padding-right: 348px; }
+}
+body.presenting .flashcard { height: min(72vh, 720px); width: min(1000px, 100%); max-width: 1000px; margin: 0; }
+body.presenting .flashcard.has-passage { height: min(82vh, 860px); }
+body.presenting .slide-view { display: flex; flex-direction: column; width: min(1120px, 100%); }
+body.presenting .slide-stage { min-height: min(66vh, 680px); }
+body.presenting .slide-content { padding: clamp(28px, 4vw, 60px); }
+body.presenting .slide-content h2 { font-size: clamp(2rem, 3.8vw, 3.6rem); }
+body.presenting .slide-bullets li { font-size: clamp(1.1rem, 2vw, 1.45rem); }
+body.presenting .slide-footer { color: rgba(234,241,255,0.6); }
+body.presenting .card-face p { font-size: clamp(1.2rem, 1.9vw, 1.7rem); }
+
+/* Annotation toolbar sits at the bottom of the stage (already absolute). */
+body.presenting .lesson-annobar { bottom: 16px; }
+
+/* Attendee / questions rail on the right. */
+body.presenting .live-strip {
+  position: fixed !important; top: 60px; right: 0; bottom: 0; width: 336px;
+  margin: 0 !important; padding: 18px !important; z-index: 1002;
+  background: rgba(9,17,31,0.72); backdrop-filter: blur(8px);
+  border: 0 !important; border-left: 1px solid rgba(255,255,255,0.08) !important;
+  border-radius: 0 !important; box-shadow: none !important;
+  overflow: auto; color: #eaf1ff;
+  display: flex; flex-direction: column; gap: 12px;
+}
+body.presenting .live-strip .live-head { color: #eaf1ff; }
+body.presenting .live-strip .live-body { background: rgba(255,255,255,0.04); border-color: rgba(255,255,255,0.10); }
+body.presenting .live-strip .live-qtitle { color: rgba(234,241,255,0.7); }
+body.presenting .live-strip .react-btn { background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.16); }
+body.presenting .live-strip .live-ask input { background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.16); color: #eaf1ff; }
+body.presenting .live-strip .live-agg { color: #6fe3d4; }
+
+/* Deck controls (Prev/Next) float at the bottom centre for the teacher. */
+body.presenting .study-actions {
+  position: fixed; left: 50%; bottom: 84px; transform: translateX(-50%);
+  margin: 0; z-index: 1001; display: flex; gap: 10px;
+  background: rgba(9,17,31,0.6); border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 14px; padding: 8px; backdrop-filter: blur(6px);
+}
+body.presenting .study-actions .btn { background: rgba(255,255,255,0.08); color: #eaf1ff; border-color: rgba(255,255,255,0.14); }
+body.presenting.live-student .study-actions { display: none; }
+/* Students never drive the deck. */
+body.presenting.live-student #flipCard, body.presenting.live-student #shuffleCards { display: none !important; }
+
+/* Join QR sits above the stage, bottom-left. */
+body.presenting .session-qr, body.presenting .session-qr-reopen { z-index: 1003; }
+
+/* On the right-railless narrow view, the rail becomes a bottom sheet. */
+@media (max-width: 899px) {
+  body.presenting .live-strip {
+    top: auto; left: 0; right: 0; bottom: 0; width: auto; max-height: 40vh;
+    border-left: 0 !important; border-top: 1px solid rgba(255,255,255,0.08) !important;
+  }
+  body.presenting .study-actions { bottom: 44vh; }
+  body.presenting .lesson-annobar { bottom: calc(40vh + 10px); }
+  body.presenting .session-qr { display: none; }
 }
 
 /* ===== Webinars page ===== */
 .panel-sub { margin: 6px 0 0; color: var(--muted, #5a6b85); font-size: 0.92rem; max-width: 60ch; }
+.info-empty { color: var(--muted, #5a6b85); font-size: 0.92rem; line-height: 1.55; padding: 8px 0; }
+.info-empty a { color: var(--brand, #2563ff); }
 .webinar-list { display: flex; flex-direction: column; gap: 10px; margin-top: 16px; }
 .webinar-row {
   display: flex; align-items: center; justify-content: space-between; gap: 14px;
@@ -236,4 +339,8 @@ body[data-page="app"].live-on .app-grid[data-view="study"] .live-strip {
 .web-pill { font-size: 0.72rem; font-weight: 800; letter-spacing: 0.03em; padding: 3px 9px; border-radius: 999px; background: #eef2fa; color: #5a6b85; }
 .web-pill.live { background: rgba(18,181,166,0.16); color: #0e8f83; }
 .web-pill.due { background: rgba(37,99,255,0.14); color: #2563ff; }
+.web-pill.full { background: rgba(214,69,69,0.14); color: #c2410c; }
+.web-pill.pubtag { background: rgba(37,99,255,0.12); color: #2563ff; }
+.web-seats { font-size: 0.8rem; color: var(--muted, #5a6b85); font-weight: 600; }
+.web-full-txt { color: #c2410c; font-weight: 700; }
 .btn.xs { padding: 3px 8px; font-size: 0.72rem; }

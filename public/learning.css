@@ -98,6 +98,14 @@
 .lrn-topic h3 { font-size: 1.02rem; margin: 0; color: var(--ink); font-weight: 600; line-height: 1.28; }
 .lrn-topic .lt-blurb { font-size: 0.88rem; color: var(--ink-soft); margin: 0; flex: 1; }
 .lrn-topic .lt-std { font-family: "Space Mono", monospace; font-size: 0.7rem; color: var(--muted); }
+.lrn-topic .lt-formats { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 2px; }
+.lrn-topic .lt-fmt {
+  font: inherit; font-size: 0.74rem; font-weight: 700; cursor: pointer;
+  color: var(--ink-soft, #5a6b85); background: var(--panel-2, #f3f7ff);
+  border: 1px solid var(--line-2, #dce6f5); border-radius: 999px; padding: 4px 11px;
+  transition: all 0.12s ease;
+}
+.lrn-topic .lt-fmt:hover { color: var(--brand); border-color: rgba(37,99,255,0.4); background: #fff; }
 .lrn-topic .lt-actions { display: flex; gap: 8px; align-items: center; margin-top: 4px; flex-wrap: wrap; }
 .lrn-topic .lt-open {
   font: inherit; font-size: 0.82rem; font-weight: 700; text-decoration: none; cursor: pointer;
