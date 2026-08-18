@@ -2123,6 +2123,7 @@
       }
       if (m.type === 'presence') {
         updateViewers(m.viewers || []);
+        const a = liveActivities(); if (a) a.setStudentCount((m.viewers || []).length);
         // Catch viewers who joined after audio was already on.
         if (isOwner && Audio.on) send({ type: 'audio', on: true });
         return;

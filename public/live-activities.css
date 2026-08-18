@@ -31,8 +31,31 @@
 .la-tabs { display: inline-flex; gap: 4px; background: var(--panel, rgba(0,0,0,.05)); border-radius: 10px; padding: 3px; }
 .la-tab { border: 0; background: transparent; color: var(--muted, #6a7893); font-weight: 700; font-size: .84rem; padding: 6px 14px; border-radius: 8px; cursor: pointer; }
 .la-tab.on { background: var(--brand, #7c5cff); color: #fff; }
-.la-x { border: 0; background: transparent; color: var(--muted, #6a7893); font-size: 1rem; cursor: pointer; }
+.la-x { border: 0; background: transparent; color: var(--muted, #6a7893); font-size: 1rem; cursor: pointer; padding: 4px 6px; border-radius: 8px; }
+.la-x:hover { background: var(--panel, rgba(0,0,0,.06)); color: var(--text, #12203a); }
+.la-count { margin-left: auto; margin-right: 6px; font-size: .74rem; font-weight: 700; color: var(--muted, #6a7893); white-space: nowrap; }
 .la-panel-body { padding: 14px; overflow: auto; }
+
+.la-notice { margin: 0 0 12px; padding: 10px 12px; border-radius: 10px; font-size: .82rem; line-height: 1.4; font-weight: 600;
+  color: #8a6d00; background: color-mix(in srgb, var(--accent, #ffcc66) 24%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent, #ffcc66) 45%, transparent); }
+
+/* Searchable lesson picker (combobox) */
+.la-combo { position: relative; }
+.la-combo-input { width: 100%; box-sizing: border-box; font: inherit; font-weight: 600; padding: 9px 10px; border-radius: 10px;
+  border: 1px solid var(--line, rgba(0,0,0,.16)); background: var(--panel, #fff); color: var(--text, #12203a); }
+.la-combo-input:focus { outline: none; border-color: var(--brand, #7c5cff); }
+.la-combo-list { position: absolute; z-index: 5; left: 0; right: 0; top: calc(100% + 4px); max-height: 240px; overflow: auto;
+  background: var(--bg-2, #fff); border: 1px solid var(--line, rgba(0,0,0,.16)); border-radius: 12px; box-shadow: 0 16px 40px rgba(10,15,40,.28); padding: 4px; }
+.la-combo-item { display: flex; flex-direction: column; gap: 2px; width: 100%; text-align: left; padding: 8px 10px; border: 0; border-radius: 8px; cursor: pointer; background: transparent; color: var(--text, #12203a); }
+.la-combo-item:hover, .la-combo-item.on { background: color-mix(in srgb, var(--brand, #7c5cff) 12%, transparent); }
+.la-combo-title { font-weight: 650; font-size: .88rem; }
+.la-combo-meta { font-size: .7rem; color: var(--muted, #6a7893); }
+.la-combo-empty { padding: 10px; font-size: .82rem; color: var(--muted, #6a7893); }
+
+.la-qlist.disabled { opacity: .5; pointer-events: none; }
+.la-qpick:disabled, .la-qcheck input:disabled { cursor: not-allowed; }
+.btn:disabled { opacity: .5; cursor: not-allowed; }
 
 .la-hint { margin: 0 0 12px; font-size: .82rem; line-height: 1.45; color: var(--muted, #6a7893); }
 .la-loading, .la-empty { padding: 18px 6px; color: var(--muted, #6a7893); font-size: .86rem; text-align: center; }

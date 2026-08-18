@@ -1786,14 +1786,15 @@ const shareSet = (req, res) => {
 
 // Prepared question banks for in-session activities (polls + team quiz). The
 // lesson surface already has the open set's cards on the client, but a live
-// whiteboard has none, so a teacher picks from any of their own sets here.
-// Returns only answerable questions (a prompt + 2+ choices) with the correct
-// index and explanation — the teacher's screen keeps those; the engine strips
-// them before anything reaches a student device.
+// whiteboard has none, so a teacher picks from any lesson they can read here:
+// their own sets first, then lessons shared with them. Returns only answerable
+// questions (a prompt + 2+ choices) with the correct index and explanation —
+// the teacher's screen keeps those; the engine strips them before anything
+// reaches a student device.
 app.get('/api/live/question-banks', requireUser, (req, res) => {
   const store = readStore();
-  const banks = store.quizlets
-    .filter((s) => s.ownerId === req.user.id)
+  const readable = store.quizlets.filter((s) => userCanReadQuizlet(req.user, s, store));
+  const banks = readable
     .map((s) => {
       const questions = (s.cards || [])
         .filter((c) => c.type !== 'slide' && Array.isArray(c.choices) && c.choices.length >= 2)
@@ -1803,10 +1804,17 @@ app.get('/api/live/question-banks', requireUser, (req, res) => {
           answerIndex: Number.isInteger(c.answerIndex) ? c.answerIndex : -1,
           explanation: String(c.explanation || '').slice(0, 1200)
         }));
-      return { id: s.id, title: s.title || 'Untitled set', subject: s.subject || s.category || '', topic: s.topic || '', questions };
+      const owned = s.ownerId === req.user.id;
+      return {
+        id: s.id, title: s.title || 'Untitled set',
+        subject: s.subject || s.category || '', topic: s.topic || '',
+        owned, creator: owned ? 'You' : creatorName(store, s.ownerId),
+        questions
+      };
     })
     .filter((b) => b.questions.length)
-    .sort((a, b) => a.title.localeCompare(b.title));
+    // Your own lessons first, then alphabetical — so the picker is predictable.
+    .sort((a, b) => (Number(b.owned) - Number(a.owned)) || a.title.localeCompare(b.title));
   res.json({ banks });
 });
 

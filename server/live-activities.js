@@ -98,6 +98,10 @@ function createLiveActivities() {
       bus.toTeacher({ type: 'activity:error', scope: 'poll', message: 'A poll needs a question and at least two choices.' });
       return;
     }
+    if (bus.roster().length < 1) {
+      bus.toTeacher({ type: 'activity:error', scope: 'poll', message: 'No students have joined yet — wait for at least one to arrive before polling.' });
+      return;
+    }
     // A survey (no correct answer) is allowed: answerIndex stays -1.
     const poll = { id: rid('poll'), ...q, votes: new Map(), open: true };
     state.poll = poll;

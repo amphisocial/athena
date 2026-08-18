@@ -42,19 +42,30 @@
       banks: null,          // teacher: cached prepared questions
       poll: null,           // { pollId, question, choices, answerIndex, explanation, counts, total, voted }
       teams: null,          // student: { exId, team, quiz, answers:{}, } ; teacher: { exId, title, teams, standings, quizLen, log:[] }
-      launchedQuiz: null    // teacher: the quiz array launched (kept for export)
+      launchedQuiz: null,   // teacher: the quiz array launched (kept for export)
+      studentCount: 0       // teacher: live attendee count (drives guards)
     };
 
     // ---- Teacher launcher + panel ----------------------------------------
     const launcher = el('button', 'la-launcher', '<span class="la-launcher-ico">🎬</span> Activities');
     launcher.type = 'button';
     launcher.hidden = true;
-    launcher.addEventListener('click', () => openPanel());
+    // Clicking the launcher toggles the panel — a second click closes it.
+    launcher.addEventListener('click', () => { if (panel.hidden) openPanel(); else closePanel(); });
     root.appendChild(launcher);
 
     const panel = el('div', 'la-panel');
     panel.hidden = true;
     root.appendChild(panel);
+
+    // Escape closes the panel; clicking anywhere outside it (but not on the
+    // launcher) closes it too. Both are ignored while a student overlay is up.
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !panel.hidden) closePanel(); });
+    document.addEventListener('pointerdown', (e) => {
+      if (panel.hidden) return;
+      if (panel.contains(e.target) || launcher.contains(e.target)) return;
+      closePanel();
+    }, true);
 
     function updateLauncher() {
       const show = state.role === 'teacher' && state.active;
@@ -68,6 +79,16 @@
     }
     function closePanel() { panel.hidden = true; }
 
+    // The live attendee count gates what can start (a poll needs ≥1 student, a
+    // team exercise needs ≥2). Re-render the open picker so its notice/buttons
+    // reflect the change the moment someone joins or leaves.
+    function setStudentCount(n) {
+      const next = Math.max(0, Number(n) || 0);
+      if (next === state.studentCount) return;
+      state.studentCount = next;
+      if (!panel.hidden && state.role === 'teacher' && !state.poll && !state.teams) renderPanel(panel.dataset.tab || 'poll');
+    }
+
     async function ensureBanks() {
       if (state.banks) return state.banks;
       try { state.banks = await loadBanks(); } catch (_) { state.banks = []; }
@@ -76,19 +97,64 @@
 
     function renderPanel(tab) {
       panel.dataset.tab = tab;
+      const n = state.studentCount;
       panel.innerHTML = `
         <div class="la-panel-head">
           <div class="la-tabs">
             <button class="la-tab${tab === 'poll' ? ' on' : ''}" data-tab="poll">Poll</button>
             <button class="la-tab${tab === 'teams' ? ' on' : ''}" data-tab="teams">Teams</button>
           </div>
-          <button class="la-x" title="Close" aria-label="Close">✕</button>
+          <span class="la-count" title="Students in this session">${n} student${n === 1 ? '' : 's'}</span>
+          <button class="la-x" title="Close (Esc)" aria-label="Close">✕</button>
         </div>
         <div class="la-panel-body" id="laPanelBody"></div>`;
       panel.querySelector('.la-x').addEventListener('click', closePanel);
       panel.querySelectorAll('.la-tab').forEach((b) => b.addEventListener('click', () => renderPanel(b.dataset.tab)));
       if (tab === 'poll') renderPollTab();
       else renderTeamsTab();
+    }
+
+    // A compact, searchable bank picker that scales past a handful of lessons:
+    // a text box filters a scrollable list (your own lessons first, then shared,
+    // each labelled). Calls onPick(bank) when a lesson is chosen. Returns the
+    // currently selected bank via getSelected().
+    function bankPicker(container, banks, onPick) {
+      let selected = banks[0] || null;
+      let openList = false;
+      function render() {
+        container.innerHTML = `
+          <div class="la-combo">
+            <input class="la-combo-input" id="laBankInput" placeholder="Search your lessons…" autocomplete="off"
+              value="${esc(selected ? selected.title : '')}" />
+            <div class="la-combo-list" id="laBankList" ${openList ? '' : 'hidden'}></div>
+          </div>`;
+        const input = container.querySelector('#laBankInput');
+        const list = container.querySelector('#laBankList');
+        const paintList = (filter) => {
+          const f = (filter || '').trim().toLowerCase();
+          const matches = banks.filter((b) => !f || b.title.toLowerCase().includes(f) || (b.topic || '').toLowerCase().includes(f) || (b.subject || '').toLowerCase().includes(f));
+          list.innerHTML = matches.length ? matches.map((b) => {
+            const idx = banks.indexOf(b);
+            return `<button class="la-combo-item${b === selected ? ' on' : ''}" data-i="${idx}">
+              <span class="la-combo-title">${esc(b.title)}</span>
+              <span class="la-combo-meta">${b.owned ? 'Your lesson' : 'Shared · ' + esc(b.creator)} · ${b.questions.length} Q</span>
+            </button>`;
+          }).join('') : '<div class="la-combo-empty">No lessons match.</div>';
+          list.querySelectorAll('.la-combo-item').forEach((it) => it.addEventListener('pointerdown', (e) => {
+            e.preventDefault();
+            selected = banks[Number(it.dataset.i)];
+            openList = false;
+            render();
+            onPick(selected);
+          }));
+        };
+        input.addEventListener('focus', () => { openList = true; list.hidden = false; paintList(''); });
+        input.addEventListener('input', () => { openList = true; list.hidden = false; paintList(input.value); });
+        input.addEventListener('keydown', (e) => { if (e.key === 'Escape') { openList = false; list.hidden = true; input.blur(); } });
+        if (openList) paintList(input.value);
+      }
+      render();
+      return { getSelected: () => selected };
     }
 
     // ----- Teacher: Poll tab ----------------------------------------------
@@ -99,31 +165,31 @@
       body.innerHTML = '<div class="la-loading">Loading your prepared questions…</div>';
       const banks = await ensureBanks();
       if (!banks.length) {
-        body.innerHTML = '<div class="la-empty">No prepared questions yet. Add a quiz to one of your lessons, then pick a question here to poll the room.</div>';
+        body.innerHTML = '<div class="la-empty">No prepared questions yet. Add a quiz to one of your lessons — any lesson you own or one shared with you — then pick a question here to poll the room.</div>';
         return;
       }
+      const noStudents = state.studentCount < 1;
       body.innerHTML = `
         <p class="la-hint">Pick one prepared question. It pops up on every student's screen; as answers land, a live graph builds here and on their screens.</p>
-        <label class="la-field"><span>From</span>
-          <select id="laPollBank">${banks.map((b, i) => `<option value="${i}">${esc(b.title)}</option>`).join('')}</select></label>
-        <div id="laPollList" class="la-qlist"></div>
+        ${noStudents ? '<div class="la-notice">No students have joined yet. The poll will be ready to send as soon as someone arrives.</div>' : ''}
+        <div class="la-field"><span>Lesson</span><div id="laPollBank"></div></div>
+        <div id="laPollList" class="la-qlist${noStudents ? ' disabled' : ''}"></div>
         <label class="la-check"><input type="checkbox" id="laSurvey" /> Survey — no right answer (just gather opinions)</label>`;
-      const bankSel = body.querySelector('#laPollBank');
-      const paint = () => {
-        const bank = banks[Number(bankSel.value) || 0];
+      const paint = (bank) => {
         body.querySelector('#laPollList').innerHTML = bank.questions.map((q, i) => `
-          <button class="la-qpick" data-i="${i}">
+          <button class="la-qpick" data-i="${i}"${noStudents ? ' disabled' : ''}>
             <span class="la-qpick-q">${esc(q.front)}</span>
             <span class="la-qpick-meta">${q.choices.length} choices${q.answerIndex >= 0 ? '' : ' · survey'}</span>
           </button>`).join('');
         body.querySelectorAll('.la-qpick').forEach((btn) => btn.addEventListener('click', () => {
+          if (state.studentCount < 1) { flash('No students have joined yet.'); return; }
           const q = bank.questions[Number(btn.dataset.i)];
           const survey = body.querySelector('#laSurvey').checked;
           send({ type: 'activity:poll:launch', question: q.front, choices: q.choices, answerIndex: survey ? -1 : q.answerIndex, explanation: q.explanation });
         }));
       };
-      bankSel.addEventListener('change', paint);
-      paint();
+      const picker = bankPicker(body.querySelector('#laPollBank'), banks, paint);
+      paint(picker.getSelected());
     }
 
     function renderTeacherPollLive(body) {
@@ -155,40 +221,42 @@
       body.innerHTML = '<div class="la-loading">Loading your prepared questions…</div>';
       const banks = await ensureBanks();
       if (!banks.length) {
-        body.innerHTML = '<div class="la-empty">No prepared questions yet. Add a quiz to a lesson, then run it as a team exercise here.</div>';
+        body.innerHTML = '<div class="la-empty">No prepared questions yet. Add a quiz to a lesson — one you own or one shared with you — then run it as a team exercise here.</div>';
         return;
       }
+      const tooFew = state.studentCount < 2;
+      let current = banks[0];
       body.innerHTML = `
         <p class="la-hint">Split the room into random teams named after mountain ranges, hand them a quiz, and watch the scores climb. Answers freeze the moment a teammate picks — the whole team sees right or wrong at once.</p>
+        ${tooFew ? `<div class="la-notice">Teams need at least two students present. ${state.studentCount === 0 ? 'No one has joined yet.' : 'Only one student has joined so far.'}</div>` : ''}
         <div class="la-row">
           <label class="la-field"><span>Teams</span>
             <select id="laTeamCount">
               <option value="0">Auto</option><option value="2">2</option><option value="3" selected>3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option>
             </select></label>
-          <label class="la-field grow"><span>Quiz</span>
-            <select id="laTeamBank">${banks.map((b, i) => `<option value="${i}">${esc(b.title)}</option>`).join('')}</select></label>
+          <div class="la-field grow"><span>Lesson</span><div id="laTeamBank"></div></div>
         </div>
         <div class="la-qtitle-row"><span>Questions</span><button class="la-linkbtn" id="laTeamAll">Toggle all</button></div>
         <div id="laTeamQs" class="la-qlist checks"></div>
         <div class="la-panel-actions">
-          <button class="btn primary" id="laTeamStart">Make teams &amp; start</button>
+          <button class="btn primary" id="laTeamStart"${tooFew ? ' disabled' : ''}>Make teams &amp; start</button>
         </div>`;
-      const bankSel = body.querySelector('#laTeamBank');
-      const paint = () => {
-        const bank = banks[Number(bankSel.value) || 0];
+      const paint = (bank) => {
+        current = bank;
         body.querySelector('#laTeamQs').innerHTML = bank.questions.map((q, i) => `
           <label class="la-qcheck"><input type="checkbox" data-i="${i}" checked />
             <span>${esc(q.front)}</span></label>`).join('');
       };
-      bankSel.addEventListener('change', paint);
-      paint();
+      const picker = bankPicker(body.querySelector('#laTeamBank'), banks, paint);
+      paint(picker.getSelected());
       body.querySelector('#laTeamAll').addEventListener('click', () => {
         const boxes = body.querySelectorAll('#laTeamQs input');
         const anyOff = [...boxes].some((b) => !b.checked);
         boxes.forEach((b) => { b.checked = anyOff; });
       });
       body.querySelector('#laTeamStart').addEventListener('click', () => {
-        const bank = banks[Number(bankSel.value) || 0];
+        if (state.studentCount < 2) { flash('Teams need at least two students present.'); return; }
+        const bank = current;
         const picked = [...body.querySelectorAll('#laTeamQs input:checked')].map((b) => bank.questions[Number(b.dataset.i)]);
         if (!picked.length) { flash('Pick at least one question.'); return; }
         state.launchedQuiz = picked;
@@ -520,7 +588,7 @@
     function setActive(on) { state.active = !!on; updateLauncher(); if (!on && state.role === 'teacher') { /* keep panel state */ } }
     function destroy() { try { root.remove(); } catch (_) {} }
 
-    return { handle, setRole, setActive, destroy, _state: state };
+    return { handle, setRole, setActive, setStudentCount, destroy, _state: state };
   }
 
   window.LiveActivities = { attach };

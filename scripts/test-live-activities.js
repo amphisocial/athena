@@ -158,6 +158,12 @@ console.log('GUARDS');
   eng.handle({ roomId: 'r3', isTeacher: true, actor: { id: 't' }, bus: room.busFor(null),
     msg: { type: 'activity:poll:launch', question: 'Q', choices: ['only one'], answerIndex: 0 } });
   ok('poll refuses with fewer than two choices', [...room.inbox.teacher].reverse().find((m) => m.type === 'activity:error' && m.scope === 'poll'));
+
+  // Poll needs at least one student to answer.
+  const empty = makeRoom([]);
+  eng.handle({ roomId: 'r4', isTeacher: true, actor: { id: 't' }, bus: empty.busFor(null),
+    msg: { type: 'activity:poll:launch', question: 'Q', choices: ['a', 'b'], answerIndex: 0 } });
+  ok('poll refuses when no students have joined', [...empty.inbox.teacher].reverse().find((m) => m.type === 'activity:error' && m.scope === 'poll'));
 })();
 
 console.log(`\nAll ${passed} assertions passed.`);

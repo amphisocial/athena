@@ -995,7 +995,9 @@
     } else if (m.type === 'reaction') {
       floatEmoji(m.emoji);
     } else if (m.type === 'presence') {
-      Live.count = m.count; Live.roster = m.roster || null; renderLiveChrome();
+      Live.count = m.count; Live.roster = m.roster || null;
+      const a = liveActivities(); if (a) a.setStudentCount(m.count);
+      renderLiveChrome();
     } else if (m.type === 'quiz:aggregate') {
       Live.aggregate = m; renderLiveChrome();
     } else if (m.type === 'question') {
