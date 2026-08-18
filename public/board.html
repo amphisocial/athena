@@ -14,7 +14,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/styles.css?v=boardsy13" />
   <link rel="stylesheet" href="/board.css?v=boardsy20" />
-  <link rel="stylesheet" href="/live-activities.css?v=boardsy4" />
+  <link rel="stylesheet" href="/live-activities.css?v=boardsy5" />
 </head>
 <body data-page="board">
   <div class="board-shell" id="boardShell">
@@ -98,7 +98,8 @@
           <button class="session-qr-collapse" id="sessionQrCollapse" title="Hide QR" aria-label="Hide QR">–</button>
           <img class="session-qr-img" id="sessionQrImg" alt="Scan to join this session" width="128" height="128" />
           <div class="session-qr-meta">
-            <span class="session-qr-label">Scan to join</span>
+            <span class="session-qr-label">Scan, or join with code</span>
+            <button class="session-qr-code" id="sessionQrCode" title="Click to copy the join code"></button>
             <span class="session-qr-host" id="sessionQrHost"></span>
           </div>
         </div>
@@ -229,6 +230,6 @@
   <script async src="https://cdn.jsdelivr.net/npm/livekit-client@2/dist/livekit-client.umd.min.js"></script>
   <script src="/common.js?v=boardsy15"></script>
   <script src="/live-activities.js?v=boardsy3"></script>
-  <script src="/board.js?v=boardsy21"></script>
+  <script src="/board.js?v=boardsy22"></script>
 </body>
 </html>

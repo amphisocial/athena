@@ -1791,6 +1791,22 @@ const shareSet = (req, res) => {
 // questions (a prompt + 2+ choices) with the correct index and explanation —
 // the teacher's screen keeps those; the engine strips them before anything
 // reaches a student device.
+// Resolve a student join code to the right live surface. The code is a lesson
+// share token (les…) or a whiteboard public token (pub…); the homepage join box
+// posts it here and redirects. Kept public (no login) — students have no account.
+app.get('/api/join/:code', (req, res) => {
+  const code = String(req.params.code || '').trim();
+  if (!code) return res.status(400).json({ ok: false });
+  const store = readStore();
+  const lesson = (store.quizlets || []).find((s) => s.shareToken === code);
+  if (lesson) return res.json({ ok: true, kind: 'lesson', live: !!lesson.isLive, url: `/l/${encodeURIComponent(code)}` });
+  let boards = [];
+  try { boards = require('./board').readBoardStore().boards || []; } catch (_) { boards = []; }
+  const b = boards.find((x) => x.publicToken === code && x.shared);
+  if (b) return res.json({ ok: true, kind: 'board', live: !!b.isLive, url: `/s/${encodeURIComponent(code)}` });
+  return res.status(404).json({ ok: false, error: 'No live session found for that code.' });
+});
+
 app.get('/api/live/question-banks', requireUser, (req, res) => {
   const store = readStore();
   const readable = store.quizlets.filter((s) => userCanReadQuizlet(req.user, s, store));

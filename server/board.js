@@ -768,6 +768,10 @@ function attachBoardWebSocket(httpServer, deps) {
 
   // boardId -> Set of { ws, user, isOwner }
   const rooms = new Map();
+  // boardId -> Set of removed participant names (best-effort rejoin block for
+  // anonymous, no-login students — mirrors the lesson surface).
+  const removedNames = new Map();
+  function removedFor(id) { if (!removedNames.has(id)) removedNames.set(id, new Set()); return removedNames.get(id); }
 
   function roomFor(id) {
     if (!rooms.has(id)) rooms.set(id, new Set());
@@ -795,13 +799,14 @@ function attachBoardWebSocket(httpServer, deps) {
     if (!room) return;
     const viewers = Array.from(room)
       .filter((c) => !c.isOwner)
-      .map((c) => ({ name: [c.user.firstName, c.user.lastName].filter(Boolean).join(' ') || c.user.email, email: c.user.email }));
+      .map((c) => ({ id: c.cid, name: [c.user.firstName, c.user.lastName].filter(Boolean).join(' ') || c.user.email, email: c.user.email || '', anon: !!c.user.anon }));
     broadcast(id, { type: 'presence', viewers }, null);
   }
 
   function getBoard(boardIdValue) {
     const store = readBoardStore();
-    return store.boards.find((b) => b.id === boardIdValue);
+    return store.boards.find((b) => b.id === boardIdValue)
+      || store.boards.find((b) => b.publicToken === boardIdValue);
   }
 
   // Adapts a board room (a Set of clients) to the activities engine. The
@@ -836,30 +841,44 @@ function attachBoardWebSocket(httpServer, deps) {
   wss.on('connection', (ws, req) => {
     try {
       const url = new URL(req.url, 'http://localhost');
-      const targetBoardId = url.searchParams.get('boardId');
-      if (!targetBoardId) return ws.close(4001, 'Missing boardId');
+      const joinKey = url.searchParams.get('boardId');
+      if (!joinKey) return ws.close(4001, 'Missing boardId');
 
       const user = getUserFromCookieHeader(req.headers.cookie);
-      if (!user) return ws.close(4001, 'Not signed in');
-
-      const board = getBoard(targetBoardId);
+      const board = getBoard(joinKey);
       if (!board) return ws.close(4004, 'Board not found');
+      const targetBoardId = board.id; // canonical room key even if joined via public token
 
-      const isOwner = user.id === board.teacherId;
-      if (isOwner && !userHasWhiteboardAccess(user)) return ws.close(4003, 'Teams plan required');
-      if (!isOwner) {
+      const isOwner = Boolean(user && user.id === board.teacherId);
+      let participant = user;
+      const cid = `c_${crypto.randomBytes(6).toString('hex')}`;
+      if (isOwner) {
+        if (!userHasWhiteboardAccess(user)) return ws.close(4003, 'Teams plan required');
+      } else if (user) {
+        // Signed-in student: must be on the roster / shared with.
         const mainStore = readStore();
         const allowed = board.shared && viewerAllowed(mainStore, board.teacherId, user.email);
         if (!allowed) return ws.close(4003, 'This whiteboard has not been shared with you');
+        const dn = [user.firstName, user.lastName].filter(Boolean).join(' ') || user.email;
+        if (dn && removedFor(targetBoardId).has(dn.toLowerCase())) return ws.close(4008, 'Removed by teacher');
+      } else {
+        // Anonymous student joining by code: allowed only on a LIVE, shared
+        // board, and only with a name (mirrors the lesson surface). No login.
+        if (!board.isLive || !board.shared) return ws.close(4003, 'This whiteboard is not live');
+        const raw = (url.searchParams.get('name') || '').trim().replace(/\s+/g, ' ').slice(0, 60);
+        if (!raw) return ws.close(4005, 'Name required');
+        if (removedFor(targetBoardId).has(raw.toLowerCase())) return ws.close(4008, 'Removed by teacher');
+        const parts = raw.split(' ');
+        participant = { id: cid, firstName: parts[0], lastName: parts.slice(1).join(' '), email: '', anon: true };
       }
 
-      const client = { ws, user, isOwner, lost: false, cid: `c_${crypto.randomBytes(6).toString('hex')}` };
+      const client = { ws, user: participant, isOwner, lost: false, cid };
       roomFor(targetBoardId).add(client);
 
       ws.send(JSON.stringify({ type: 'sync', board, isOwner }));
       if (!isOwner) broadcastPresence(targetBoardId);
       // Catch a (re)joining client up to any activity already running.
-      activities.resync({ roomId: targetBoardId, isTeacher: isOwner, actor: { id: client.cid, name: displayName(user), label: displayName(user) }, bus: boardActivityBus(targetBoardId, ws) });
+      activities.resync({ roomId: targetBoardId, isTeacher: isOwner, actor: { id: client.cid, name: displayName(participant), label: displayName(participant) }, bus: boardActivityBus(targetBoardId, ws) });
 
       ws.on('message', async (raw) => {
         let msg;
@@ -905,6 +924,26 @@ function attachBoardWebSocket(httpServer, deps) {
             createdAt: nowIso()
           };
           broadcast(targetBoardId, { type: 'question', question: q }, null);
+          return;
+        }
+
+        // Teacher removes a viewer (fraud/safety). Tell them, close their
+        // socket, and block that name from rejoining this session.
+        if (msg.type === 'kick') {
+          if (!isOwner) return;
+          const room = rooms.get(targetBoardId);
+          if (room) {
+            const target = Array.from(room).find((c) => c.cid === msg.id && !c.isOwner);
+            if (target) {
+              const dn = [target.user.firstName, target.user.lastName].filter(Boolean).join(' ') || target.user.email;
+              if (dn) removedFor(targetBoardId).add(dn.toLowerCase());
+              try { target.ws.send(JSON.stringify({ type: 'kicked' })); } catch (_) {}
+              try { target.ws.close(4008, 'Removed by teacher'); } catch (_) {}
+              room.delete(target);
+              broadcastPresence(targetBoardId);
+              broadcastLostCount(targetBoardId);
+            }
+          }
           return;
         }
 

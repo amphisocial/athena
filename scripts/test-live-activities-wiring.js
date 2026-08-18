@@ -125,5 +125,23 @@ console.log('\nroster Remove button is readable + roster scrolls');
   ok('roster scrolls (max-height + overflow)', /\.live-roster\b/.test(css) && /max-height:\s*240px/.test(css) && /overflow-y:\s*auto/.test(css));
 }
 
+console.log('\nwhiteboard parity: join-by-code, anonymous live join, roster + kick');
+{
+  const bjs = read('public/board.js');
+  const bsrv = read('server/board.js');
+  const bhtml = read('public/board.html');
+  ok('board WS accepts an anonymous named participant', /participant = \{ id: cid, firstName/.test(bsrv) && /searchParams\.get\('name'\)/.test(bsrv));
+  ok('board WS resolves a public token to the board', /publicToken === (boardIdValue|joinKey)/.test(bsrv));
+  ok('board WS handles teacher kick + blocks rejoin', /msg\.type === 'kick'/.test(bsrv) && /removedFor\(targetBoardId\)\.add/.test(bsrv));
+  ok('board presence carries id for kicking', /viewers = Array\.from\(room\)[\s\S]{0,240}id: c\.cid/.test(bsrv));
+  ok('board client prompts for a name to join a live public board', /function promptBoardName/.test(bjs) && /board\.isLive[\s\S]{0,120}promptBoardName/.test(bjs));
+  ok('board client passes the name into the WS', /&name=\$\{encodeURIComponent\(joinName\)\}/.test(bjs));
+  ok('board viewers panel has Remove buttons', /viewer-kick/.test(bjs) && /type: 'kick'/.test(bjs));
+  ok('board client handles being kicked', /m\.type === 'kicked'/.test(bjs) && /function boardKicked/.test(bjs));
+  ok('board shows a copyable join code', /id="sessionQrCode"/.test(bhtml) && /sessionQrCode/.test(bjs));
+  ok('server has a join-code resolver for lesson + board', /\/api\/join\/:code/.test(serverJs) && /kind: 'board'/.test(serverJs));
+  ok('homepage join box uses the resolver', /\/api\/join\//.test(read('public/index.html')));
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

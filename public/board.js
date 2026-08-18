@@ -2057,14 +2057,79 @@
   }
   function setPill(text, kind) { const p = $('#boardStatus'); p.textContent = text; p.className = `board-status${kind ? ` ${kind}` : ''}`; }
 
+  let joinName = null; // anonymous student's entered name (public live join)
+
+  // No-login students name themselves before joining a live whiteboard. Mirrors
+  // the lesson gate; remembered per session so a refresh doesn't re-ask.
+  function promptBoardName() {
+    return new Promise((resolve) => {
+      let saved = null;
+      try { saved = JSON.parse(sessionStorage.getItem('boardName:' + boardIdValue) || 'null'); } catch (_) {}
+      if (saved && saved.first && saved.last) { resolve(`${saved.first} ${saved.last}`); return; }
+      const ov = document.createElement('div');
+      ov.className = 'name-gate';
+      ov.innerHTML = `
+        <div class="name-gate-card">
+          <div class="ng-eyebrow">Live whiteboard</div>
+          <h2 class="ng-title">Join with your name</h2>
+          <p class="ng-sub">Your teacher and teammates will see this. No account needed.</p>
+          <div class="ng-row">
+            <input class="ng-input" id="bngFirst" placeholder="First name" autocomplete="given-name" maxlength="30" />
+            <input class="ng-input" id="bngLast" placeholder="Last name" autocomplete="family-name" maxlength="30" />
+          </div>
+          <button class="ng-btn" id="bngJoin" disabled>Join session</button>
+        </div>`;
+      document.body.appendChild(ov);
+      const first = ov.querySelector('#bngFirst');
+      const last = ov.querySelector('#bngLast');
+      const btn = ov.querySelector('#bngJoin');
+      const check = () => { btn.disabled = !(first.value.trim() && last.value.trim()); };
+      const submit = () => {
+        const f = first.value.trim().replace(/\s+/g, ' ');
+        const l = last.value.trim().replace(/\s+/g, ' ');
+        if (!f || !l) return;
+        try { sessionStorage.setItem('boardName:' + boardIdValue, JSON.stringify({ first: f, last: l })); } catch (_) {}
+        ov.remove();
+        resolve(`${f} ${l}`);
+      };
+      first.addEventListener('input', check);
+      last.addEventListener('input', check);
+      [first, last].forEach((i) => i.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !btn.disabled) submit(); }));
+      btn.addEventListener('click', submit);
+      setTimeout(() => first.focus(), 50);
+    });
+  }
+
+  function boardKicked() {
+    clearTimeout(reconnectTimer);
+    try { if (ws) ws.close(); } catch (_) {}
+    try { sessionStorage.removeItem('boardName:' + boardIdValue); } catch (_) {}
+    if (document.querySelector('.kicked-gate')) return;
+    const ov = document.createElement('div');
+    ov.className = 'name-gate kicked-gate';
+    ov.innerHTML = `
+      <div class="name-gate-card">
+        <div class="ng-eyebrow">Removed</div>
+        <h2 class="ng-title">You've been removed</h2>
+        <p class="ng-sub">The teacher removed you from this live whiteboard. If this was a mistake, ask them to let you back in.</p>
+        <a class="ng-btn" href="/">Back home</a>
+      </div>`;
+    document.body.appendChild(ov);
+  }
+
   function connect() {
     const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    ws = new WebSocket(`${proto}//${window.location.host}/ws/board?boardId=${encodeURIComponent(boardIdValue)}`);
+    const nameQ = (!isOwner && joinName) ? `&name=${encodeURIComponent(joinName)}` : '';
+    ws = new WebSocket(`${proto}//${window.location.host}/ws/board?boardId=${encodeURIComponent(boardIdValue)}${nameQ}`);
     ws.addEventListener('open', () => {
       if (isOwner || (board && board.isLive)) setPill('Live', 'live');
       else setPill('Snapshot', 'shared');
     });
-    ws.addEventListener('close', () => { setPill('Reconnecting…', 'error'); clearTimeout(reconnectTimer); reconnectTimer = setTimeout(connect, 1500); });
+    ws.addEventListener('close', (ev) => {
+      // Removed by the teacher: stop, don't reconnect, tell the student.
+      if (ev && ev.code === 4008) { boardKicked(); return; }
+      setPill('Reconnecting…', 'error'); clearTimeout(reconnectTimer); reconnectTimer = setTimeout(connect, 1500);
+    });
     ws.addEventListener('error', () => setPill('Connection error', 'error'));
 
     ws.addEventListener('message', (event) => {
@@ -2128,6 +2193,7 @@
         if (isOwner && Audio.on) send({ type: 'audio', on: true });
         return;
       }
+      if (m.type === 'kicked') { boardKicked(); return; }
       if (m.type === 'question') { addQuestion(m.question); return; }
       if (m.type === 'question:cleared') { removeQuestion(m.id); return; }
       if (m.type === 'graph:live') {
@@ -2152,9 +2218,12 @@
   function updateViewers(viewers) {
     $('#viewerCount').textContent = viewers.length;
     const body = $('#viewersPanelBody');
-    body.innerHTML = viewers.length
-      ? viewers.map((v) => `<div class="viewer-row"><span class="viewer-dot"></span>${escapeHtml(v.name)}</div>`).join('')
-      : '<p class="info-empty">No one watching yet.</p>';
+    if (!viewers.length) { body.innerHTML = '<p class="info-empty">No one watching yet.</p>'; return; }
+    body.innerHTML = viewers.map((v) => `<div class="viewer-row"><span class="viewer-dot"></span><span class="viewer-name">${escapeHtml(v.name)}</span>${isOwner ? `<button class="btn ghost xs viewer-kick" data-id="${escapeHtml(v.id || '')}" title="Remove this viewer">Remove</button>` : ''}</div>`).join('');
+    if (isOwner) body.querySelectorAll('.viewer-kick').forEach((b) => b.addEventListener('click', () => {
+      const row = b.closest('.viewer-row'); const nm = row ? row.querySelector('.viewer-name').textContent : 'this viewer';
+      if (window.confirm(`Remove ${nm} from the session?`)) send({ type: 'kick', id: b.dataset.id });
+    }));
   }
 
   // ---- Role / chrome ------------------------------------------------------
@@ -2222,6 +2291,19 @@
     if (img && img.dataset.url !== url) { img.src = `/qr?d=${encodeURIComponent(url)}`; img.dataset.url = url; }
     const host = $('#sessionQrHost');
     if (host) host.textContent = url.replace(/^https?:\/\//, '');
+    const codeEl = $('#sessionQrCode');
+    if (codeEl) {
+      const code = board.publicToken;
+      if (codeEl.dataset.code !== code) {
+        codeEl.dataset.code = code;
+        codeEl.textContent = code;
+        codeEl.onclick = () => {
+          try { navigator.clipboard.writeText(code); } catch (_) {}
+          codeEl.textContent = 'Copied ✓';
+          setTimeout(() => { codeEl.textContent = codeEl.dataset.code; }, 1200);
+        };
+      }
+    }
     dock.hidden = sessionQrCollapsed;
     reopen.hidden = !sessionQrCollapsed;
   }
@@ -2607,6 +2689,16 @@
       $('#brandLink')?.setAttribute('href', '/');
       $('#exitLink')?.setAttribute('href', '/');
       buildStudentTools();
+      // If the shared board is LIVE right now, join the session as a named
+      // student (no login) so activities + live sync work just like a lesson.
+      if (board && board.isLive) {
+        joinName = await promptBoardName();
+        applyPanelState(); applyRole(); bindUI(); bindPointer();
+        updatePageBar(); updateZoomLabel(); updateUndoButtons(); resizeCanvas();
+        connect();
+        checkAudioConfig();
+        return;
+      }
     } else {
       try {
         const data = await api(`/api/board/${boardIdValue}`);

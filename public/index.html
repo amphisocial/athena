@@ -97,7 +97,18 @@
         if (code.indexOf('/') !== -1) code = code.split('/').pop();
         code = code.replace(/\s+/g, '');
         if (!code) { input.focus(); return; }
-        window.location.href = '/l/' + encodeURIComponent(code);
+        var btn = form.querySelector('.jl-btn');
+        if (btn) { btn.disabled = true; btn.textContent = 'Joining…'; }
+        // Resolve to the right surface (lesson /l/ or whiteboard /s/).
+        fetch('/api/join/' + encodeURIComponent(code)).then(function (r) {
+          return r.ok ? r.json() : null;
+        }).then(function (d) {
+          if (d && d.url) { window.location.href = d.url; return; }
+          // Unknown code: fall back to trying it as a lesson link.
+          window.location.href = '/l/' + encodeURIComponent(code);
+        }).catch(function () {
+          window.location.href = '/l/' + encodeURIComponent(code);
+        });
       });
     })();
   </script>
