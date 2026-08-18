@@ -230,11 +230,13 @@ body.presenting .max-btn { display: none !important; }
 
 body.presenting .shell,
 body.presenting .app-page,
-body.presenting .app-grid { display: block; padding: 0; margin: 0; max-width: none; }
+body.presenting .app-grid { display: block !important; padding: 0 !important; margin: 0 !important; max-width: none !important; width: auto !important; }
 
 body.presenting .study-panel {
-  position: fixed; inset: 0; top: 0; margin: 0; z-index: 1000; border-radius: 0;
-  background: radial-gradient(130% 120% at 50% -10%, #17253f 0%, #0b1424 70%);
+  position: fixed !important; inset: 0 !important; top: 0 !important; margin: 0 !important;
+  width: 100vw !important; height: 100vh; height: 100dvh; max-width: none !important;
+  z-index: 1000; border-radius: 0;
+  background: radial-gradient(130% 120% at 50% -10%, #17253f 0%, #0b1424 70%) !important;
   display: flex; flex-direction: column; padding: 0; overflow: hidden;
 }
 
@@ -256,37 +258,35 @@ body:not(.presenting) .present-topbar { display: none; }
 .present-btn.danger { border-color: rgba(226,59,59,0.5); color: #ff9ea4; }
 .present-btn.danger:hover { background: rgba(226,59,59,0.18); }
 
-/* Central stage: card/slide centred, with room for the right rail. */
+/* Central stage: the slide/card owns the whole screen. The participants panel
+   floats over it (Zoom/Teams style) rather than reserving a column. */
 body.presenting .lesson-stage {
   flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center;
-  padding: clamp(14px, 2.6vw, 34px); padding-right: clamp(14px, 2.6vw, 34px);
-  position: relative;
+  padding: clamp(16px, 2.5vw, 40px); position: relative;
 }
-@media (min-width: 900px) {
-  body.presenting .lesson-stage { padding-right: 348px; }
-}
-body.presenting .flashcard { height: min(72vh, 720px); width: min(1000px, 100%); max-width: 1000px; margin: 0; }
-body.presenting .flashcard.has-passage { height: min(82vh, 860px); }
-body.presenting .slide-view { display: flex; flex-direction: column; width: min(1120px, 100%); }
-body.presenting .slide-stage { min-height: min(66vh, 680px); }
-body.presenting .slide-content { padding: clamp(28px, 4vw, 60px); }
-body.presenting .slide-content h2 { font-size: clamp(2rem, 3.8vw, 3.6rem); }
-body.presenting .slide-bullets li { font-size: clamp(1.1rem, 2vw, 1.45rem); }
-body.presenting .slide-footer { color: rgba(234,241,255,0.6); }
-body.presenting .card-face p { font-size: clamp(1.2rem, 1.9vw, 1.7rem); }
+body.presenting .flashcard { height: min(80vh, 900px); width: min(1500px, 94vw); max-width: 1500px; margin: 0; }
+body.presenting .flashcard.has-passage { height: min(86vh, 980px); }
+body.presenting .slide-view { display: flex; flex-direction: column; width: min(1600px, 95vw); }
+body.presenting .slide-stage { min-height: min(78vh, 860px); }
+body.presenting .slide-content { padding: clamp(32px, 4vw, 72px); }
+body.presenting .slide-content h2 { font-size: clamp(2.2rem, 4.4vw, 4.4rem); }
+body.presenting .slide-bullets li { font-size: clamp(1.2rem, 2.2vw, 1.7rem); }
+body.presenting .slide-footer { color: rgba(60,72,95,0.7); }
+body.presenting .card-face p { font-size: clamp(1.3rem, 2.1vw, 2rem); }
 
-/* Annotation toolbar sits at the bottom of the stage (already absolute). */
-body.presenting .lesson-annobar { bottom: 16px; }
+/* Annotation toolbar sits at the bottom-centre of the stage. */
+body.presenting .lesson-annobar { bottom: 18px; }
 
-/* Attendee / questions rail on the right. */
+/* ---- Floating participants panel (minimizable, like Zoom/Teams) ---- */
 body.presenting .live-strip {
-  position: fixed !important; top: 60px; right: 0; bottom: 0; width: 336px;
-  margin: 0 !important; padding: 18px !important; z-index: 1002;
-  background: rgba(9,17,31,0.72); backdrop-filter: blur(8px);
-  border: 0 !important; border-left: 1px solid rgba(255,255,255,0.08) !important;
-  border-radius: 0 !important; box-shadow: none !important;
-  overflow: auto; color: #eaf1ff;
-  display: flex; flex-direction: column; gap: 12px;
+  position: fixed !important; top: 104px; right: 16px; width: 300px;
+  max-height: min(60vh, 540px); overflow: auto;
+  margin: 0 !important; padding: 16px !important; z-index: 1002;
+  background: rgba(11,20,36,0.86); backdrop-filter: blur(10px);
+  border: 1px solid rgba(255,255,255,0.12) !important;
+  border-radius: 16px !important; box-shadow: 0 20px 50px rgba(0,0,0,0.4) !important;
+  color: #eaf1ff; display: flex; flex-direction: column; gap: 12px;
+  transition: opacity 0.15s ease, transform 0.15s ease;
 }
 body.presenting .live-strip .live-head { color: #eaf1ff; }
 body.presenting .live-strip .live-body { background: rgba(255,255,255,0.04); border-color: rgba(255,255,255,0.10); }
@@ -294,30 +294,45 @@ body.presenting .live-strip .live-qtitle { color: rgba(234,241,255,0.7); }
 body.presenting .live-strip .react-btn { background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.16); }
 body.presenting .live-strip .live-ask input { background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.16); color: #eaf1ff; }
 body.presenting .live-strip .live-agg { color: #6fe3d4; }
+/* Collapsed: hide the panel, leave only the launcher chip. */
+body.presenting.rail-min .live-strip { opacity: 0; pointer-events: none; transform: translateY(-6px); }
+
+/* Launcher chip — always visible top-right below the bar; toggles the panel. */
+.present-panel-toggle {
+  position: fixed; top: 60px; right: 16px; z-index: 1004;
+  display: none; align-items: center; gap: 8px;
+  padding: 8px 13px; border-radius: 999px; cursor: pointer;
+  background: rgba(11,20,36,0.86); backdrop-filter: blur(10px);
+  border: 1px solid rgba(255,255,255,0.16); color: #eaf1ff;
+  font: inherit; font-weight: 700; font-size: 0.82rem; box-shadow: 0 10px 30px rgba(0,0,0,0.35);
+}
+body.presenting .present-panel-toggle { display: inline-flex; }
+.present-panel-toggle:hover { background: rgba(23,37,63,0.95); }
+.present-panel-toggle .ppt-dot { color: #ff5a5a; font-size: 0.7rem; }
+.present-panel-toggle .ppt-chev { opacity: 0.7; font-size: 0.7rem; }
 
 /* Deck controls (Prev/Next) float at the bottom centre for the teacher. */
 body.presenting .study-actions {
-  position: fixed; left: 50%; bottom: 84px; transform: translateX(-50%);
+  position: fixed; left: 50%; bottom: 86px; transform: translateX(-50%);
   margin: 0; z-index: 1001; display: flex; gap: 10px;
   background: rgba(9,17,31,0.6); border: 1px solid rgba(255,255,255,0.12);
   border-radius: 14px; padding: 8px; backdrop-filter: blur(6px);
 }
 body.presenting .study-actions .btn { background: rgba(255,255,255,0.08); color: #eaf1ff; border-color: rgba(255,255,255,0.14); }
 body.presenting.live-student .study-actions { display: none; }
-/* Students never drive the deck. */
 body.presenting.live-student #flipCard, body.presenting.live-student #shuffleCards { display: none !important; }
 
 /* Join QR sits above the stage, bottom-left. */
 body.presenting .session-qr, body.presenting .session-qr-reopen { z-index: 1003; }
 
-/* On the right-railless narrow view, the rail becomes a bottom sheet. */
-@media (max-width: 899px) {
+/* Narrow screens: panel becomes a bottom sheet, launcher stays top-right. */
+@media (max-width: 720px) {
   body.presenting .live-strip {
-    top: auto; left: 0; right: 0; bottom: 0; width: auto; max-height: 40vh;
-    border-left: 0 !important; border-top: 1px solid rgba(255,255,255,0.08) !important;
+    top: auto; left: 12px; right: 12px; bottom: 12px; width: auto; max-height: 44vh;
+    border-radius: 16px !important;
   }
-  body.presenting .study-actions { bottom: 44vh; }
-  body.presenting .lesson-annobar { bottom: calc(40vh + 10px); }
+  body.presenting .study-actions { bottom: 12px; }
+  body.presenting .lesson-annobar { bottom: 76px; }
   body.presenting .session-qr { display: none; }
 }
 

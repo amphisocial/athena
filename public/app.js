@@ -1277,25 +1277,40 @@
   // and (teacher only) a fullscreen toggle. Injected once into the stage.
   function mountPresentControls() {
     const stage = document.getElementById('studyPanel');
-    if (!stage || document.getElementById('presentTopBar')) { syncPresentControls(); return; }
-    const bar = document.createElement('div');
-    bar.id = 'presentTopBar';
-    bar.className = 'present-topbar';
-    bar.innerHTML = `
-      <span class="present-title" id="presentTitle"></span>
-      <span class="present-spacer"></span>
-      <button class="present-btn" id="presentFsBtn" title="Toggle fullscreen">⛶ Fullscreen</button>
-      <button class="present-btn danger" id="presentExitBtn"></button>`;
-    stage.appendChild(bar);
-    document.getElementById('presentFsBtn').addEventListener('click', () => {
-      const el = document.documentElement;
-      if (!document.fullscreenElement) el.requestFullscreen?.().catch(() => {});
-      else document.exitFullscreen?.().catch(() => {});
-    });
-    document.getElementById('presentExitBtn').addEventListener('click', () => {
-      if (Live.role === 'teacher') teacherEndLive();
-      else { closeLive(); renderLiveChrome(); }   // student/webinar attendee just leaves
-    });
+    if (!stage) return;
+    if (!document.getElementById('presentTopBar')) {
+      const bar = document.createElement('div');
+      bar.id = 'presentTopBar';
+      bar.className = 'present-topbar';
+      bar.innerHTML = `
+        <span class="present-title" id="presentTitle"></span>
+        <span class="present-spacer"></span>
+        <button class="present-btn" id="presentFsBtn" title="Toggle fullscreen">⛶ Fullscreen</button>
+        <button class="present-btn danger" id="presentExitBtn"></button>`;
+      stage.appendChild(bar);
+      document.getElementById('presentFsBtn').addEventListener('click', () => {
+        const el = document.documentElement;
+        if (!document.fullscreenElement) el.requestFullscreen?.().catch(() => {});
+        else document.exitFullscreen?.().catch(() => {});
+      });
+      document.getElementById('presentExitBtn').addEventListener('click', () => {
+        if (Live.role === 'teacher') teacherEndLive();
+        else { closeLive(); renderLiveChrome(); }   // student/webinar attendee just leaves
+      });
+    }
+    // Floating launcher chip that shows the live head-count and minimizes /
+    // restores the participants panel (Zoom/Teams style).
+    if (!document.getElementById('presentPanelToggle')) {
+      const chip = document.createElement('button');
+      chip.id = 'presentPanelToggle';
+      chip.className = 'present-panel-toggle';
+      chip.innerHTML = `<span class="ppt-dot">●</span><span id="pptLabel">Live</span><span class="ppt-chev" id="pptChev">▾</span>`;
+      stage.appendChild(chip);
+      chip.addEventListener('click', () => {
+        document.body.classList.toggle('rail-min');
+        syncPresentControls();
+      });
+    }
     syncPresentControls();
   }
   function syncPresentControls() {
@@ -1303,6 +1318,14 @@
     if (t) t.textContent = study.set ? study.set.title : '';
     const x = document.getElementById('presentExitBtn');
     if (x) x.textContent = Live.role === 'teacher' ? '■ End live' : '✕ Leave';
+    // Launcher label: student head-count for the teacher, "Session" otherwise.
+    const lbl = document.getElementById('pptLabel');
+    if (lbl) {
+      const n = typeof Live.count === 'number' ? Live.count : 0;
+      lbl.textContent = Live.role === 'teacher' ? `${n} ${n === 1 ? 'student' : 'students'}` : 'Session';
+    }
+    const chev = document.getElementById('pptChev');
+    if (chev) chev.textContent = document.body.classList.contains('rail-min') ? '▸' : '▾';
   }
 
   // ---- Live annotation toolbar + persistent QR (teacher) ----
