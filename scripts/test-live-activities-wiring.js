@@ -73,5 +73,21 @@ console.log('\nprivacy: student payloads never carry the answer key');
   ok('studentQuestion sends only question + choices', /question: q\.question, choices: q\.choices/.test(sq) && !/answerIndex/.test(sq));
 }
 
+console.log('\nUI: the hidden attribute must actually hide the panel + launcher');
+{
+  const css = read('public/live-activities.css');
+  // An author display:flex/inline-flex defeats the UA [hidden]{display:none};
+  // there must be an explicit override or Close/Esc/toggle silently no-op.
+  ok('css forces display:none for [hidden] panel + launcher',
+    /\.la-(launcher|panel)\[hidden\][^{]*,?[^{]*\[hidden\][^{]*\{[^}]*display:\s*none\s*!important/.test(css)
+    || (/\.la-launcher\[hidden\]/.test(css) && /\.la-panel\[hidden\]/.test(css) && /display:\s*none\s*!important/.test(css)));
+  ok('cache-buster bumped so the fix actually loads', /live-activities\.js\?v=boardsy2/.test(appHtml) && /live-activities\.js\?v=boardsy2/.test(boardHtml));
+}
+
+console.log('\nExit ends a live session before leaving');
+{
+  ok('presentExitBtn ends live for a live teacher', /teacherLive/.test(appJs) && /teacherEndLive\(\)/.test(appJs.slice(appJs.indexOf('presentExitBtn'))));
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

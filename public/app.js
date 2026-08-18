@@ -1312,10 +1312,17 @@
         if (!document.fullscreenElement) el.requestFullscreen?.().catch(() => {});
         else document.exitFullscreen?.().catch(() => {});
       });
-      document.getElementById('presentExitBtn').addEventListener('click', () => {
-        // Exit the presentation and go back to the Library. This does NOT end
-        // the live session — the "End live" control inside the panel does that,
-        // so a teacher can step out of the full-screen view and return to it.
+      document.getElementById('presentExitBtn').addEventListener('click', async () => {
+        // Exit the presentation. If the teacher is live, ending the session for
+        // everyone is destructive, so confirm once, then end it before leaving.
+        // Students just disconnect. Non-live teachers leave straight to Library.
+        const teacherLive = Live.role === 'teacher' && (Live.on || (study.set && study.set.isLive));
+        if (teacherLive) {
+          if (!window.confirm('End the live session for everyone and exit?')) return;
+          try { await teacherEndLive(); } catch (_) {}
+        } else {
+          closeLive();
+        }
         try { if (document.fullscreenElement) document.exitFullscreen?.(); } catch (_) {}
         window.location.href = (state && state.user) ? '/library' : '/';
       });

@@ -5,6 +5,12 @@
 .la-root { position: fixed; inset: 0; z-index: 4000; pointer-events: none; font-family: 'Inter', system-ui, sans-serif; }
 .la-root > * { pointer-events: auto; }
 
+/* An author display value (flex/inline-flex below) overrides the browser's
+ * built-in [hidden]{display:none}, so the hidden attribute alone won't hide
+ * these. Force it — this is what makes Close / Esc / the launcher toggle work,
+ * and keeps students from ever seeing the teacher launcher. */
+.la-launcher[hidden], .la-panel[hidden] { display: none !important; }
+
 /* ---- Teacher launcher ---- */
 .la-launcher {
   position: fixed; right: 18px; bottom: 18px;
