@@ -15,7 +15,8 @@
     "test:db": "node scripts/test-db-layer.js",
     "test:membership": "node scripts/test-membership.js",
     "test:marketing": "node scripts/smoke-marketing.js",
-    "test:all": "npm run test:graph && npm run test:board && npm run test:db && npm run test:membership && npm run test:marketing"
+    "test:activities": "node scripts/test-live-activities.js && node scripts/test-live-activities-ws.js && node scripts/test-live-activities-wiring.js",
+    "test:all": "npm run test:graph && npm run test:board && npm run test:db && npm run test:membership && npm run test:marketing && npm run test:activities"
   },
   "engines": {
     "node": ">=18"

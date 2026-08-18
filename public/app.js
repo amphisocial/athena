@@ -945,6 +945,18 @@
 
   // ===================== Live lesson sessions =====================
   const Live = { ws: null, role: null, on: false, setId: null, aggregate: null, questions: [] };
+  // Immersive in-session activities (polls + team quiz). Attached once; role and
+  // active state are updated as the teacher/student joins or leaves a session.
+  let LA = null;
+  function liveActivities() {
+    if (LA || !window.LiveActivities) return LA;
+    LA = window.LiveActivities.attach({
+      host: 'lesson',
+      send: (o) => liveSend(o),
+      loadBanks: async () => { const r = await api('/api/live/question-banks'); return (r && r.banks) || []; }
+    });
+    return LA;
+  }
   const Audio = { room: null, enabled: false, url: null, on: false, checked: false };
   function liveSend(o) { try { if (Live.ws && Live.ws.readyState === 1) Live.ws.send(JSON.stringify(o)); } catch (_) {} }
   const wsLessonUrl = (setId) => `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws/lesson?set=${encodeURIComponent(setId)}`;
@@ -952,15 +964,20 @@
   function connectLive(setId, role) {
     closeLive();
     Live.setId = setId; Live.role = role;
+    const la = liveActivities(); if (la) la.setRole(role);
     const ws = new WebSocket(wsLessonUrl(setId));
     Live.ws = ws;
-    ws.onopen = () => { Live.on = true; renderLiveChrome(); };
-    ws.onclose = () => { Live.on = false; renderLiveChrome(); };
+    ws.onopen = () => { Live.on = true; const a = liveActivities(); if (a) a.setActive(true); renderLiveChrome(); };
+    ws.onclose = () => { Live.on = false; const a = liveActivities(); if (a) a.setActive(false); renderLiveChrome(); };
     ws.onmessage = (ev) => { let m; try { m = JSON.parse(ev.data); } catch { return; } handleLive(m); };
   }
-  function closeLive() { if (Live.ws) { try { Live.ws.close(); } catch (_) {} } Live.ws = null; Live.on = false; Anno.reset(); }
+  function closeLive() { if (Live.ws) { try { Live.ws.close(); } catch (_) {} } Live.ws = null; Live.on = false; const a = liveActivities(); if (a) a.setActive(false); Anno.reset(); }
 
   function handleLive(m) {
+    if (typeof m.type === 'string' && m.type.startsWith('activity:')) {
+      const a = liveActivities(); if (a) a.handle(m);
+      return;
+    }
     if (m.type === 'sync') {
       if (m.youAre) Live.youAre = m.youAre;
       if (Live.role === 'student' && m.set) loadSetIntoStudy(m.set);

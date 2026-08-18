@@ -32,6 +32,19 @@
   let ws = null;
   let reconnectTimer = null;
 
+  // Immersive in-session activities (polls + team quiz), shared with the lesson
+  // player. Attached lazily; role/active are pushed on sync and live changes.
+  let LA = null;
+  function liveActivities() {
+    if (LA || !window.LiveActivities || NOLOGIN) return LA;
+    LA = window.LiveActivities.attach({
+      host: 'board',
+      send: (o) => send(o),
+      loadBanks: async () => { const r = await api('/api/live/question-banks'); return (r && r.banks) || []; }
+    });
+    return LA;
+  }
+
   // Optional live audio (LiveKit). Mirrors the lesson viewer: the teacher
   // broadcasts their mic to viewers of a live board; viewers auto-subscribe.
   // Stays fully dormant unless the server reports audio is configured.
@@ -2058,11 +2071,17 @@
       let m; try { m = JSON.parse(event.data); } catch { return; }
       const pageFor = (id) => board.pages.find((p) => p.id === id) || board.pages[pageIndex];
 
+      if (typeof m.type === 'string' && m.type.startsWith('activity:')) {
+        const a = liveActivities(); if (a) a.handle(m);
+        return;
+      }
+
       if (m.type === 'sync') {
         board = m.board; isOwner = m.isOwner;
         updateViewerBanner();
         if (pageIndex >= board.pages.length) pageIndex = 0;
         applyRole(); updatePageBar(); redraw();
+        const a = liveActivities(); if (a) { a.setRole(isOwner ? 'teacher' : 'student'); a.setActive(!!(board && board.isLive)); }
         return;
       }
       if (m.type === 'stroke:add' || m.type === 'stroke:shape') { pageFor(m.pageId).strokes.push(m.stroke); redraw(); return; }
@@ -2089,6 +2108,7 @@
       if (m.type === 'live:changed') {
         if (board) board.isLive = m.isLive;
         updateViewerBanner();
+        const a = liveActivities(); if (a) a.setActive(!!m.isLive);
         if (!isOwner) {
           setPill(m.isLive ? 'Live' : 'Snapshot', m.isLive ? 'live' : 'shared');
           if (!m.isLive) stopAudio(); // teacher went offline — drop audio too
@@ -2534,6 +2554,7 @@
         if (d.board.publicToken) board.publicToken = d.board.publicToken;
         updateBadge();
         send({ type: 'live:changed', isLive: board.isLive });
+        const a = liveActivities(); if (a) a.setActive(!!board.isLive);
         if (!board.isLive && Audio.on) await stopAudio(true); // ending live ends audio
         updateAudioBtn();
         setStatus(board.isLive ? 'You are live.' : 'Stopped broadcasting.', 'success');

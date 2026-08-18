@@ -16,9 +16,14 @@
  * Teacher-only inbound:{ type:'nav' }, { type:'question:clear', id }, { type:'end' }
  */
 const { WebSocketServer } = require('ws');
+const { createLiveActivities } = require('./live-activities');
 
 function attachLessonWebSocket(httpServer, deps) {
   const { getUserFromCookieHeader, readStore, writeStore, emailOnRoster, nowIso } = deps;
+  // Immersive in-session activities (polls + team quiz). Shared engine; the
+  // room-shaped `bus` below adapts our teacher/students structure to it. Team
+  // exercises are ephemeral by design and never written to the store.
+  const activities = createLiveActivities();
   // noServer: upgrades are routed centrally in server.js. See the matching
   // note in board.js — two WebSocketServers sharing one http.Server via
   // { server, path } fight over the 'upgrade' event and destroy each other's
@@ -61,6 +66,22 @@ function attachLessonWebSocket(httpServer, deps) {
     if (Number.isInteger(card.answerIndex)) return card.answerIndex;
     const choices = card.choices || [];
     return choices.findIndex((ch) => String(ch).trim().toLowerCase() === String(card.back || '').trim().toLowerCase());
+  }
+
+  // Adapts a lesson room to the activities engine. Teammates only ever see the
+  // privacy-safe "Student N" label; the teacher-facing name carries the real
+  // identity where one exists (public/anonymous students have none).
+  function activityBus(room, actorWs) {
+    const findById = (cid) => [...room.students].find((c) => c.id === cid);
+    return {
+      toTeacher: (o) => { if (room.teacher) send(room.teacher.ws, o); },
+      toActor: (o) => { if (actorWs) send(actorWs, o); },
+      toParticipant: (cid, o) => { const c = findById(cid); if (c) send(c.ws, o); },
+      toParticipants: (ids, o) => { ids.forEach((cid) => { const c = findById(cid); if (c) send(c.ws, o); }); },
+      toStudents: (o) => toStudents(room, o),
+      toAll: (o) => toAll(room, o),
+      roster: () => [...room.students].map((c) => ({ id: c.id, name: c.realName || c.label, label: c.label }))
+    };
   }
 
   function aggregateFor(room, set, index) {
@@ -123,6 +144,8 @@ function attachLessonWebSocket(httpServer, deps) {
         [...room.answers.keys()].forEach((i) => send(ws, { type: 'quiz:aggregate', ...aggregateFor(room, set, i) }));
       }
       presence(room);
+      // Catch a (re)joining client up to any activity already in flight.
+      activities.resync({ roomId: setId, isTeacher, actor: { id: client.id, name: client.realName || client.label, label: client.label }, bus: activityBus(room, ws) });
 
       ws.on('message', (raw) => {
         let msg; try { msg = JSON.parse(raw.toString()); } catch { return; }
@@ -130,6 +153,14 @@ function attachLessonWebSocket(httpServer, deps) {
         if (msg.type === 'reaction') {
           const emoji = String(msg.emoji || '').slice(0, 8);
           if (emoji) toAll(room, { type: 'reaction', emoji, from: isTeacher ? 'teacher' : (client.label || 'student') });
+          return;
+        }
+
+        // Immersive activities (poll + team quiz). The engine decides teacher vs
+        // student capability itself, so we route before the owner-only gate.
+        if (typeof msg.type === 'string' && msg.type.startsWith('activity:')) {
+          const actor = { id: client.id, name: client.realName || client.label, label: client.label };
+          activities.handle({ roomId: setId, isTeacher, actor, bus: activityBus(room, ws), msg });
           return;
         }
 
@@ -218,7 +249,7 @@ function attachLessonWebSocket(httpServer, deps) {
         if (isTeacher) { if (room.teacher === client) room.teacher = null; }
         else { room.students.delete(client); }
         presence(room);
-        if (!room.teacher && room.students.size === 0) rooms.delete(setId);
+        if (!room.teacher && room.students.size === 0) { rooms.delete(setId); activities.clearRoom(setId); }
       });
     } catch (err) {
       try { ws.close(1011, 'Server error'); } catch (_) {}

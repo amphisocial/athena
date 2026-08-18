@@ -1,0 +1,183 @@
+/* live-activities.css — in-session polls + team quiz. Uses the app's CSS
+ * variables so it inherits the dark board theme and the light lesson theme
+ * automatically; fallbacks keep it legible if a var is ever missing. */
+
+.la-root { position: fixed; inset: 0; z-index: 4000; pointer-events: none; font-family: 'Inter', system-ui, sans-serif; }
+.la-root > * { pointer-events: auto; }
+
+/* ---- Teacher launcher ---- */
+.la-launcher {
+  position: fixed; right: 18px; bottom: 18px;
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 11px 16px; border-radius: 999px; cursor: pointer;
+  border: 1px solid var(--line, rgba(0,0,0,.14));
+  background: var(--brand, #7c5cff); color: #fff;
+  font-weight: 700; font-size: .92rem; letter-spacing: .01em;
+  box-shadow: 0 10px 28px rgba(20,25,60,.28);
+}
+.la-launcher:hover { filter: brightness(1.06); }
+.la-launcher-ico { font-size: 1.05rem; }
+
+/* ---- Teacher control panel ---- */
+.la-panel {
+  position: fixed; right: 18px; bottom: 74px; width: min(390px, calc(100vw - 36px));
+  max-height: min(72vh, 640px); display: flex; flex-direction: column;
+  border-radius: 18px; overflow: hidden;
+  background: var(--bg-2, #ffffff); color: var(--text, #12203a);
+  border: 1px solid var(--line, rgba(0,0,0,.12));
+  box-shadow: 0 24px 60px rgba(15,20,50,.32);
+}
+.la-panel-head { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; border-bottom: 1px solid var(--line, rgba(0,0,0,.1)); }
+.la-tabs { display: inline-flex; gap: 4px; background: var(--panel, rgba(0,0,0,.05)); border-radius: 10px; padding: 3px; }
+.la-tab { border: 0; background: transparent; color: var(--muted, #6a7893); font-weight: 700; font-size: .84rem; padding: 6px 14px; border-radius: 8px; cursor: pointer; }
+.la-tab.on { background: var(--brand, #7c5cff); color: #fff; }
+.la-x { border: 0; background: transparent; color: var(--muted, #6a7893); font-size: 1rem; cursor: pointer; }
+.la-panel-body { padding: 14px; overflow: auto; }
+
+.la-hint { margin: 0 0 12px; font-size: .82rem; line-height: 1.45; color: var(--muted, #6a7893); }
+.la-loading, .la-empty { padding: 18px 6px; color: var(--muted, #6a7893); font-size: .86rem; text-align: center; }
+.la-field { display: flex; flex-direction: column; gap: 4px; font-size: .74rem; font-weight: 700; color: var(--muted, #6a7893); text-transform: uppercase; letter-spacing: .04em; margin-bottom: 10px; }
+.la-field.grow { flex: 1; }
+.la-field select { font: inherit; font-weight: 600; text-transform: none; letter-spacing: 0; padding: 9px 10px; border-radius: 10px; border: 1px solid var(--line, rgba(0,0,0,.16)); background: var(--panel, #fff); color: var(--text, #12203a); }
+.la-row { display: flex; gap: 10px; align-items: flex-end; }
+.la-row .la-field { flex: 0 0 auto; }
+.la-row .la-field.grow { flex: 1; }
+
+.la-qlist { display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px; }
+.la-qpick { text-align: left; display: flex; flex-direction: column; gap: 3px; padding: 11px 12px; border-radius: 12px; cursor: pointer;
+  border: 1px solid var(--line, rgba(0,0,0,.14)); background: var(--panel, rgba(0,0,0,.03)); color: var(--text, #12203a); }
+.la-qpick:hover { border-color: var(--brand, #7c5cff); }
+.la-qpick-q { font-weight: 650; font-size: .9rem; line-height: 1.35; }
+.la-qpick-meta { font-size: .72rem; color: var(--muted, #6a7893); }
+.la-check { display: flex; align-items: center; gap: 8px; font-size: .82rem; color: var(--muted, #6a7893); }
+
+.la-qtitle-row { display: flex; align-items: center; justify-content: space-between; font-size: .74rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--muted, #6a7893); margin: 4px 0 8px; }
+.la-linkbtn { border: 0; background: transparent; color: var(--brand, #7c5cff); font-weight: 700; font-size: .76rem; cursor: pointer; }
+.la-qlist.checks { max-height: 210px; overflow: auto; gap: 4px; }
+.la-qcheck { display: flex; gap: 8px; align-items: flex-start; padding: 7px 8px; border-radius: 8px; font-size: .84rem; line-height: 1.35; }
+.la-qcheck:hover { background: var(--panel, rgba(0,0,0,.04)); }
+.la-qcheck input { margin-top: 3px; }
+
+.la-panel-actions { margin-top: 14px; display: flex; gap: 8px; }
+.la-panel-actions.wrap { flex-wrap: wrap; }
+.la-panel-actions .btn { flex: 1; }
+
+/* ---- Live graphs (bars) — shared teacher + student ---- */
+.la-live-q { font-weight: 750; font-size: 1rem; line-height: 1.35; margin-bottom: 4px; }
+.la-poll-meta { font-size: .78rem; color: var(--muted, #6a7893); margin-bottom: 12px; }
+.la-bars { display: flex; flex-direction: column; gap: 9px; }
+.la-bar-row { display: grid; grid-template-columns: 1fr; gap: 4px; }
+.la-bar-label { font-size: .84rem; font-weight: 600; display: flex; align-items: center; gap: 6px; }
+.la-bar-track { height: 12px; border-radius: 999px; background: var(--panel, rgba(0,0,0,.08)); overflow: hidden; }
+.la-bar-fill { height: 100%; border-radius: 999px; background: var(--brand, #7c5cff); transition: width .5s cubic-bezier(.2,.7,.2,1); }
+.la-bar-num { font-size: .74rem; color: var(--muted, #6a7893); text-align: right; }
+.la-bar-row.correct .la-bar-fill { background: #23c38a; }
+.la-bar-row.correct .la-bar-label { color: #1c9e72; }
+.la-tick { color: #23c38a; font-weight: 800; }
+.la-bar-row.yours .la-bar-label { font-weight: 800; }
+.la-you { font-size: .64rem; background: var(--brand, #7c5cff); color: #fff; padding: 1px 6px; border-radius: 999px; }
+.la-explain { margin-top: 10px; padding: 10px 12px; border-radius: 10px; font-size: .82rem; line-height: 1.45;
+  background: color-mix(in srgb, var(--brand, #7c5cff) 12%, transparent); border: 1px solid color-mix(in srgb, var(--brand, #7c5cff) 26%, transparent); }
+
+/* ---- Teacher standings ---- */
+.la-standings { display: flex; flex-direction: column; gap: 10px; margin-top: 8px; }
+.la-stand-row { display: grid; grid-template-columns: auto auto 1fr auto auto; align-items: center; gap: 9px; }
+.la-stand-row.perfect { }
+.la-team-dot { width: 12px; height: 12px; border-radius: 999px; display: inline-block; flex: 0 0 auto; }
+.la-team-dot.sm { width: 9px; height: 9px; }
+.la-team-name { font-weight: 700; font-size: .88rem; }
+.la-team-score { font-weight: 800; font-size: .84rem; font-variant-numeric: tabular-nums; }
+.la-team-prog { font-size: .72rem; color: var(--muted, #6a7893); }
+.la-who { margin-top: 14px; font-size: .84rem; }
+.la-who summary { cursor: pointer; color: var(--muted, #6a7893); font-weight: 700; }
+.la-wholog { margin-top: 8px; display: flex; flex-direction: column; gap: 5px; max-height: 160px; overflow: auto; }
+.la-whorow { display: flex; align-items: center; gap: 6px; font-size: .8rem; }
+.la-muted { color: var(--muted, #6a7893); }
+
+/* ---- Student overlays (poll popup, team intro, results) ---- */
+.la-overlay { position: fixed; inset: 0; display: grid; place-items: center; padding: 18px;
+  background: rgba(8,14,30,.55); backdrop-filter: blur(3px); animation: la-fade .18s ease; }
+@keyframes la-fade { from { opacity: 0; } to { opacity: 1; } }
+.la-card { width: min(440px, 100%); border-radius: 20px; padding: 22px; color: var(--text, #12203a);
+  background: var(--bg-2, #fff); border: 1px solid var(--line, rgba(0,0,0,.12));
+  box-shadow: 0 30px 70px rgba(10,15,40,.4); animation: la-pop .2s cubic-bezier(.2,.8,.2,1); }
+@keyframes la-pop { from { transform: translateY(10px) scale(.98); opacity: 0; } to { transform: none; opacity: 1; } }
+.la-card-eyebrow { font-size: .7rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--brand, #7c5cff); }
+.la-card-q { font-size: 1.28rem; font-weight: 800; line-height: 1.28; margin: 8px 0 16px; }
+.la-card-q.sm { font-size: 1rem; margin-bottom: 12px; }
+.la-choices { display: flex; flex-direction: column; gap: 9px; }
+.la-choice { text-align: left; padding: 13px 15px; border-radius: 13px; font: inherit; font-weight: 650; font-size: .96rem; cursor: pointer;
+  border: 1.5px solid var(--line, rgba(0,0,0,.16)); background: var(--panel, rgba(0,0,0,.03)); color: var(--text, #12203a); transition: transform .08s, border-color .12s; }
+.la-choice:hover:not(:disabled) { border-color: var(--brand, #7c5cff); transform: translateY(-1px); }
+.la-choice.picked { border-color: var(--brand, #7c5cff); background: color-mix(in srgb, var(--brand, #7c5cff) 16%, transparent); }
+.la-choice:disabled { cursor: default; opacity: .82; }
+.la-card-foot { margin-top: 16px; font-size: .8rem; color: var(--muted, #6a7893); display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.la-dismiss { border: 0; background: transparent; color: var(--brand, #7c5cff); font-weight: 700; cursor: pointer; font-size: .84rem; }
+
+/* Team assignment "summit" card */
+.la-team-card { text-align: center; border-top: 5px solid var(--team, #7c5cff); }
+.la-summit { font-size: 1.6rem; color: var(--team, #7c5cff); line-height: 1; }
+.la-summit-peak { display: inline-block; transform: scaleX(1.5); }
+.la-team-title { font-size: 1.9rem; font-weight: 900; letter-spacing: -.01em; margin: 2px 0 12px; color: var(--team, #7c5cff); }
+.la-mates { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; margin-bottom: 6px; }
+.la-mate { font-size: .82rem; font-weight: 650; padding: 5px 11px; border-radius: 999px; background: var(--panel, rgba(0,0,0,.05)); border: 1px solid var(--line, rgba(0,0,0,.1)); }
+.la-team-card .btn { margin-top: 16px; width: 100%; }
+
+/* Final results / podium */
+.la-podium { display: flex; flex-direction: column; gap: 8px; margin-top: 4px; }
+.la-podium-row { display: grid; grid-template-columns: auto auto 1fr auto; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 12px;
+  border: 1px solid var(--line, rgba(0,0,0,.1)); background: var(--panel, rgba(0,0,0,.03)); }
+.la-podium-row.win { border-color: #f0b400; background: color-mix(in srgb, #ffcc33 18%, transparent); }
+.la-rank { font-weight: 900; font-size: 1rem; width: 20px; text-align: center; color: var(--muted, #6a7893); }
+.la-podium-row.win .la-rank { color: #b8860b; }
+.la-crown { font-size: .9rem; }
+.la-firstperfect { font-size: .66rem; font-weight: 700; color: #b8860b; background: color-mix(in srgb, #ffcc33 30%, transparent); padding: 2px 7px; border-radius: 999px; margin-left: 4px; }
+
+/* ---- Student team room (docked) ---- */
+.la-teamroom { position: fixed; right: 16px; bottom: 16px; width: min(360px, calc(100vw - 32px)); max-height: min(78vh, 680px);
+  display: flex; flex-direction: column; border-radius: 16px; overflow: hidden;
+  background: var(--bg-2, #fff); color: var(--text, #12203a);
+  border: 1px solid var(--line, rgba(0,0,0,.12)); border-top: 4px solid var(--team, #7c5cff);
+  box-shadow: 0 22px 56px rgba(10,15,40,.34); }
+.la-tr-head { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-bottom: 1px solid var(--line, rgba(0,0,0,.1)); }
+.la-tr-head strong { font-size: .95rem; }
+.la-tr-prog { margin-left: auto; font-size: .78rem; font-weight: 700; color: var(--muted, #6a7893); font-variant-numeric: tabular-nums; }
+.la-tr-min { border: 0; background: transparent; font-size: 1.2rem; line-height: 1; cursor: pointer; color: var(--muted, #6a7893); }
+.la-teamroom.min .la-tr-body { display: none; }
+.la-tr-body { overflow: auto; display: flex; flex-direction: column; }
+.la-tr-quiz { padding: 12px; display: flex; flex-direction: column; gap: 12px; }
+.la-tq { border: 1px solid var(--line, rgba(0,0,0,.12)); border-radius: 12px; padding: 11px 12px; }
+.la-tq.right { border-color: #23c38a; background: color-mix(in srgb, #23c38a 8%, transparent); }
+.la-tq.wrong { border-color: var(--danger, #ff6b7a); background: color-mix(in srgb, var(--danger, #ff6b7a) 8%, transparent); }
+.la-tq-q { font-weight: 650; font-size: .9rem; line-height: 1.35; display: flex; gap: 8px; }
+.la-tq-n { flex: 0 0 auto; width: 20px; height: 20px; border-radius: 999px; display: grid; place-items: center; font-size: .72rem; font-weight: 800; background: var(--brand, #7c5cff); color: #fff; }
+.la-tq-choices { display: flex; flex-direction: column; gap: 6px; margin-top: 9px; }
+.la-tq-choice { text-align: left; padding: 9px 11px; border-radius: 9px; font: inherit; font-size: .86rem; font-weight: 600; cursor: pointer;
+  border: 1.5px solid var(--line, rgba(0,0,0,.16)); background: var(--panel, rgba(0,0,0,.03)); color: var(--text, #12203a); }
+.la-tq-choice:hover:not(:disabled) { border-color: var(--brand, #7c5cff); }
+.la-tq-choice:disabled { cursor: default; opacity: .9; }
+.la-tq-choice.chosen { border-color: currentColor; font-weight: 800; }
+.la-tq-choice.correct { border-color: #23c38a; background: color-mix(in srgb, #23c38a 14%, transparent); color: #158a60; }
+.la-tq-choice.chosen:not(.correct) { border-color: var(--danger, #ff6b7a); background: color-mix(in srgb, var(--danger, #ff6b7a) 12%, transparent); }
+.la-tq-verdict { margin-top: 8px; font-size: .8rem; font-weight: 700; }
+.la-tr-done { margin: 0 12px 12px; padding: 10px; border-radius: 10px; text-align: center; font-size: .82rem; font-weight: 650;
+  background: color-mix(in srgb, var(--brand, #7c5cff) 12%, transparent); }
+.la-tr-chat { border-top: 1px solid var(--line, rgba(0,0,0,.1)); padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; }
+.la-tr-mates { font-size: .72rem; color: var(--muted, #6a7893); }
+.la-chat-log { display: flex; flex-direction: column; gap: 4px; max-height: 140px; overflow: auto; font-size: .82rem; }
+.la-chat-line { line-height: 1.35; }
+.la-chat-in { display: flex; gap: 6px; }
+.la-chat-in input { flex: 1; font: inherit; font-size: .84rem; padding: 8px 10px; border-radius: 9px; border: 1px solid var(--line, rgba(0,0,0,.16)); background: var(--panel, #fff); color: var(--text, #12203a); }
+
+/* ---- Toast ---- */
+.la-toast { position: fixed; left: 50%; bottom: 88px; transform: translate(-50%, 12px); opacity: 0; transition: .28s;
+  background: var(--danger, #ff6b7a); color: #fff; font-weight: 650; font-size: .84rem; padding: 10px 16px; border-radius: 12px; box-shadow: 0 12px 30px rgba(10,15,40,.3); }
+.la-toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+@media (prefers-reduced-motion: reduce) {
+  .la-overlay, .la-card, .la-bar-fill, .la-toast { animation: none !important; transition: none !important; }
+}
+@media (max-width: 520px) {
+  .la-panel, .la-teamroom { right: 8px; left: 8px; width: auto; }
+  .la-launcher { right: 10px; bottom: 10px; }
+}

@@ -1784,6 +1784,32 @@ const shareSet = (req, res) => {
   res.json({ set, quizlet: set });
 };
 
+// Prepared question banks for in-session activities (polls + team quiz). The
+// lesson surface already has the open set's cards on the client, but a live
+// whiteboard has none, so a teacher picks from any of their own sets here.
+// Returns only answerable questions (a prompt + 2+ choices) with the correct
+// index and explanation — the teacher's screen keeps those; the engine strips
+// them before anything reaches a student device.
+app.get('/api/live/question-banks', requireUser, (req, res) => {
+  const store = readStore();
+  const banks = store.quizlets
+    .filter((s) => s.ownerId === req.user.id)
+    .map((s) => {
+      const questions = (s.cards || [])
+        .filter((c) => c.type !== 'slide' && Array.isArray(c.choices) && c.choices.length >= 2)
+        .map((c) => ({
+          front: String(c.front || '').slice(0, 600),
+          choices: c.choices.map((x) => String(x)).slice(0, 6),
+          answerIndex: Number.isInteger(c.answerIndex) ? c.answerIndex : -1,
+          explanation: String(c.explanation || '').slice(0, 1200)
+        }));
+      return { id: s.id, title: s.title || 'Untitled set', subject: s.subject || s.category || '', topic: s.topic || '', questions };
+    })
+    .filter((b) => b.questions.length)
+    .sort((a, b) => a.title.localeCompare(b.title));
+  res.json({ banks });
+});
+
 app.get(['/api/sets', '/api/quizlets'], requireUser, listSets);
 app.get(['/api/sets/:id', '/api/quizlets/:id'], requireUser, getSet);
 app.delete(['/api/sets/:id', '/api/quizlets/:id'], requireUser, deleteSet);

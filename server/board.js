@@ -751,6 +751,11 @@ function attachBoardRoutes(app, deps) {
 function attachBoardWebSocket(httpServer, deps) {
   const { getUserFromCookieHeader, readStore, emailOnRoster, canViewTeachersContent, userHasWhiteboardAccess, askVisionAI } = deps;
   const viewerAllowed = canViewTeachersContent || ((store, teacherId, email) => emailOnRoster(store, teacherId, email));
+  // Immersive in-session activities (polls + team quiz), shared with the lesson
+  // surface. On the whiteboard, viewer names are already public to the room, so
+  // teammate labels here carry real names.
+  const { createLiveActivities } = require('./live-activities');
+  const activities = createLiveActivities();
 
   // noServer: upgrades are routed centrally in server.js. Attaching multiple
   // WebSocketServers to the same http.Server with { server, path } makes each
@@ -799,6 +804,27 @@ function attachBoardWebSocket(httpServer, deps) {
     return store.boards.find((b) => b.id === boardIdValue);
   }
 
+  // Adapts a board room (a Set of clients) to the activities engine. The
+  // "roster" is the non-owner viewers; each carries a stable per-connection id
+  // (client.cid) so team membership survives across messages. Names are already
+  // shared to the whole room via presence, so mates use the full display name.
+  function displayName(user) { return [user.firstName, user.lastName].filter(Boolean).join(' ') || user.email; }
+  function boardActivityBus(boardIdValue, actorWs) {
+    const room = rooms.get(boardIdValue) || new Set();
+    const findByCid = (cid) => [...room].find((c) => c.cid === cid);
+    const teacher = [...room].find((c) => c.isOwner);
+    const send = (ws, o) => { try { if (ws && ws.readyState === 1) ws.send(JSON.stringify(o)); } catch (_) {} };
+    return {
+      toTeacher: (o) => { if (teacher) send(teacher.ws, o); },
+      toActor: (o) => send(actorWs, o),
+      toParticipant: (cid, o) => { const c = findByCid(cid); if (c) send(c.ws, o); },
+      toParticipants: (ids, o) => ids.forEach((cid) => { const c = findByCid(cid); if (c) send(c.ws, o); }),
+      toStudents: (o) => { for (const c of room) if (!c.isOwner) send(c.ws, o); },
+      toAll: (o) => { for (const c of room) send(c.ws, o); },
+      roster: () => [...room].filter((c) => !c.isOwner).map((c) => ({ id: c.cid, name: displayName(c.user), label: displayName(c.user) }))
+    };
+  }
+
   function saveBoard(board) {
     const store = readBoardStore();
     const idx = store.boards.findIndex((b) => b.id === board.id);
@@ -827,11 +853,13 @@ function attachBoardWebSocket(httpServer, deps) {
         if (!allowed) return ws.close(4003, 'This whiteboard has not been shared with you');
       }
 
-      const client = { ws, user, isOwner, lost: false };
+      const client = { ws, user, isOwner, lost: false, cid: `c_${crypto.randomBytes(6).toString('hex')}` };
       roomFor(targetBoardId).add(client);
 
       ws.send(JSON.stringify({ type: 'sync', board, isOwner }));
       if (!isOwner) broadcastPresence(targetBoardId);
+      // Catch a (re)joining client up to any activity already running.
+      activities.resync({ roomId: targetBoardId, isTeacher: isOwner, actor: { id: client.cid, name: displayName(user), label: displayName(user) }, bus: boardActivityBus(targetBoardId, ws) });
 
       ws.on('message', async (raw) => {
         let msg;
@@ -844,6 +872,14 @@ function attachBoardWebSocket(httpServer, deps) {
           const emoji = String(msg.emoji || '').slice(0, 8);
           if (!emoji) return;
           broadcast(targetBoardId, { type: 'reaction', emoji, from: isOwner ? 'teacher' : 'student' }, null);
+          return;
+        }
+
+        // Immersive activities (poll + team quiz). The engine gates teacher vs
+        // student itself, so route before the owner-only mutation guard.
+        if (typeof msg.type === 'string' && msg.type.startsWith('activity:')) {
+          const actor = { id: client.cid, name: displayName(client.user), label: displayName(client.user) };
+          activities.handle({ roomId: targetBoardId, isTeacher: isOwner, actor, bus: boardActivityBus(targetBoardId, ws), msg });
           return;
         }
 
@@ -1060,7 +1096,7 @@ function attachBoardWebSocket(httpServer, deps) {
         const room = rooms.get(targetBoardId);
         if (room) {
           room.delete(client);
-          if (room.size === 0) rooms.delete(targetBoardId);
+          if (room.size === 0) { rooms.delete(targetBoardId); activities.clearRoom(targetBoardId); }
           else if (!isOwner) { broadcastPresence(targetBoardId); broadcastLostCount(targetBoardId); }
         }
       });
