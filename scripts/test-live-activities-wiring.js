@@ -143,5 +143,17 @@ console.log('\nwhiteboard parity: join-by-code, anonymous live join, roster + ki
   ok('homepage join box uses the resolver', /\/api\/join\//.test(read('public/index.html')));
 }
 
+console.log('\nwhiteboard fixes: activities reach code-joined students, fullscreen, clear, viewers z-index');
+{
+  const bjs = read('public/board.js');
+  const css = read('public/live-activities.css');
+  // The killer bug: liveActivities() must NOT bail on NOLOGIN, or /s/:token
+  // (code-joined) students never get polls/teams.
+  ok('board activities are NOT gated behind NOLOGIN', /function liveActivities[\s\S]{0,500}!window\.LiveActivities \|\| GUEST\) return LA/.test(bjs) && !/!window\.LiveActivities \|\| NOLOGIN\) return LA/.test(bjs));
+  ok('fullscreen targets the document so overlays render', /fullscreenBtn[\s\S]{0,360}document\.documentElement\.requestFullscreen/.test(bjs));
+  ok('clear-page is guarded against non-owners', /clearBoardBtn[\s\S]{0,120}if \(!isOwner\) return/.test(bjs));
+  ok('viewers panel lifted above the join QR', /\.viewers-panel\s*\{\s*z-index:\s*30\s*!important/.test(css));
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

@@ -36,7 +36,11 @@
   // player. Attached lazily; role/active are pushed on sync and live changes.
   let LA = null;
   function liveActivities() {
-    if (LA || !window.LiveActivities || NOLOGIN) return LA;
+    // NOTE: no NOLOGIN guard — students who join a live board by code are on the
+    // public path (/s/:token), and they must receive polls + team activities.
+    // In guest/sandbox and static (non-live) public views there's no socket, so
+    // this is never invoked there anyway.
+    if (LA || !window.LiveActivities || GUEST) return LA;
     LA = window.LiveActivities.attach({
       host: 'board',
       send: (o) => send(o),
@@ -2499,13 +2503,17 @@
     $('#zoomResetBtn').addEventListener('click', () => { view.x = 0; view.y = 0; view.scale = 1; updateZoomLabel(); redraw(); });
 
     $('#clearBoardBtn').addEventListener('click', () => {
+      if (!isOwner) return; // students can't clear — the button is hidden for them anyway
       if (!confirm('Clear this page for everyone?')) return;
       page().strokes = []; page().objects = [];
       redraw(); send({ type: 'page:clear', pageId: pageId() });
     });
 
     $('#fullscreenBtn').addEventListener('click', () => {
-      if (!document.fullscreenElement) $('#boardShell').requestFullscreen?.().catch(() => {});
+      // Fullscreen the whole document (not just the board shell) so poll popups,
+      // the team room, and the name gate — which mount at body level — still
+      // render. Works for both the teacher and students.
+      if (!document.fullscreenElement) document.documentElement.requestFullscreen?.().catch(() => {});
       else document.exitFullscreen?.();
     });
 

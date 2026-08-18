@@ -263,6 +263,13 @@ body.presenting .live-strip .lr-kick.btn:hover { background: rgba(255,90,104,.26
 .viewer-kick.btn { margin-left: auto; color: #ff5a68 !important; background: rgba(255,90,104,.14) !important;
   border: 1px solid rgba(255,90,104,.55) !important; font-size: .72rem; font-weight: 700; padding: 3px 10px; border-radius: 8px; }
 .viewer-kick.btn:hover { background: rgba(255,90,104,.26) !important; border-color: rgba(255,90,104,.8) !important; }
+
+/* The "Currently watching" panel overlapped the join-QR dock (z-index 6) and
+   rendered behind it. Lift it above so it's readable when open. */
+.viewers-panel { z-index: 30 !important; }
+/* Belt-and-suspenders: students never see Clear page (the toolbar is hidden for
+   non-owners; this covers any public view where it might slip through). */
+body.public-view #clearBoardBtn { display: none !important; }
 @media (max-width: 520px) {
   .la-panel, .la-teamroom { right: 8px; left: 8px; width: auto; }
   .la-launcher { right: 10px; bottom: 10px; }
