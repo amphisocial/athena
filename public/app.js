@@ -1286,7 +1286,7 @@
         <span class="present-title" id="presentTitle"></span>
         <span class="present-spacer"></span>
         <button class="present-btn" id="presentFsBtn" title="Toggle fullscreen">⛶ Fullscreen</button>
-        <button class="present-btn danger" id="presentExitBtn"></button>`;
+        <button class="present-btn" id="presentExitBtn"></button>`;
       stage.appendChild(bar);
       document.getElementById('presentFsBtn').addEventListener('click', () => {
         const el = document.documentElement;
@@ -1294,8 +1294,11 @@
         else document.exitFullscreen?.().catch(() => {});
       });
       document.getElementById('presentExitBtn').addEventListener('click', () => {
-        if (Live.role === 'teacher') teacherEndLive();
-        else { closeLive(); renderLiveChrome(); }   // student/webinar attendee just leaves
+        // Exit the presentation and go back to the Library. This does NOT end
+        // the live session — the "End live" control inside the panel does that,
+        // so a teacher can step out of the full-screen view and return to it.
+        try { if (document.fullscreenElement) document.exitFullscreen?.(); } catch (_) {}
+        window.location.href = (state && state.user) ? '/library' : '/';
       });
     }
     // Floating launcher chip that shows the live head-count and minimizes /
@@ -1317,7 +1320,7 @@
     const t = document.getElementById('presentTitle');
     if (t) t.textContent = study.set ? study.set.title : '';
     const x = document.getElementById('presentExitBtn');
-    if (x) x.textContent = Live.role === 'teacher' ? '■ End live' : '✕ Leave';
+    if (x) x.textContent = '⤺ Exit';
     // Launcher label: student head-count for the teacher, "Session" otherwise.
     const lbl = document.getElementById('pptLabel');
     if (lbl) {

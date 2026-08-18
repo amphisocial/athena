@@ -315,6 +315,19 @@ body.presenting .live-strip .live-qtitle { color: rgba(234,241,255,0.7); }
 body.presenting .live-strip .react-btn { background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.16); }
 body.presenting .live-strip .live-ask input { background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.16); color: #eaf1ff; }
 body.presenting .live-strip .live-agg { color: #6fe3d4; }
+/* Ghost/outline buttons in the panel (End live, roster mic toggles) are dark
+   text by default — invisible on the dark panel. Make them light. */
+body.presenting .live-strip .btn.ghost {
+  color: #eaf1ff; border-color: rgba(255,255,255,0.24); background: rgba(255,255,255,0.06);
+}
+body.presenting .live-strip .btn.ghost:hover { background: rgba(255,255,255,0.15); }
+/* End live is the one destructive control — give it a clear red read. */
+body.presenting .live-strip #endLiveBtn,
+body.presenting .live-strip #endLiveBtn2 {
+  color: #ffb4b8; border-color: rgba(255,90,90,0.55); background: rgba(255,90,90,0.12);
+}
+body.presenting .live-strip #endLiveBtn:hover,
+body.presenting .live-strip #endLiveBtn2:hover { background: rgba(255,90,90,0.22); }
 /* Collapsed: hide the panel, leave only the launcher chip. */
 body.presenting.rail-min .live-strip { opacity: 0; pointer-events: none; transform: translateY(-6px); }
 
