@@ -115,5 +115,15 @@ console.log('\nmandatory name + roster + kick');
   ok('client handles being kicked', /m\.type === 'kicked'/.test(appJs) && /showKickedNotice/.test(appJs));
 }
 
+console.log('\nroster Remove button is readable + roster scrolls');
+{
+  const css = read('public/live-activities.css');
+  // theme-light forces .btn.ghost text dark with !important; the Remove button
+  // must override that with its own !important colour or it's invisible on the
+  // dark presenting panel.
+  ok('Remove button has an !important colour override', /\.lr-kick\.btn[\s\S]{0,160}color:[^;]*!important/.test(css));
+  ok('roster scrolls (max-height + overflow)', /\.live-roster\b/.test(css) && /max-height:\s*240px/.test(css) && /overflow-y:\s*auto/.test(css));
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

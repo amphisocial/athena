@@ -234,12 +234,28 @@
   padding: 2px 6px; border-radius: 8px; text-decoration: underline dotted; }
 .live-count-btn:hover { background: rgba(0,0,0,.06); }
 .lc-chev { font-size: .7em; }
-.live-roster { margin: 6px 0 8px; border: 1px solid var(--line, rgba(0,0,0,.12)); border-radius: 10px; padding: 6px; max-height: 200px; overflow: auto; }
+.live-roster { margin: 6px 0 8px; border: 1px solid var(--line, rgba(0,0,0,.12)); border-radius: 10px; padding: 4px;
+  /* Cap the height and scroll internally so a 30–50 student roster never pushes
+     the reactions/questions below it off-screen. */
+  max-height: 240px; overflow-y: auto; overscroll-behavior: contain; }
+.live-roster::-webkit-scrollbar { width: 9px; }
+.live-roster::-webkit-scrollbar-thumb { background: rgba(140,140,160,.5); border-radius: 999px; border: 2px solid transparent; background-clip: content-box; }
+.live-roster { scrollbar-width: thin; }
 .lr-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 8px; border-radius: 8px; }
-.lr-row:hover { background: rgba(0,0,0,.04); }
+.lr-row:hover { background: rgba(127,127,140,.14); }
 .lr-name { font-weight: 650; font-size: .88rem; }
-.lr-kick.xs { font-size: .74rem; padding: 3px 9px; }
 .lr-empty { padding: 8px; font-size: .84rem; }
+/* The Remove button must read on BOTH the light inline strip and the dark
+   presenting panel. theme-light.css forces .btn.ghost text to var(--text)
+   with !important, so we override with !important here (this file loads last).
+   Styled as a clear destructive action. */
+.live-strip .lr-kick.btn,
+body.presenting .live-strip .lr-kick.btn {
+  color: #ff5a68 !important; background: rgba(255,90,104,.14) !important;
+  border: 1px solid rgba(255,90,104,.55) !important; font-size: .74rem; font-weight: 700; padding: 4px 11px; border-radius: 8px;
+}
+.live-strip .lr-kick.btn:hover,
+body.presenting .live-strip .lr-kick.btn:hover { background: rgba(255,90,104,.26) !important; border-color: rgba(255,90,104,.8) !important; }
 @media (max-width: 520px) {
   .la-panel, .la-teamroom { right: 8px; left: 8px; width: auto; }
   .la-launcher { right: 10px; bottom: 10px; }
