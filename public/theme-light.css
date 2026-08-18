@@ -321,13 +321,16 @@ body.presenting .live-strip .btn.ghost {
   color: #eaf1ff; border-color: rgba(255,255,255,0.24); background: rgba(255,255,255,0.06);
 }
 body.presenting .live-strip .btn.ghost:hover { background: rgba(255,255,255,0.15); }
-/* End live is the one destructive control — give it a clear red read. */
+/* End live is the one destructive control — solid red, white text, so it can
+   never blend into the dark panel no matter what the base .btn styling is. */
 body.presenting .live-strip #endLiveBtn,
-body.presenting .live-strip #endLiveBtn2 {
-  color: #ffb4b8; border-color: rgba(255,90,90,0.55); background: rgba(255,90,90,0.12);
+body.presenting .live-strip #endLiveBtn2,
+body.presenting .live-strip .live-head .btn.ghost {
+  color: #ffffff !important; background: #e2483b !important; border: 1px solid #e2483b !important;
 }
 body.presenting .live-strip #endLiveBtn:hover,
-body.presenting .live-strip #endLiveBtn2:hover { background: rgba(255,90,90,0.22); }
+body.presenting .live-strip #endLiveBtn2:hover,
+body.presenting .live-strip .live-head .btn.ghost:hover { background: #c73a2e !important; border-color: #c73a2e !important; }
 /* Collapsed: hide the panel, leave only the launcher chip. */
 body.presenting.rail-min .live-strip { opacity: 0; pointer-events: none; transform: translateY(-6px); }
 
