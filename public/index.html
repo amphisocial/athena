@@ -45,7 +45,62 @@
       <span>The <strong>Founding 30</strong> Math &amp; Science teachers — free Teams this semester.</span>
       <span class="fs-cta">Apply →</span>
     </a>
+
+    <!-- Student join-by-code. Kept right under the founding strip so a student
+         handed a code can get into a live class without scrolling. -->
+    <div class="join-live" id="joinLive">
+      <div class="jl-left">
+        <span class="jl-emoji">🎥</span>
+        <div class="jl-text">
+          <strong>In a live class right now?</strong>
+          <span>Enter the join code your teacher is showing on screen.</span>
+        </div>
+      </div>
+      <form class="jl-form" id="joinLiveForm" autocomplete="off">
+        <input class="jl-input" id="joinCode" name="joinCode" placeholder="e.g. les3ea1df404e" spellcheck="false" aria-label="Join code" />
+        <button class="jl-btn" type="submit">Join session →</button>
+      </form>
+    </div>
   </div>
+
+  <style>
+    .join-live { margin: 12px 0 4px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 14px;
+      padding: 16px 20px; border-radius: 16px; background: linear-gradient(100deg, #0e63ff, #17b0c9); color: #fff;
+      box-shadow: 0 14px 34px rgba(14,60,140,.28); }
+    .jl-left { display: flex; align-items: center; gap: 12px; min-width: 0; }
+    .jl-emoji { font-size: 1.7rem; line-height: 1; }
+    .jl-text { display: flex; flex-direction: column; line-height: 1.3; }
+    .jl-text strong { font-size: 1.02rem; }
+    .jl-text span { font-size: .86rem; opacity: .92; }
+    .jl-form { display: flex; gap: 8px; flex: 1 1 320px; max-width: 460px; }
+    .jl-input { flex: 1; min-width: 0; font: inherit; font-size: 1rem; font-weight: 600; letter-spacing: .01em; padding: 12px 14px;
+      border-radius: 11px; border: 0; background: rgba(255,255,255,.96); color: #0c1830; }
+    .jl-input:focus { outline: 3px solid rgba(255,255,255,.6); }
+    .jl-btn { font: inherit; font-weight: 800; font-size: .98rem; white-space: nowrap; padding: 12px 18px; border-radius: 11px; border: 0;
+      cursor: pointer; background: #0b1533; color: #fff; }
+    .jl-btn:hover { background: #12224e; }
+    .jl-error { color: #ffe0e0; font-weight: 700; font-size: .82rem; padding: 2px 2px 0; flex-basis: 100%; }
+    @media (max-width: 620px) { .join-live { flex-direction: column; align-items: stretch; } .jl-form { max-width: none; } }
+  </style>
+  <script>
+    (function () {
+      var form = document.getElementById('joinLiveForm');
+      if (!form) return;
+      form.addEventListener('submit', function (e) {
+        e.preventDefault();
+        var input = document.getElementById('joinCode');
+        var raw = (input.value || '').trim();
+        if (!raw) { input.focus(); return; }
+        // Accept a bare code, or a pasted full/partial join URL — take the last
+        // path segment either way, and drop any query/hash.
+        var code = raw.replace(/[?#].*$/, '').replace(/\/+$/, '');
+        if (code.indexOf('/') !== -1) code = code.split('/').pop();
+        code = code.replace(/\s+/g, '');
+        if (!code) { input.focus(); return; }
+        window.location.href = '/l/' + encodeURIComponent(code);
+      });
+    })();
+  </script>
 
   <!-- ===================== HERO ===================== -->
   <main>

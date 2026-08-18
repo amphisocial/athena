@@ -34,7 +34,7 @@ function attachLessonWebSocket(httpServer, deps) {
   // setId -> { teacher, students:Set, state:{index,flipped}, answers:Map, nextLabel }
   const rooms = new Map();
   function roomFor(id) {
-    if (!rooms.has(id)) rooms.set(id, { teacher: null, students: new Set(), state: { index: 0, flipped: false }, answers: new Map(), nextLabel: 0, annotations: new Map() });
+    if (!rooms.has(id)) rooms.set(id, { teacher: null, students: new Set(), state: { index: 0, flipped: false }, answers: new Map(), nextLabel: 0, annotations: new Map(), removed: new Set() });
     return rooms.get(id);
   }
   // Live annotations, keyed by card index, so a late-joining student can be
@@ -55,8 +55,9 @@ function attachLessonWebSocket(httpServer, deps) {
   function toAll(room, obj) { if (room.teacher) send(room.teacher.ws, obj); toStudents(room, obj); }
 
   function presence(room) {
-    // Teacher sees labels + real identities; students just see the count.
-    const roster = [...room.students].map((c) => ({ label: c.label, name: c.realName || null }));
+    // Teacher sees each student's id + name (to view the roster and remove
+    // people); students still just see the head-count.
+    const roster = [...room.students].map((c) => ({ id: c.id, label: c.label, name: c.realName || c.label }));
     if (room.teacher) send(room.teacher.ws, { type: 'presence', count: room.students.size, roster });
     toStudents(room, { type: 'presence', count: room.students.size });
   }
@@ -128,10 +129,21 @@ function attachLessonWebSocket(httpServer, deps) {
       if (isTeacher) {
         room.teacher = client;
       } else {
+        // Students enter their name before joining (no login). That name is
+        // their identity in the room: teammates see it, and the teacher's roster
+        // uses it. Signed-in students fall back to their account name.
+        const rawName = (url.searchParams.get('name') || '').trim().replace(/\s+/g, ' ').slice(0, 60);
+        const accountName = user ? ([user.firstName, user.lastName].filter(Boolean).join(' ') || user.email) : '';
+        const displayName = rawName || accountName;
+        // A teacher can remove someone; block that exact name from walking back
+        // in for the rest of the session (best-effort, since there's no login).
+        if (room.removed && displayName && room.removed.has(displayName.toLowerCase())) {
+          return ws.close(4008, 'Removed by teacher');
+        }
         room.nextLabel += 1;
-        client.label = `Student ${room.nextLabel}`;
         client.id = `c_${Math.random().toString(16).slice(2)}`;
-        client.realName = user ? ([user.firstName, user.lastName].filter(Boolean).join(' ') || user.email) : null;
+        client.label = displayName || `Student ${room.nextLabel}`;
+        client.realName = displayName || null;
         room.students.add(client);
       }
 
@@ -165,6 +177,20 @@ function attachLessonWebSocket(httpServer, deps) {
         }
 
         if (isTeacher) {
+          if (msg.type === 'kick') {
+            // Fraud/safety control: remove a named participant. Tell them, close
+            // their socket, and remember the name so they can't immediately
+            // rejoin for this session.
+            const target = [...room.students].find((c) => c.id === msg.id);
+            if (target) {
+              if (target.realName) room.removed.add(target.realName.toLowerCase());
+              try { send(target.ws, { type: 'kicked' }); } catch (_) {}
+              try { target.ws.close(4008, 'Removed by teacher'); } catch (_) {}
+              room.students.delete(target);
+              presence(room);
+            }
+            return;
+          }
           if (msg.type === 'nav') {
             room.state = { index: Math.max(0, Number(msg.index) || 0), flipped: Boolean(msg.flipped) };
             toStudents(room, { type: 'nav', index: room.state.index, flipped: room.state.flipped });

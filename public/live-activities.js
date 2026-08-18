@@ -51,7 +51,7 @@
     launcher.type = 'button';
     launcher.hidden = true;
     // Clicking the launcher toggles the panel — a second click closes it.
-    launcher.addEventListener('click', () => { if (panel.hidden) openPanel(); else closePanel(); });
+    launcher.addEventListener('click', () => { if (state.role !== 'teacher') return; if (panel.hidden) openPanel(); else closePanel(); });
     root.appendChild(launcher);
 
     const panel = el('div', 'la-panel');
@@ -74,6 +74,7 @@
     }
 
     function openPanel(tab) {
+      if (state.role !== 'teacher') return; // students never get the panel
       panel.hidden = false;
       renderPanel(tab || panel.dataset.tab || 'poll');
     }

@@ -27,8 +27,9 @@ const deps = {
   nowIso: () => new Date().toISOString()
 };
 
-function open(cookie) {
-  const ws = new WebSocket(`ws://127.0.0.1:${PORT}/ws/lesson?set=set-1`, { headers: cookie ? { cookie } : {} });
+function open(cookie, name) {
+  const q = `set=set-1${name ? `&name=${encodeURIComponent(name)}` : ''}`;
+  const ws = new WebSocket(`ws://127.0.0.1:${PORT}/ws/lesson?${q}`, { headers: cookie ? { cookie } : {} });
   ws.messages = [];
   ws.on('message', (raw) => { try { ws.messages.push(JSON.parse(raw.toString())); } catch (_) {} });
   ws.sendJSON = (o) => ws.send(JSON.stringify(o));
@@ -51,11 +52,33 @@ let server;
 
   const teacher = open('session=teacher-abc');
   await onOpen(teacher);
-  const s1 = open(null); const s2 = open(null);
+  const s1 = open(null, 'Ada Lovelace'); const s2 = open(null, 'Alan Turing');
   await Promise.all([onOpen(s1), onOpen(s2)]);
   await wait(120);
 
   ok('students joined and got a sync', s1.messages.some((m) => m.type === 'sync') && s2.messages.some((m) => m.type === 'sync'));
+
+  console.log('NAMED JOIN + ROSTER + KICK');
+  const pres = lastOf(teacher, 'presence');
+  ok('teacher roster carries entered names', pres && pres.roster.some((r) => r.name === 'Ada Lovelace') && pres.roster.some((r) => r.name === 'Alan Turing'));
+  ok('each roster entry has an id for kicking', pres && pres.roster.every((r) => typeof r.id === 'string' && r.id));
+  ok('the joining student is told their own name', (lastOf(s1, 'sync') || {}).youAre === 'Ada Lovelace');
+
+  // A throwaway student joins and gets removed, leaving s1/s2 intact.
+  const sk = open(null, 'Mallory Kane'); await onOpen(sk); await wait(80);
+  const before = (lastOf(teacher, 'presence') || {}).count;
+  const kId = lastOf(teacher, 'presence').roster.find((r) => r.name === 'Mallory Kane').id;
+  teacher.sendJSON({ type: 'kick', id: kId });
+  await wait(80);
+  ok('kicked student receives a kicked notice', lastOf(sk, 'kicked'));
+  ok('roster shrinks by one after a kick', (lastOf(teacher, 'presence') || {}).count === before - 1);
+
+  // Mallory tries to walk back in with the same name — blocked for the session.
+  const kAgain = open(null, 'Mallory Kane');
+  let closedCode = null;
+  kAgain.on('close', (code) => { closedCode = code; });
+  await wait(160);
+  ok('a removed student cannot rejoin under the same name', closedCode === 4008 || !kAgain.messages.some((m) => m.type === 'sync'));
 
   console.log('POLL over the wire');
   teacher.sendJSON({ type: 'activity:poll:launch', question: SET.cards[0].front, choices: SET.cards[0].choices, answerIndex: 1, explanation: SET.cards[0].explanation });
@@ -82,7 +105,7 @@ let server;
   const you2 = lastOf(s2, 'activity:teams:you');
   ok('each student is assigned a mountain-range team', you1 && you2 && you1.team.name && you2.team.name);
   ok('student quiz payload hides the answer index', you1.quiz.every((q) => q.answerIndex === undefined));
-  ok('teammates are shown by safe Student N labels', you1.team.mates.every((m) => /^Student \d+$/.test(m)));
+  ok('teammates are shown by their entered names', you1.team.mates.every((m) => typeof m === 'string' && m.length) && [...you1.team.mates, ...you2.team.mates].some((m) => m === 'Ada Lovelace' || m === 'Alan Turing'));
   const tState = lastOf(teacher, 'activity:teams:state');
   ok('teacher sees the full team roster with real names', tState && tState.teams.some((t) => t.members.some((m) => m.name === 'Anonymous' || typeof m.name === 'string')));
 

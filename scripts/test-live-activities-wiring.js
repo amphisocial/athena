@@ -81,12 +81,38 @@ console.log('\nUI: the hidden attribute must actually hide the panel + launcher'
   ok('css forces display:none for [hidden] panel + launcher',
     /\.la-(launcher|panel)\[hidden\][^{]*,?[^{]*\[hidden\][^{]*\{[^}]*display:\s*none\s*!important/.test(css)
     || (/\.la-launcher\[hidden\]/.test(css) && /\.la-panel\[hidden\]/.test(css) && /display:\s*none\s*!important/.test(css)));
-  ok('cache-buster bumped so the fix actually loads', /live-activities\.js\?v=boardsy2/.test(appHtml) && /live-activities\.js\?v=boardsy2/.test(boardHtml));
+  ok('cache-buster present so the fix actually loads', /live-activities\.js\?v=boardsy\d+/.test(appHtml) && /live-activities\.js\?v=boardsy\d+/.test(boardHtml));
 }
 
 console.log('\nExit ends a live session before leaving');
 {
   ok('presentExitBtn ends live for a live teacher', /teacherLive/.test(appJs) && /teacherEndLive\(\)/.test(appJs.slice(appJs.indexOf('presentExitBtn'))));
+}
+
+console.log('\nstudents can never open Activities');
+{
+  ok('openPanel refuses non-teachers', /function openPanel[\s\S]{0,80}role !== 'teacher'\) return/.test(client));
+  ok('launcher click refuses non-teachers', /launcher\.addEventListener[\s\S]{0,90}role !== 'teacher'\) return/.test(client));
+}
+
+console.log('\njoin-by-code');
+{
+  const indexHtml = read('public/index.html');
+  ok('homepage has a join-by-code box under the founding strip',
+    indexHtml.indexOf('founding-strip') < indexHtml.indexOf('joinLiveForm') && /id="joinCode"/.test(indexHtml));
+  ok('join box navigates to /l/<code>', /location\.href = '\/l\/' \+ encodeURIComponent\(code\)/.test(indexHtml));
+  ok('teacher session QR shows a copyable join code', /id="lessonQrCode"/.test(read('public/app.html')) && /lessonQrCode/.test(appJs));
+}
+
+console.log('\nmandatory name + roster + kick');
+{
+  const lesson = read('server/lesson-live.js');
+  ok('server reads the entered name from the WS query', /searchParams\.get\('name'\)/.test(lesson));
+  ok('presence roster carries id + name for the teacher', /roster = \[\.\.\.room\.students\]\.map\(\(c\) => \(\{ id: c\.id/.test(lesson));
+  ok('server handles teacher kick + blocks rejoin', /msg\.type === 'kick'/.test(lesson) && /room\.removed\.add/.test(lesson));
+  ok('client prompts for a name before joining live', /function promptStudentName/.test(appJs) && /connectLive\(token, 'student', name\)/.test(appJs));
+  ok('client renders a roster with remove buttons', /id="rosterToggle"/.test(appJs) && /lr-kick/.test(appJs) && /type: 'kick'/.test(appJs));
+  ok('client handles being kicked', /m\.type === 'kicked'/.test(appJs) && /showKickedNotice/.test(appJs));
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

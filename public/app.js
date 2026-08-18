@@ -959,19 +959,65 @@
   }
   const Audio = { room: null, enabled: false, url: null, on: false, checked: false };
   function liveSend(o) { try { if (Live.ws && Live.ws.readyState === 1) Live.ws.send(JSON.stringify(o)); } catch (_) {} }
-  const wsLessonUrl = (setId) => `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws/lesson?set=${encodeURIComponent(setId)}`;
+  const wsLessonUrl = (setId, name) => `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws/lesson?set=${encodeURIComponent(setId)}${name ? `&name=${encodeURIComponent(name)}` : ''}`;
 
-  function connectLive(setId, role) {
+  function connectLive(setId, role, name) {
     closeLive();
-    Live.setId = setId; Live.role = role;
+    Live.setId = setId; Live.role = role; Live.myName = name || null;
     const la = liveActivities(); if (la) la.setRole(role);
-    const ws = new WebSocket(wsLessonUrl(setId));
+    const ws = new WebSocket(wsLessonUrl(setId, role === 'student' ? name : ''));
     Live.ws = ws;
     ws.onopen = () => { Live.on = true; const a = liveActivities(); if (a) a.setActive(true); renderLiveChrome(); };
-    ws.onclose = () => { Live.on = false; const a = liveActivities(); if (a) a.setActive(false); renderLiveChrome(); };
+    ws.onclose = (ev) => {
+      Live.on = false; const a = liveActivities(); if (a) a.setActive(false); renderLiveChrome();
+      // Removed by the teacher and blocked from rejoining under the same name.
+      if (ev && ev.code === 4008) { try { sessionStorage.removeItem('liveName:' + Live.setId); } catch (_) {} showKickedNotice(); }
+    };
     ws.onmessage = (ev) => { let m; try { m = JSON.parse(ev.data); } catch { return; } handleLive(m); };
   }
   function closeLive() { if (Live.ws) { try { Live.ws.close(); } catch (_) {} } Live.ws = null; Live.on = false; const a = liveActivities(); if (a) a.setActive(false); Anno.reset(); }
+
+  // No-login students identify themselves by name before joining a live lesson.
+  // The name is remembered per session so a refresh doesn't re-ask. Mandatory:
+  // the Join button stays disabled until both names are filled.
+  function promptStudentName(token) {
+    return new Promise((resolve) => {
+      let saved = null;
+      try { saved = JSON.parse(sessionStorage.getItem('liveName:' + token) || 'null'); } catch (_) {}
+      if (saved && saved.first && saved.last) { resolve(`${saved.first} ${saved.last}`); return; }
+      const ov = document.createElement('div');
+      ov.className = 'name-gate';
+      ov.innerHTML = `
+        <div class="name-gate-card">
+          <div class="ng-eyebrow">Live session</div>
+          <h2 class="ng-title">Join with your name</h2>
+          <p class="ng-sub">Your teacher and teammates will see this. No account needed.</p>
+          <div class="ng-row">
+            <input class="ng-input" id="ngFirst" placeholder="First name" autocomplete="given-name" maxlength="30" />
+            <input class="ng-input" id="ngLast" placeholder="Last name" autocomplete="family-name" maxlength="30" />
+          </div>
+          <button class="ng-btn" id="ngJoin" disabled>Join session</button>
+        </div>`;
+      document.body.appendChild(ov);
+      const first = ov.querySelector('#ngFirst');
+      const last = ov.querySelector('#ngLast');
+      const btn = ov.querySelector('#ngJoin');
+      const check = () => { btn.disabled = !(first.value.trim() && last.value.trim()); };
+      const submit = () => {
+        const f = first.value.trim().replace(/\s+/g, ' ');
+        const l = last.value.trim().replace(/\s+/g, ' ');
+        if (!f || !l) return;
+        try { sessionStorage.setItem('liveName:' + token, JSON.stringify({ first: f, last: l })); } catch (_) {}
+        ov.remove();
+        resolve(`${f} ${l}`);
+      };
+      first.addEventListener('input', check);
+      last.addEventListener('input', check);
+      [first, last].forEach((i) => i.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !btn.disabled) submit(); }));
+      btn.addEventListener('click', submit);
+      setTimeout(() => first.focus(), 50);
+    });
+  }
 
   function handleLive(m) {
     if (typeof m.type === 'string' && m.type.startsWith('activity:')) {
@@ -1006,7 +1052,28 @@
       Live.questions = Live.questions.filter((q) => q.id !== m.id); renderLiveChrome();
     } else if (m.type === 'ended') {
       closeLive(); stopAudio(); setStatus('The teacher ended the live session.', 'info'); renderLiveChrome();
+    } else if (m.type === 'kicked') {
+      // Removed by the teacher: forget the saved name so a rejoin re-prompts,
+      // drop the connection, and tell the student plainly.
+      try { sessionStorage.removeItem('liveName:' + Live.setId); } catch (_) {}
+      Live.kicked = true;
+      closeLive(); stopAudio(); renderLiveChrome();
+      showKickedNotice();
     }
+  }
+
+  function showKickedNotice() {
+    if (document.querySelector('.kicked-gate')) return;
+    const ov = document.createElement('div');
+    ov.className = 'name-gate kicked-gate';
+    ov.innerHTML = `
+      <div class="name-gate-card">
+        <div class="ng-eyebrow">Removed</div>
+        <h2 class="ng-title">You've been removed</h2>
+        <p class="ng-sub">The teacher removed you from this live session. If this was a mistake, ask them to let you back in.</p>
+        <a class="ng-btn" href="/lessons">Back to lessons</a>
+      </div>`;
+    document.body.appendChild(ov);
   }
   function applyRemoteState(st) { if (!st) return; study.index = Number(st.index) || 0; study.flipped = Boolean(st.flipped); renderStudy(); }
 
@@ -1249,11 +1316,24 @@
         const canAudio = Audio.enabled && state.user && state.user.limits && state.user.limits.whiteboardLive;
         if (canAudio) audioBlock = '<div class="live-audio"><button class="btn soft small" id="startAudioBtn">🎤 Start audio</button></div>';
       }
+      const rosterHtml = Live.showRoster ? `<div class="live-roster">${
+        (Live.roster && Live.roster.length)
+          ? Live.roster.map((r) => `<div class="lr-row"><span class="lr-name">${escapeHtml(r.name || r.label)}</span><button class="btn ghost xs lr-kick" data-id="${escapeHtml(r.id)}" title="Remove this student">Remove</button></div>`).join('')
+          : '<div class="lr-empty muted">No students have joined yet.</div>'
+      }</div>` : '';
       strip.innerHTML = `
-        <div class="live-head"><span class="live-dot">● LIVE</span> <span>${Live.count || 0} student${Live.count === 1 ? '' : 's'}</span>
+        <div class="live-head"><span class="live-dot">● LIVE</span>
+          <button class="live-count-btn" id="rosterToggle" aria-expanded="${Live.showRoster ? 'true' : 'false'}">${Live.count || 0} student${Live.count === 1 ? '' : 's'} <span class="lc-chev">${Live.showRoster ? '▴' : '▾'}</span></button>
           ${Audio.on ? '<span class="audio-live">🎤 audio on</span>' : ''}
           <button class="btn ghost small" id="endLiveBtn">End live</button></div>
+        ${rosterHtml}
         <div class="live-body">${aggHtml} ${react}${audioBlock}<div class="live-qtitle">Questions</div>${qs}</div>`;
+      const rt = document.getElementById('rosterToggle');
+      if (rt) rt.addEventListener('click', () => { Live.showRoster = !Live.showRoster; renderLiveChrome(); });
+      strip.querySelectorAll('.lr-kick').forEach((b) => b.addEventListener('click', () => {
+        const row = b.closest('.lr-row'); const nm = row ? row.querySelector('.lr-name').textContent : 'this student';
+        if (window.confirm(`Remove ${nm} from the session?`)) liveSend({ type: 'kick', id: b.dataset.id });
+      }));
       document.getElementById('endLiveBtn').addEventListener('click', teacherEndLive);
       strip.querySelectorAll('.q-clear').forEach((b) => b.addEventListener('click', () => liveSend({ type: 'question:clear', id: b.dataset.id })));
       const mt = document.getElementById('micToggle'); if (mt) mt.addEventListener('click', toggleMyMic);
@@ -1416,6 +1496,21 @@
     if (img && img.dataset.url !== Live.shareUrl) { img.src = `/qr?d=${encodeURIComponent(Live.shareUrl)}`; img.dataset.url = Live.shareUrl; }
     const host = document.getElementById('lessonQrHost');
     if (host) host.textContent = Live.shareUrl.replace(/^https?:\/\//, '');
+    // The join code IS the share token (last path segment). Students type it on
+    // the homepage; click to copy.
+    const codeEl = document.getElementById('lessonQrCode');
+    if (codeEl) {
+      const code = Live.shareUrl.split('/').pop();
+      if (codeEl.dataset.code !== code) {
+        codeEl.dataset.code = code;
+        codeEl.textContent = code;
+        codeEl.onclick = () => {
+          try { navigator.clipboard.writeText(code); } catch (_) {}
+          codeEl.textContent = 'Copied ✓';
+          setTimeout(() => { codeEl.textContent = codeEl.dataset.code; }, 1200);
+        };
+      }
+    }
     dock.hidden = lessonQrCollapsed;
     reopen.hidden = !lessonQrCollapsed;
   }
@@ -1539,8 +1634,12 @@
         const data = await api(`/api/public/lesson/${token}`);
         loadSetIntoStudy(data.set);
         mountPublicRating(data.set, token);
-        // If the lesson is live right now, join the session as a student.
-        if (data.set.isLive) connectLive(token, 'student');
+        // If the lesson is live right now, ask the student's name (no login),
+        // then join the session under that name.
+        if (data.set.isLive) {
+          const name = state.user ? ([state.user.firstName, state.user.lastName].filter(Boolean).join(' ') || null) : await promptStudentName(token);
+          connectLive(token, 'student', name);
+        }
       } catch (error) {
         setStatus(error.message || 'This lesson is not available.', 'error');
       }

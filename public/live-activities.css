@@ -206,6 +206,40 @@
 @media (prefers-reduced-motion: reduce) {
   .la-overlay, .la-card, .la-bar-fill, .la-toast { animation: none !important; transition: none !important; }
 }
+
+/* ---- Student name gate (no-login join) ---- */
+.name-gate { position: fixed; inset: 0; z-index: 5000; display: grid; place-items: center; padding: 20px;
+  background: rgba(8,14,30,.62); backdrop-filter: blur(4px); }
+.name-gate-card { width: min(420px, 100%); background: #fff; color: #12203a; border-radius: 20px; padding: 26px;
+  box-shadow: 0 30px 70px rgba(10,15,40,.45); text-align: center; }
+.ng-eyebrow { font-size: .7rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: #0e63ff; }
+.ng-title { margin: 6px 0 4px; font-size: 1.5rem; font-weight: 900; }
+.ng-sub { margin: 0 0 18px; font-size: .9rem; color: #5a6b86; line-height: 1.4; }
+.ng-row { display: flex; gap: 10px; margin-bottom: 12px; }
+.ng-input { flex: 1; min-width: 0; font: inherit; font-size: 1rem; padding: 12px 13px; border-radius: 11px; border: 1.5px solid #d5dce8; color: #12203a; }
+.ng-input:focus { outline: none; border-color: #0e63ff; }
+.ng-btn { display: inline-block; width: 100%; box-sizing: border-box; text-align: center; text-decoration: none; font: inherit; font-weight: 800; font-size: 1rem;
+  padding: 13px 16px; border-radius: 12px; border: 0; cursor: pointer; background: #0e63ff; color: #fff; }
+.ng-btn:hover:not(:disabled) { background: #0b52d6; }
+.ng-btn:disabled { opacity: .45; cursor: not-allowed; }
+
+/* ---- Teacher: join code chip on the session QR ---- */
+.session-qr-code { font: inherit; font-weight: 800; font-size: .96rem; letter-spacing: .02em; cursor: pointer;
+  background: rgba(14,99,255,.12); color: #0e63ff; border: 1px dashed rgba(14,99,255,.5); border-radius: 9px; padding: 5px 9px; margin: 3px 0; }
+.session-qr-code:hover { background: rgba(14,99,255,.2); }
+.session-qr-host { font-size: .68rem; opacity: .7; }
+
+/* ---- Teacher: clickable head-count + roster with remove ---- */
+.live-count-btn { font: inherit; font-weight: 700; font-size: inherit; cursor: pointer; background: transparent; border: 0; color: inherit;
+  padding: 2px 6px; border-radius: 8px; text-decoration: underline dotted; }
+.live-count-btn:hover { background: rgba(0,0,0,.06); }
+.lc-chev { font-size: .7em; }
+.live-roster { margin: 6px 0 8px; border: 1px solid var(--line, rgba(0,0,0,.12)); border-radius: 10px; padding: 6px; max-height: 200px; overflow: auto; }
+.lr-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 8px; border-radius: 8px; }
+.lr-row:hover { background: rgba(0,0,0,.04); }
+.lr-name { font-weight: 650; font-size: .88rem; }
+.lr-kick.xs { font-size: .74rem; padding: 3px 9px; }
+.lr-empty { padding: 8px; font-size: .84rem; }
 @media (max-width: 520px) {
   .la-panel, .la-teamroom { right: 8px; left: 8px; width: auto; }
   .la-launcher { right: 10px; bottom: 10px; }
