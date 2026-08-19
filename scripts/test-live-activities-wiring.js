@@ -188,7 +188,7 @@ console.log('\nwhiteboard: natural expressions + integral area');
   ok('expressions are normalized (superscripts / symbols) before parsing', /function normalizeExpr/.test(bjs) && /const source = normalizeExpr\(raw\)/.test(bjs));
   ok('family detection + params also normalize', /rhsOf[\s\S]{0,120}normalizeExpr/.test(bjs) && /const rhs = normalizeExpr\(expression\)/.test(bjs));
   ok('integrals draw shaded areas in one system', /function syncAnalysisGraph\(rawExprs, integrals\)/.test(bjs) && /obj\.areas = areas/.test(bjs));
-  ok('each integral adds an antiderivative curve + area band', /The "answer": y = /.test(bjs) && /areas\.push\(/.test(bjs));
+  ok('each integral plots only the resultant (antiderivative) curve', /Draw ONLY the resultant/.test(bjs) && /areas\.push\(/.test(bjs));
   ok('analyzer schema returns an integrals array with antiderivative', /"integrals": \[/.test(bsrv) && /antiderivative/.test(bsrv));
 }
 

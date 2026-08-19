@@ -1836,13 +1836,13 @@
       const F = normalizeExpr(intg.antiderivative || '').trim();
       const from = Number(intg.from), to = Number(intg.to);
       const hasBounds = Number.isFinite(from) && Number.isFinite(to) && from !== to;
-      // The "answer": y = ∫ f dx = F(x). Plotted as its own curve.
-      if (F) addCurve(/=/.test(F) ? F : `y = ${F}`);
-      // The integrand, with a shaded band whose area equals the definite integral.
-      if (integrand) {
-        const ci = addCurve(/=/.test(integrand) ? integrand : `y = ${integrand}`);
-        if (ci >= 0 && hasBounds) areas.push({ ci, from: Math.min(from, to), to: Math.max(from, to), color: AREA_FILLS[areas.length % AREA_FILLS.length], value: intg.value, integrand, antiderivative: F });
-      }
+      // Draw ONLY the resultant of the integral — the antiderivative y = ∫f dx =
+      // F(x). The integrand (e.g. the straight line y = x) is intentionally NOT
+      // plotted; it just added clutter. Shade the resultant over [a,b].
+      const curveExpr = F ? (/=/.test(F) ? F : `y = ${F}`) : (integrand ? (/=/.test(integrand) ? integrand : `y = ${integrand}`) : null);
+      if (!curveExpr) return;
+      const ci = addCurve(curveExpr);
+      if (ci >= 0 && hasBounds) areas.push({ ci, from: Math.min(from, to), to: Math.max(from, to), color: AREA_FILLS[areas.length % AREA_FILLS.length], value: intg.value, integrand, antiderivative: F });
     });
     if (!curves.length) return;
 
@@ -1887,12 +1887,12 @@
     if ((areas || []).length) {
       const rows = areas.map((a) => {
         const bounds = `from ${fmtNum(a.from)} to ${fmtNum(a.to)}`;
-        const anti = a.antiderivative ? `∫ ${escapeHtml(a.integrand)} dx = ${escapeHtml(a.antiderivative)}` : `∫ ${escapeHtml(a.integrand)} dx`;
+        const anti = a.antiderivative ? `∫ ${escapeHtml(a.integrand || 'f')} dx = ${escapeHtml(a.antiderivative)}` : `∫ ${escapeHtml(a.integrand || 'f')} dx`;
         const val = (a.value !== undefined && a.value !== null) ? ` = <strong>${escapeHtml(String(a.value))}</strong>` : '';
         return `<div class="insight-fact"><span style="border-left:3px solid ${a.color.replace('0.22', '0.9').replace('0.24', '0.9')};padding-left:6px">${anti}</span><span>${escapeHtml(bounds)}${val}</span></div>`;
       }).join('');
-      blocks.push(`<h4>Integral — area under the curve</h4><div class="insight-facts">${rows}</div>
-        <div class="insight-method">The shaded band is the area between the integrand and the x-axis over the limits; that area IS the definite integral. The separate curve is the antiderivative y = ∫f dx (the result of integrating).</div>`);
+      blocks.push(`<h4>Integral — the resultant curve</h4><div class="insight-facts">${rows}</div>
+        <div class="insight-method">The plotted curve is the antiderivative y = ∫f dx (the result of integrating), shaded across the limits. The definite integral equals the change in that antiderivative between the limits: F(b) − F(a) (shown above).</div>`);
     }
 
     if ((obj.intersections || []).length && (equationIdx || []).length >= 2) {
