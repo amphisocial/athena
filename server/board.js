@@ -144,6 +144,7 @@ function boardSummary(board) {
     subject: board.subject || null,
     grade: board.grade || '',
     topic: board.topic || '',
+    topicId: board.topicId || '',
     public: Boolean(board.public),
     rating: board.rating || { sum: 0, count: 0 },
     pageCount: board.pages.length,
@@ -208,6 +209,10 @@ function attachBoardRoutes(app, deps) {
       subject,
       grade: String(body.grade || '').trim().slice(0, 40),
       topic: String(body.topic || '').trim().slice(0, 80),
+      // Curriculum topic id (set when the board was started from a topic), so
+      // in-session polls/team quizzes can be scoped to this exact topic — the
+      // same way lessons are keyed by topicId.
+      topicId: String(body.topicId || '').trim().slice(0, 80),
       public: Boolean(body.public)
     };
   }
@@ -247,6 +252,7 @@ function attachBoardRoutes(app, deps) {
       subject: meta.subject,
       grade: meta.grade,
       topic: meta.topic,
+      topicId: meta.topicId,
       public: meta.public,
       createdAt: nowIso(),
       updatedAt: nowIso(),

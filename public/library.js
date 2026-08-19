@@ -263,6 +263,7 @@
     return () => selected;
   }
   function openNewBoard() {
+    pendingBoardTopicId = '';   // a blank board isn't tied to a curriculum topic
     if (!getSelectedTemplate) getSelectedTemplate = buildTemplatePicker();
     if ($('#newBoardName')) $('#newBoardName').value = '';
     $('#templateDialog').showModal();
@@ -278,7 +279,7 @@
     $('#createBoardBtn').disabled = true;
     try {
       const data = await api('/api/board/mine/new', { method: 'POST',
-        body: JSON.stringify({ title, template, subject, grade, topic, public: isPublic }) });
+        body: JSON.stringify({ title, template, subject, grade, topic, topicId: pendingBoardTopicId, public: isPublic }) });
       window.location.href = `/board/${data.board.id}`;
     } catch (error) {
       setStatus(error.message, 'error');
@@ -297,6 +298,7 @@
   let lcGrade = 5;
   let lcSubject = 'math';
   let pendingLessonTopicId = '';   // set when a curriculum topic drives the lesson
+  let pendingBoardTopicId = '';    // set when a curriculum topic drives a whiteboard
   let pendingLessonFormat = '';    // Slides/Flashcards/Quiz chosen on /learning
   let myTopicContent = {};         // topicId -> { slides, flashcard, quiz, mixed }
 
@@ -387,6 +389,7 @@
 
   // Prefill + open the New whiteboard dialog for a topic.
   function startTopicWhiteboard(topic) {
+    pendingBoardTopicId = topic.id || '';   // curriculum topic -> board.topicId (scopes live polls/teams)
     if (!getSelectedTemplate) getSelectedTemplate = buildTemplatePicker();
     if ($('#newBoardName')) $('#newBoardName').value = topic.title || '';
     if ($('#newBoardSubject')) $('#newBoardSubject').value = topic.subject || '';
