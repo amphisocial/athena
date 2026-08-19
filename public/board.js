@@ -1553,13 +1553,56 @@
   let analysisGraphId = null;
   function normExpr(e) { return String(e || '').replace(/\s+/g, '').toLowerCase(); }
 
+  // Rearrange an equation into plottable "y = f(x)" form when possible.
+  //  - "y = ..."            -> kept as-is
+  //  - a bare "4x^2" etc.   -> "y = 4x^2"
+  //  - implicit LINEAR      -> solved for y:  Ax + By = C  ->  y = (C - Ax)/B
+  //    (this is what makes 2x + 3y = 12 and 5x - 3y = 9 actually graph)
+  //  - anything else it can't solve for y (circles, x = k, ...) -> null (skip)
+  function coefOf(token) {
+    if (token === '' || token === '+') return 1;
+    if (token === '-') return -1;
+    const n = Number(token);
+    return Number.isFinite(n) ? n : NaN;
+  }
+  function linearParts(side) {
+    // side like "2x+3y-12" -> { a:2, b:3, c:-12 }. Returns null if non-linear.
+    if (!side) return { a: 0, b: 0, c: 0 };
+    if (/[\^]|sqrt|sin|cos|tan|log|ln|exp|abs|\//i.test(side)) return null; // not plain linear
+    let a = 0, b = 0, c = 0;
+    const terms = side.replace(/-/g, '+-').split('+').filter((t) => t !== '');
+    for (const term of terms) {
+      if (/x/i.test(term) && /y/i.test(term)) return null; // xy term -> non-linear
+      if (/y/i.test(term)) { const co = coefOf(term.replace(/y/i, '')); if (!Number.isFinite(co)) return null; b += co; }
+      else if (/x/i.test(term)) { const co = coefOf(term.replace(/x/i, '')); if (!Number.isFinite(co)) return null; a += co; }
+      else { const n = Number(term); if (!Number.isFinite(n)) return null; c += n; }
+    }
+    return { a, b, c };
+  }
+  function toExplicitY(raw) {
+    const s = String(raw || '').replace(/\s+/g, '');
+    if (!s) return null;
+    if (!s.includes('=')) return /[a-wyz]/i.test(s) ? `y = ${raw}` : null; // bare expr in x
+    const [lhs, rhs] = s.split('=');
+    if (/^y$/i.test(lhs)) return `y = ${rhs}`;
+    if (/^y$/i.test(rhs)) return `y = ${lhs}`;
+    // Move everything to one side: (lhs) - (rhs) = 0, then solve linear for y.
+    const L = linearParts(lhs), R = linearParts(rhs);
+    if (!L || !R) return null;
+    const a = L.a - R.a, b = L.b - R.b, c = L.c - R.c;
+    if (!Number.isFinite(a) || !Number.isFinite(b) || !Number.isFinite(c)) return null;
+    if (Math.abs(b) < 1e-9) return null; // no y (vertical line) — can't plot as y=f(x)
+    // a·x + b·y + c = 0  ->  y = (-c - a·x)/b
+    return `y = (${-c} - (${a})*x)/(${b})`;
+  }
+
   function syncAnalysisGraph(rawExprs) {
-    // Keep only distinct, plottable expressions (skip anything the parser can't
-    // compile, e.g. implicit forms the analyzer didn't solve for y).
+    // Normalise to y = f(x) (solving implicit linear equations), then keep only
+    // distinct, plottable expressions.
     const seen = new Set();
     const exprs = [];
     (rawExprs || []).forEach((e) => {
-      const expr = String(e || '').trim();
+      const expr = toExplicitY(e);
       if (!expr) return;
       const key = normExpr(expr);
       if (seen.has(key)) return;

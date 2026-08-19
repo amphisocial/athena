@@ -85,5 +85,48 @@ console.log('three curves: pairwise crossings are all found');
   ok('y=-x ∩ y=3 at (-3,3)', has(-3, 3));
 }
 
+// Mirror of board.js linear solver (linearParts + toExplicitY math).
+function coefOf(t) { if (t === '' || t === '+') return 1; if (t === '-') return -1; const n = Number(t); return Number.isFinite(n) ? n : NaN; }
+function linearParts(side) {
+  if (!side) return { a: 0, b: 0, c: 0 };
+  if (/[\^]|sqrt|sin|cos|tan|log|ln|exp|abs|\//i.test(side)) return null;
+  let a = 0, b = 0, c = 0;
+  const terms = side.replace(/-/g, '+-').split('+').filter((t) => t !== '');
+  for (const term of terms) {
+    if (/x/i.test(term) && /y/i.test(term)) return null;
+    if (/y/i.test(term)) { const co = coefOf(term.replace(/y/i, '')); if (!Number.isFinite(co)) return null; b += co; }
+    else if (/x/i.test(term)) { const co = coefOf(term.replace(/x/i, '')); if (!Number.isFinite(co)) return null; a += co; }
+    else { const n = Number(term); if (!Number.isFinite(n)) return null; c += n; }
+  }
+  return { a, b, c };
+}
+function solveForY(raw) {
+  const s = String(raw).replace(/\s+/g, '');
+  if (!s.includes('=')) return null;
+  const [lhs, rhs] = s.split('=');
+  const L = linearParts(lhs), R = linearParts(rhs);
+  if (!L || !R) return null;
+  const a = L.a - R.a, b = L.b - R.b, c = L.c - R.c;
+  if (!Number.isFinite(a) || !Number.isFinite(b) || Math.abs(b) < 1e-9) return null;
+  return (x) => (-c - a * x) / b;
+}
+
+console.log('implicit linear system: 2x+3y=12 and 5x-3y=9  ->  (3,2)');
+{
+  const f = solveForY('2x + 3y = 12');
+  const g = solveForY('5x - 3y = 9');
+  ok('both implicit lines solve for y', typeof f === 'function' && typeof g === 'function');
+  ok('2x+3y=12 passes through (0,4) and (3,2)', near(f(0), 4) && near(f(3), 2));
+  ok('5x-3y=9 passes through (0,-3) and (3,2)', near(g(0), -3) && near(g(3), 2));
+  const pts = intersections([f, g]);
+  ok('the system intersects at (3,2)', pts.length === 1 && near(pts[0].x, 3) && near(pts[0].y, 2));
+}
+
+console.log('non-linear implicit is skipped (returns null)');
+{
+  ok('x^2 + y^2 = 25 (circle) is not solved as y=f(x)', solveForY('x^2 + y^2 = 25') === null);
+  ok('xy = 1 (product term) is not linearised', solveForY('xy = 1') === null);
+}
+
 console.log(`\nAll ${passed} assertions passed.`);
 process.exit(0);

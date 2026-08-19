@@ -164,6 +164,8 @@ console.log('\nwhiteboard graph rework + Exit-ends-live');
   ok('an AI note explains the intersection method', /function renderIntersectionNote/.test(bjs) && /set the two expressions equal/.test(bjs));
   ok('live-analyze note is self-replacing (no stacking)', /id="liveAnalyzeNote"|liveAnalyzeNote/.test(bjs) && /opts\.live/.test(bjs));
   ok('board Exit stops live before leaving', /#exitLink[\s\S]{0,400}stop-live/.test(bjs));
+  ok('implicit linear equations are solved for y before plotting', /function toExplicitY/.test(bjs) && /function linearParts/.test(bjs) && /const expr = toExplicitY\(e\)/.test(bjs));
+  ok('analyzer is told to always plot system equations', /every equation solved for y|rearranged into explicit y = f\(x\)/.test(read('server/board.js')));
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);
