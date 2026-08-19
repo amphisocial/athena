@@ -2,16 +2,21 @@
  * curriculum-data.js — the Massachusetts curriculum topic catalog.
  *
  * Single source of truth for the public "Learning" page. Topics are organized
- * by Grade (5–10) × Subject (math | science) × Strand, mirroring the structure
+ * by Grade (5–12) × Subject (math | science) × Strand, mirroring the structure
  * of the Massachusetts Curriculum Frameworks:
  *   - Mathematics (2017 framework): grades 5–8 are organized by *domain*
- *     (e.g. Number & Operations—Fractions); high school (grades 9–10 here,
- *     Algebra I & Geometry) by *conceptual category*.
+ *     (e.g. Number & Operations—Fractions); high school by *conceptual
+ *     category*, assigned here to the MA model course sequence — Algebra I
+ *     (gr.9), Geometry (gr.10), Algebra II (gr.11), and Precalculus with an
+ *     introduction to Calculus (gr.12).
  *   - Science & Technology/Engineering (2016/2020 STE framework): grades 5–8
  *     integrate the four disciplines (Earth & Space, Life, Physical,
  *     Technology/Engineering) at each grade; high school is by discipline
  *     (Biology, Earth & Space Science in gr.9; Chemistry, Physics,
- *     Technology/Engineering in gr.10, per common MA course sequences).
+ *     Technology/Engineering in gr.10). Grades 11–12 extend the HS STE
+ *     standards through MA-common advanced courses — Anatomy & Physiology,
+ *     Environmental Science, and advanced Chemistry (gr.11); Advanced Physics,
+ *     Modern Physics, Astronomy, and Molecular Biology (gr.12).
  *
  * Topic titles are written here in our own words as student-facing concept
  * names; they are NOT copied from any commercial skill list. `standard` carries
@@ -466,6 +471,158 @@ const CURRICULUM = [
     { title: 'Optimize with trade-offs', standard: 'HS-ETS1' },
     { title: 'Material properties and selection', standard: 'HS-ETS3' },
     { title: 'Mechanical, fluid, and electrical systems', standard: 'HS-ETS3' }
+  ] },
+
+  // ======================================================================
+  // MATH — GRADE 11  (Algebra II, per the MA model course sequence:
+  // conceptual categories N-CN, A-APR, A-REI, F-IF/BF/LE/TF, S-ID/IC)
+  // ======================================================================
+  { grade: 11, subject: 'math', strand: 'Number & Quantity — Complex Numbers', topics: [
+    { title: 'Imaginary and complex numbers', standard: 'HS.N-CN' },
+    { title: 'Add, subtract, and multiply complex numbers', standard: 'HS.N-CN' },
+    { title: 'Complex solutions of quadratic equations', standard: 'HS.N-CN', template: 'quadratic' }
+  ] },
+  { grade: 11, subject: 'math', strand: 'Polynomial Expressions & Functions', topics: [
+    { title: 'Polynomial arithmetic and the Remainder Theorem', standard: 'HS.A-APR' },
+    { title: 'Factor higher-degree polynomials', standard: 'HS.A-APR' },
+    { title: 'Zeros, multiplicity, and end behavior', standard: 'HS.A-APR', template: 'quadratic' },
+    { title: 'Graph polynomial functions', standard: 'HS.F-IF', template: 'quadratic' }
+  ] },
+  { grade: 11, subject: 'math', strand: 'Rational & Radical Expressions', topics: [
+    { title: 'Simplify and operate on rational expressions', standard: 'HS.A-APR' },
+    { title: 'Solve rational equations', standard: 'HS.A-REI' },
+    { title: 'Rational exponents and simplifying radicals', standard: 'HS.N-RN' },
+    { title: 'Solve radical equations', standard: 'HS.A-REI' }
+  ] },
+  { grade: 11, subject: 'math', strand: 'Advanced Equations & Systems', topics: [
+    { title: 'Solve systems with nonlinear equations', standard: 'HS.A-REI', template: 'quadratic' },
+    { title: 'Quadratic and polynomial inequalities', standard: 'HS.A-REI', template: 'quadratic' }
+  ] },
+  { grade: 11, subject: 'math', strand: 'Exponential & Logarithmic Functions', topics: [
+    { title: 'Exponential growth and decay', standard: 'HS.F-LE' },
+    { title: 'Logarithms and their properties', standard: 'HS.F-BF' },
+    { title: 'Solve exponential and logarithmic equations', standard: 'HS.F-LE' },
+    { title: 'Model with exponential and log functions', standard: 'HS.F-LE' }
+  ] },
+  { grade: 11, subject: 'math', strand: 'Trigonometric Functions', topics: [
+    { title: 'Angles, radians, and the unit circle', standard: 'HS.F-TF' },
+    { title: 'Sine, cosine, and tangent as functions', standard: 'HS.F-TF', template: 'pendulum' },
+    { title: 'Graph and transform trigonometric functions', standard: 'HS.F-TF', template: 'pendulum' },
+    { title: 'Model periodic phenomena', standard: 'HS.F-TF', template: 'pendulum' }
+  ] },
+  { grade: 11, subject: 'math', strand: 'Statistics & Inference', topics: [
+    { title: 'The normal distribution', standard: 'HS.S-ID' },
+    { title: 'Sampling and experimental design', standard: 'HS.S-IC' },
+    { title: 'Estimate population parameters', standard: 'HS.S-IC' },
+    { title: 'Interpret and evaluate statistical claims', standard: 'HS.S-IC' }
+  ] },
+
+  // ======================================================================
+  // MATH — GRADE 12  (Precalculus with an introduction to Calculus, per the
+  // MA model advanced courses: F-IF/BF/TF, N-CN/VM, G-GPE)
+  // ======================================================================
+  { grade: 12, subject: 'math', strand: 'Functions & Their Behavior', topics: [
+    { title: 'Domain, range, and end behavior', standard: 'HS.F-IF' },
+    { title: 'Piecewise and step functions', standard: 'HS.F-IF' },
+    { title: 'Composition of functions', standard: 'HS.F-BF' },
+    { title: 'Inverse functions', standard: 'HS.F-BF' },
+    { title: 'Transform and combine functions', standard: 'HS.F-BF', template: 'quadratic' }
+  ] },
+  { grade: 12, subject: 'math', strand: 'Advanced Trigonometry', topics: [
+    { title: 'Fundamental trigonometric identities', standard: 'HS.F-TF' },
+    { title: 'Sum, difference, and double-angle formulas', standard: 'HS.F-TF' },
+    { title: 'Inverse trigonometric functions', standard: 'HS.F-TF', template: 'pendulum' },
+    { title: 'Solve trigonometric equations', standard: 'HS.F-TF' },
+    { title: 'Law of Sines and Law of Cosines', standard: 'HS.G-SRT' }
+  ] },
+  { grade: 12, subject: 'math', strand: 'Complex Numbers, Vectors & Matrices', topics: [
+    { title: 'Polar form of complex numbers', standard: 'HS.N-CN' },
+    { title: 'Vectors and vector operations', standard: 'HS.N-VM' },
+    { title: 'Matrix operations', standard: 'HS.N-VM' },
+    { title: 'Solve systems using matrices', standard: 'HS.A-REI', template: 'linear' }
+  ] },
+  { grade: 12, subject: 'math', strand: 'Analytic Geometry — Conic Sections', topics: [
+    { title: 'Parabolas as conic sections', standard: 'HS.G-GPE', template: 'quadratic' },
+    { title: 'Circles and ellipses', standard: 'HS.G-GPE' },
+    { title: 'Hyperbolas', standard: 'HS.G-GPE' },
+    { title: 'Polar coordinates and graphs', standard: 'HS.G-GPE' }
+  ] },
+  { grade: 12, subject: 'math', strand: 'Sequences, Series & Limits', topics: [
+    { title: 'Arithmetic and geometric series', standard: 'HS.F-BF' },
+    { title: 'Sigma notation and summation', standard: 'HS.F-BF' },
+    { title: 'Limits and continuity', standard: 'HS.F-IF' }
+  ] },
+  { grade: 12, subject: 'math', strand: 'Introduction to Calculus', topics: [
+    { title: 'Average and instantaneous rate of change', standard: 'HS.F-IF', template: 'linear' },
+    { title: 'The derivative and tangent lines', standard: 'HS.F-IF', template: 'quadratic' },
+    { title: 'Area under a curve and the definite integral', standard: 'HS.F-IF', template: 'quadratic' }
+  ] },
+
+  // ======================================================================
+  // SCIENCE — GRADE 11  (MA-common junior courses that extend the HS STE
+  // standards: Anatomy & Physiology, Environmental Science, adv. Chemistry)
+  // ======================================================================
+  { grade: 11, subject: 'science', strand: 'Anatomy & Physiology — Body Systems', topics: [
+    { title: 'Organization of the human body', standard: 'HS-LS1' },
+    { title: 'The skeletal and muscular systems', standard: 'HS-LS1' },
+    { title: 'The circulatory and respiratory systems', standard: 'HS-LS1' },
+    { title: 'The nervous and endocrine systems', standard: 'HS-LS1' },
+    { title: 'The digestive and excretory systems', standard: 'HS-LS1' },
+    { title: 'Homeostasis and feedback loops', standard: 'HS-LS1' }
+  ] },
+  { grade: 11, subject: 'science', strand: 'Environmental Science — Ecosystems & Sustainability', topics: [
+    { title: 'Biodiversity and ecosystem services', standard: 'HS-LS2' },
+    { title: 'Human population and resource use', standard: 'HS-ESS3' },
+    { title: 'Energy resources and alternatives', standard: 'HS-ESS3' },
+    { title: 'Pollution and environmental health', standard: 'HS-ESS3' },
+    { title: 'Climate change and mitigation', standard: 'HS-ESS3' }
+  ] },
+  { grade: 11, subject: 'science', strand: 'Advanced Chemistry — Reactions & Energy', topics: [
+    { title: 'Reaction rates and kinetics', standard: 'HS-PS1' },
+    { title: 'Chemical equilibrium', standard: 'HS-PS1' },
+    { title: 'Thermochemistry and enthalpy', standard: 'HS-PS3' },
+    { title: 'Oxidation–reduction reactions', standard: 'HS-PS1', template: 'molecule' },
+    { title: 'Introduction to organic chemistry', standard: 'HS-PS1', template: 'molecule' }
+  ] },
+  { grade: 11, subject: 'science', strand: 'Advanced Chemistry — Solutions & Acids/Bases', topics: [
+    { title: 'Solution chemistry and molarity', standard: 'HS-PS1' },
+    { title: 'Acid–base theories and pH', standard: 'HS-PS1' },
+    { title: 'Titrations and buffers', standard: 'HS-PS1' },
+    { title: 'Electrochemistry', standard: 'HS-PS1', template: 'molecule' }
+  ] },
+
+  // ======================================================================
+  // SCIENCE — GRADE 12  (MA-common advanced/AP-level electives extending the
+  // HS STE standards: Advanced Physics, Astronomy, Molecular Biology)
+  // ======================================================================
+  { grade: 12, subject: 'science', strand: 'Advanced Physics — Mechanics', topics: [
+    { title: 'Rotational motion and torque', standard: 'HS-PS2' },
+    { title: 'Circular motion and gravitation', standard: 'HS-PS2', template: 'newton' },
+    { title: 'Momentum, impulse, and collisions', standard: 'HS-PS2' },
+    { title: 'Oscillations and simple harmonic motion', standard: 'HS-PS2', template: 'pendulum' }
+  ] },
+  { grade: 12, subject: 'science', strand: 'Advanced Physics — Electricity & Magnetism', topics: [
+    { title: 'Electric fields and potential', standard: 'HS-PS3' },
+    { title: 'Circuits and Ohm’s law', standard: 'HS-PS3' },
+    { title: 'Magnetism and electromagnetic induction', standard: 'HS-PS2' },
+    { title: 'Electromagnetic waves', standard: 'HS-PS4', template: 'reflection' }
+  ] },
+  { grade: 12, subject: 'science', strand: 'Modern Physics', topics: [
+    { title: 'The photoelectric effect and quanta', standard: 'HS-PS4' },
+    { title: 'Atomic and nuclear physics', standard: 'HS-PS1', template: 'molecule' },
+    { title: 'An introduction to relativity', standard: 'HS-PS2' }
+  ] },
+  { grade: 12, subject: 'science', strand: 'Astronomy & Cosmology', topics: [
+    { title: 'Stellar formation and life cycles', standard: 'HS-ESS1', template: 'globe' },
+    { title: 'Galaxies and the structure of the universe', standard: 'HS-ESS1', template: 'globe' },
+    { title: 'The Big Bang and cosmic expansion', standard: 'HS-ESS1' },
+    { title: 'Exoplanets and the search for life', standard: 'HS-ESS1', template: 'globe' }
+  ] },
+  { grade: 12, subject: 'science', strand: 'Molecular Biology & Biotechnology', topics: [
+    { title: 'Gene expression and regulation', standard: 'HS-LS1', template: 'molecule' },
+    { title: 'Genetic engineering and CRISPR', standard: 'HS-LS3' },
+    { title: 'Proteins and enzyme function', standard: 'HS-LS1', template: 'molecule' },
+    { title: 'Bioethics and applications of biotechnology', standard: 'HS-LS3' }
   ] }
 ];
 

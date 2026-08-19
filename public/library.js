@@ -292,7 +292,7 @@
   //  grade, subject and topic prefilled; the normal create flow then saves.
   // =====================================================================
   const SUBJECT_LABEL = { math: 'Math', science: 'Science' };
-  const LC_GRADES = [5, 6, 7, 8, 9, 10];
+  const LC_GRADES = [5, 6, 7, 8, 9, 10, 11, 12];
   let lcOverview = null;
   let lcGrade = 5;
   let lcSubject = 'math';

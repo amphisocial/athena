@@ -15,7 +15,7 @@
   const { $, escapeHtml, api } = C;
 
   const SUBJECT_LABEL = { math: 'Math', science: 'Science' };
-  const GRADES = [5, 6, 7, 8, 9, 10];
+  const GRADES = [5, 6, 7, 8, 9, 10, 11, 12];
 
   // Templates the no-login sandbox can auto-seed onto a live board (see
   // sandbox.js). A catalog topic may reference a template that isn't seedable
@@ -241,7 +241,7 @@
       loadTopics();
     } else {
       el.title.textContent = 'Pick a grade and subject';
-      el.lede.innerHTML = 'Every Math &amp; Science topic, grades 5&ndash;10, organized by strand. Choose a grade and a subject to begin &mdash; then jump between them anytime from the bar up top.';
+      el.lede.innerHTML = 'Every Math &amp; Science topic, grades 5&ndash;12, organized by strand. Choose a grade and a subject to begin &mdash; then jump between them anytime from the bar up top.';
       el.crumbTail.innerHTML = '';
       // The filter bar is useful even here once a grade is picked, but keep the
       // full selection cards as the primary affordance until both are chosen.

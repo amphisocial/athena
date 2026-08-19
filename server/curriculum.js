@@ -1,7 +1,7 @@
 /*
  * curriculum.js — the Learning catalog (Massachusetts topics) backed by Postgres.
  *
- * The public "Learning" page lets anyone pick a Grade (5–10) and Subject
+ * The public "Learning" page lets anyone pick a Grade (5–12) and Subject
  * (math | science) and see every Massachusetts topic for that combination,
  * grouped by strand. The catalog itself lives in curriculum-data.js; this
  * module owns the database side:
@@ -24,7 +24,7 @@ const { CURRICULUM } = require('./curriculum-data');
 
 const SUBJECTS = ['math', 'science'];
 const MIN_GRADE = 5;
-const MAX_GRADE = 10;
+const MAX_GRADE = 12;
 
 const slug = (s) => String(s || '')
   .toLowerCase()
