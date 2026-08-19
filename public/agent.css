@@ -1,0 +1,97 @@
+/* AI Agent page — leans on styles.css tokens (.btn, .panel, .section-kicker). */
+
+.agent-page {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 28px 20px 80px;
+}
+
+.agent-head { margin-bottom: 18px; }
+.agent-head h1 { margin: 6px 0 8px; font-size: 30px; font-weight: 800; }
+.agent-sub { color: #5a6b85; max-width: 640px; line-height: 1.5; }
+
+.agent-step {
+  background: #fff;
+  border: 1px solid #e2e9f5;
+  border-radius: 16px;
+  padding: 20px 22px;
+  margin-bottom: 16px;
+  box-shadow: 0 6px 20px rgba(15, 30, 53, 0.04);
+  transition: opacity .2s ease;
+}
+.agent-step.is-locked { opacity: .45; pointer-events: none; }
+
+.step-title { display: flex; align-items: center; gap: 12px; margin-bottom: 6px; }
+.step-title h2 { font-size: 19px; font-weight: 700; margin: 0; }
+.step-num {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 30px; height: 30px; border-radius: 50%;
+  background: #2563ff; color: #fff; font-weight: 700; font-size: 15px; flex: none;
+}
+.step-body { padding-top: 12px; display: flex; flex-direction: column; gap: 16px; }
+
+.field { display: flex; flex-direction: column; gap: 6px; }
+.field label { font-weight: 600; font-size: 14px; color: #24324a; }
+.field select, .field input[type="number"], .field input[type="text"], .field input:not([type]) {
+  border: 1px solid #cfdaeb; border-radius: 10px; padding: 10px 12px; font: inherit;
+  background: #fff; max-width: 420px;
+}
+
+.subject-toggle { display: flex; gap: 8px; }
+.subj-btn {
+  border: 1px solid #cfdaeb; background: #f6f9ff; color: #24324a;
+  padding: 9px 18px; border-radius: 10px; font-weight: 600; cursor: pointer;
+}
+.subj-btn.active { background: #2563ff; color: #fff; border-color: #2563ff; }
+
+.topics-toolbar {
+  display: flex; align-items: center; justify-content: space-between;
+  flex-wrap: wrap; gap: 10px; padding-bottom: 8px; border-bottom: 1px solid #eef2f9;
+}
+.check-inline { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; }
+.muted { color: #7d8aa1; font-size: 13px; }
+.legend { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+
+.topics-list { display: flex; flex-direction: column; gap: 16px; max-height: 460px; overflow: auto; padding-right: 4px; }
+.strand-block h3 { font-size: 14px; text-transform: uppercase; letter-spacing: .04em; color: #7d8aa1; margin: 4px 0 8px; }
+.topic-row {
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 10px 12px; border: 1px solid #e8eef8; border-radius: 10px; background: #fbfcff;
+}
+.topic-row:hover { border-color: #cfdaeb; }
+.topic-row input { margin-top: 3px; }
+.topic-main { flex: 1; }
+.topic-main .t-title { font-weight: 600; color: #1c2941; }
+.topic-main .t-std { font-size: 12px; color: #8a97ad; }
+.topic-chips { display: flex; gap: 5px; margin-top: 5px; }
+.chip {
+  font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 20px;
+  border: 1px solid #dbe4f2; color: #8a97ad; background: #fff;
+}
+.chip.chip-has { background: #e7f2ea; border-color: #b7dcc2; color: #1f7a44; }
+
+.format-picker { display: flex; gap: 16px; flex-wrap: wrap; }
+.fmt-check { display: inline-flex; align-items: center; gap: 7px; font-weight: 600; cursor: pointer; }
+
+.counts-row { display: flex; gap: 16px; flex-wrap: wrap; }
+.counts-row .field { min-width: 160px; }
+
+.run-row { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.run-btn { font-size: 15px; padding: 12px 22px; }
+
+.progress-wrap { height: 12px; background: #eef2f9; border-radius: 20px; overflow: hidden; }
+.progress-bar { height: 100%; width: 0; background: linear-gradient(90deg, #2563ff, #4f86ff); transition: width .3s ease; }
+.progress-meta { font-weight: 600; color: #24324a; margin: 4px 0 0; }
+.progress-items { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; max-height: 320px; overflow: auto; }
+.p-item { display: flex; align-items: center; gap: 10px; font-size: 14px; padding: 6px 4px; border-bottom: 1px dashed #eef2f9; }
+.p-item .p-icon { width: 20px; text-align: center; }
+.p-item.done .p-icon { color: #1f7a44; }
+.p-item.error .p-icon { color: #b4232a; }
+.p-item .p-topic { flex: 1; color: #24324a; }
+.p-item .p-fmt { font-size: 12px; color: #7d8aa1; }
+.p-item .p-err { color: #b4232a; font-size: 12px; }
+
+@media (max-width: 620px) {
+  .agent-head h1 { font-size: 24px; }
+  .counts-row .field { min-width: 100%; }
+}

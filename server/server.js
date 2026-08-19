@@ -2345,6 +2345,284 @@ app.get('/api/learning/my-topic-content', requireUser, (req, res) => {
   }
 });
 
+// ---- Teacher AI Agent: bulk-fill Slides / Flashcards / Quiz ---------------
+// A background agent that fills a curriculum topic's (currently blank)
+// Slides / Flashcards / Quiz for a teacher. They pick a grade + subject and
+// one topic (or ALL topics), choose which formats to build and how many of
+// each, a difficulty, and any extra instructions. Each (topic × format) is
+// generated FROM that topic's stored teacher content (curriculum seed_content)
+// and saved as a study set linked to the topic (topicId) — which is exactly
+// what makes it appear on the topic's lesson chips and in my-topic-content.
+// The whole run happens in the background so ALL-topics jobs don't block the
+// request; the teacher gets an email summary when it finishes. Job progress is
+// tracked in memory (the generated sets themselves are persisted as normal).
+const AGENT_FORMATS = ['slides', 'flashcard', 'quiz'];
+const AGENT_MAX_GENERATIONS = 90;      // safety cap on (topics × formats) per run
+const agentJobs = new Map();           // jobId -> job
+
+function gradeLabelFor(g) { return g ? (/^grade/i.test(String(g)) ? String(g) : `Grade ${g}`) : ''; }
+function capitalizeWord(s) { return s ? s.charAt(0).toUpperCase() + s.slice(1) : s; }
+function agentFormatLabel(f) { return f === 'slides' ? 'Slides' : f === 'quiz' ? 'Quiz' : 'Flashcards'; }
+
+function agentDifficultySkew(level) {
+  switch (String(level || '').toLowerCase()) {
+    case 'easy':  return 'roughly 70% easy, 25% medium, 5% hard';
+    case 'hard':  return 'roughly 10% easy, 35% medium, 55% hard';
+    case 'mixed': return 'roughly 30% easy, 40% medium, 30% hard';
+    case 'medium':
+    default:      return 'roughly 25% easy, 50% medium, 25% hard';
+  }
+}
+
+function pruneAgentJobs() {
+  const cutoff = Date.now() - 2 * 60 * 60 * 1000; // keep 2h
+  for (const [jid, job] of agentJobs) {
+    if (new Date(job.updatedAt || job.createdAt).getTime() < cutoff) agentJobs.delete(jid);
+  }
+  if (agentJobs.size > 200) {
+    const oldest = [...agentJobs.entries()].sort((a, b) => String(a[1].createdAt).localeCompare(String(b[1].createdAt)));
+    for (let i = 0; i < oldest.length - 200; i += 1) agentJobs.delete(oldest[i][0]);
+  }
+}
+
+function agentJobView(job) {
+  return {
+    id: job.id, status: job.status,
+    grade: job.grade, subject: job.subject,
+    total: job.total, completed: job.completed, failed: job.failed, skipped: job.skipped,
+    topicCount: job.topicCount, createdAt: job.createdAt, finishedAt: job.finishedAt || null,
+    currentLabel: job.currentLabel || '',
+    items: job.items.map((it) => ({
+      topic: it.topicTitle, format: it.format, status: it.status,
+      setId: it.setId || null, error: it.error || ''
+    }))
+  };
+}
+
+// Map of (topicId,format) -> [setId,...] the teacher already saved, so a run
+// can skip or replace existing content instead of duplicating it.
+function existingTopicFormatSets(store, userId) {
+  const map = new Map();
+  const fmtKey = (f) => (f === 'slides' ? 'slides' : f === 'quiz' ? 'quiz' : f === 'flashcard' ? 'flashcard' : 'mixed');
+  (store.quizlets || []).forEach((s) => {
+    if (s.ownerId !== userId || !s.topicId) return;
+    const key = `${s.topicId}::${fmtKey(s.format)}`;
+    if (!map.has(key)) map.set(key, []);
+    map.get(key).push(s.id);
+  });
+  return map;
+}
+
+function sendAgentSummaryEmail(job, user) {
+  const to = user.email;
+  if (!to) return Promise.resolve({ sent: false });
+  const madeByFormat = {};
+  job.items.forEach((it) => { if (it.status === 'done') madeByFormat[it.format] = (madeByFormat[it.format] || 0) + 1; });
+  const parts = AGENT_FORMATS.filter((f) => madeByFormat[f])
+    .map((f) => `${madeByFormat[f]} ${agentFormatLabel(f).toLowerCase()} set${madeByFormat[f] > 1 ? 's' : ''}`);
+  const summaryLine = parts.length ? parts.join(', ') : 'no new content';
+  const gsub = `${gradeLabelFor(job.grade)} ${capitalizeWord(job.subject)}`.trim();
+  const subject = job.failed
+    ? `Your AI Agent run finished — ${job.completed} created, ${job.failed} failed`
+    : `Your AI Agent run is done — ${job.completed} study set${job.completed === 1 ? '' : 's'} created`;
+  const libraryUrl = `${APP_BASE_URL}/library`;
+  const learningUrl = `${APP_BASE_URL}/learning`;
+  const text = `Your AI Agent finished building content for ${gsub}.\n\n`
+    + `Created: ${summaryLine} across ${job.topicCount} topic(s).\n`
+    + `${job.skipped ? `Skipped (already had content): ${job.skipped}.\n` : ''}`
+    + `${job.failed ? `Failed: ${job.failed}. Re-run the agent to retry those.\n` : ''}`
+    + `\nOpen your Library: ${libraryUrl}\nBrowse the topics: ${learningUrl}`;
+  const html = `<div style="font-family:Arial,sans-serif;color:#0f1e35">
+    <p>Your <strong>AI Agent</strong> finished building content for <strong>${gsub}</strong>.</p>
+    <p style="font-size:16px"><strong>Created:</strong> ${summaryLine} across ${job.topicCount} topic(s).</p>
+    ${job.skipped ? `<p style="color:#5a6b85">Skipped (already had content): ${job.skipped}.</p>` : ''}
+    ${job.failed ? `<p style="color:#b4232a">Failed: ${job.failed}. Re-run the agent to retry those.</p>` : ''}
+    <p><a href="${libraryUrl}" style="background:#2563ff;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none">Open your Library</a></p>
+    <p style="color:#5a6b85;font-size:13px">The new content also shows up on each topic on the <a href="${learningUrl}">Learning</a> page.</p>
+  </div>`;
+  return sendMail({ to, subject, text, html });
+}
+
+async function runAgentJob(job, user, tasks, opts) {
+  for (const task of tasks) {
+    const item = job.items[task.itemIndex];
+    item.status = 'working';
+    job.currentLabel = `${task.topicTitle} — ${agentFormatLabel(task.format)}`;
+    job.updatedAt = nowIso();
+    try {
+      // eslint-disable-next-line no-await-in-loop
+      const topic = await curriculum.getTopicContent(db, task.topicId);
+      if (!topic || !topic.content) throw new Error('No stored content for this topic.');
+
+      const notes = [
+        `Target difficulty: ${opts.difficulty}.`,
+        opts.notes || '',
+        task.format === 'slides' ? 'Teach the concept for the stated grade and show every step of the working.' : ''
+      ].filter(Boolean).join(' ').slice(0, 500);
+
+      // eslint-disable-next-line no-await-in-loop
+      const generated = await generateWithProvider({
+        content: topic.content,
+        cardCount: task.count,
+        format: task.format,
+        category: 'Grade-level study',
+        grade: gradeLabelFor(topic.grade),
+        subject: capitalizeWord(topic.subject),
+        notes,
+        difficultySkew: agentDifficultySkew(opts.difficulty)
+      });
+
+      // When replacing, remove any prior set for this (topic,format) first so
+      // the topic ends up with exactly one current set per format.
+      if (opts.overwrite) {
+        const store = readStore();
+        const priorIds = existingTopicFormatSets(store, user.id).get(`${task.topicId}::${task.format}`) || [];
+        if (priorIds.length) {
+          store.quizlets = store.quizlets.filter((s) => !priorIds.includes(s.id));
+          writeStore(store);
+        }
+      }
+
+      const set = saveGeneratedSet(user, {
+        title: generated.title || `${topic.title} — ${agentFormatLabel(task.format)}`,
+        cards: generated.cards,
+        category: 'Grade-level study',
+        subject: topic.subject,
+        grade: String(topic.grade),
+        topic: topic.title,
+        topicId: topic.id,
+        format: task.format,
+        sourceType: 'agent'
+      });
+      item.status = 'done';
+      item.setId = set.id;
+      job.completed += 1;
+    } catch (e) {
+      item.status = 'error';
+      item.error = (e && e.message) ? String(e.message).slice(0, 200) : 'Generation failed.';
+      job.failed += 1;
+    }
+    job.updatedAt = nowIso();
+  }
+  job.status = 'done';
+  job.finishedAt = nowIso();
+  job.currentLabel = '';
+  job.updatedAt = nowIso();
+  sendAgentSummaryEmail(job, user).catch((e) => console.warn('Agent summary email failed:', e.message));
+}
+
+// Topics for a grade+subject, each flagged with which formats the signed-in
+// teacher already has — powers the Agent's topic picker.
+app.get('/api/agent/topics', requireUser, async (req, res) => {
+  try {
+    const data = await curriculum.getTopics(db, req.query.grade, req.query.subject);
+    const store = readStore();
+    const existing = existingTopicFormatSets(store, req.user.id);
+    const strands = (data.strands || []).map((st) => ({
+      strand: st.strand,
+      topics: st.topics.map((t) => ({
+        id: t.id, title: t.title, standard: t.standard || '',
+        has: {
+          slides: existing.has(`${t.id}::slides`),
+          flashcard: existing.has(`${t.id}::flashcard`),
+          quiz: existing.has(`${t.id}::quiz`)
+        }
+      }))
+    }));
+    res.json({ grade: data.grade, subject: data.subject, strands, topicCount: data.topicCount });
+  } catch (e) {
+    console.error('agent topics failed:', e.message);
+    res.status(500).json({ error: 'Could not load topics.' });
+  }
+});
+
+// Kick off a background agent run. Responds immediately with a jobId; the work
+// (and the completion email) happens in the background.
+app.post('/api/agent/run', requireUser, async (req, res) => {
+  const grade = Number(req.body.grade);
+  const subject = String(req.body.subject || '').toLowerCase();
+  const formats = Array.isArray(req.body.formats) ? req.body.formats.filter((f) => AGENT_FORMATS.includes(f)) : [];
+  const difficulty = ['easy', 'medium', 'hard', 'mixed'].includes(String(req.body.difficulty || '').toLowerCase())
+    ? String(req.body.difficulty).toLowerCase() : 'medium';
+  const notes = String(req.body.notes || '').trim().slice(0, 400);
+  const overwrite = Boolean(req.body.overwrite);
+  const counts = {
+    slides: Math.max(1, Math.min(40, Number(req.body.slideCount || 8))),
+    flashcard: Math.max(1, Math.min(40, Number(req.body.cardCount || 12))),
+    quiz: Math.max(1, Math.min(40, Number(req.body.quizCount || 10)))
+  };
+  if (!formats.length) return res.status(400).json({ error: 'Pick at least one of Slides, Flashcards, or Quiz.' });
+
+  let topicsData;
+  try { topicsData = await curriculum.getTopics(db, grade, subject); }
+  catch (e) { return res.status(500).json({ error: 'Could not load topics.' }); }
+  const allTopics = (topicsData.strands || []).flatMap((s) => s.topics);
+  if (!allTopics.length) return res.status(400).json({ error: 'No topics for that grade and subject.' });
+
+  const wantAll = req.body.topicIds === 'all' || req.body.allTopics === true;
+  const chosenIds = wantAll ? allTopics.map((t) => t.id) : (Array.isArray(req.body.topicIds) ? req.body.topicIds : []);
+  const chosen = allTopics.filter((t) => chosenIds.includes(t.id));
+  if (!chosen.length) return res.status(400).json({ error: 'Select at least one topic (or choose all topics).' });
+
+  // Build the task list (topic × format), skipping pairs that already have
+  // content unless the teacher asked to replace it.
+  const store = readStore();
+  const existing = existingTopicFormatSets(store, req.user.id);
+  const tasks = [];
+  let skipped = 0;
+  for (const t of chosen) {
+    for (const f of formats) {
+      if (!overwrite && existing.has(`${t.id}::${f}`)) { skipped += 1; continue; }
+      tasks.push({ topicId: t.id, topicTitle: t.title, format: f, count: counts[f] });
+    }
+  }
+  if (!tasks.length) {
+    return res.status(400).json({
+      error: overwrite ? 'Nothing to build for that selection.'
+        : 'Every selected topic already has that content. Turn on “Replace existing” to rebuild it.',
+      skipped
+    });
+  }
+  if (tasks.length > AGENT_MAX_GENERATIONS) {
+    return res.status(400).json({ error: `That’s ${tasks.length} items in one run (max ${AGENT_MAX_GENERATIONS}). Pick fewer topics or formats, or run it in batches.` });
+  }
+
+  pruneAgentJobs();
+  const job = {
+    id: id('agent'), userId: req.user.id, status: 'running',
+    grade, subject, difficulty, notes, overwrite,
+    total: tasks.length, completed: 0, failed: 0, skipped, topicCount: chosen.length,
+    items: tasks.map((t) => ({ topicTitle: t.topicTitle, format: t.format, status: 'queued' })),
+    currentLabel: '', createdAt: nowIso(), updatedAt: nowIso()
+  };
+  tasks.forEach((t, i) => { t.itemIndex = i; });
+  agentJobs.set(job.id, job);
+
+  const safeUser = { id: req.user.id, email: req.user.email, firstName: req.user.firstName, lastName: req.user.lastName };
+  Promise.resolve()
+    .then(() => runAgentJob(job, safeUser, tasks, { difficulty, notes, overwrite }))
+    .catch((e) => { job.status = 'error'; job.error = e.message; job.finishedAt = nowIso(); job.updatedAt = nowIso(); });
+
+  res.json({ jobId: job.id, total: job.total, skipped, topicCount: chosen.length });
+});
+
+// Poll a run's progress (owner only).
+app.get('/api/agent/job/:id', requireUser, (req, res) => {
+  const job = agentJobs.get(req.params.id);
+  if (!job || job.userId !== req.user.id) return res.status(404).json({ error: 'Run not found (it may have expired).' });
+  res.json({ job: agentJobView(job) });
+});
+
+// Recent runs for this teacher.
+app.get('/api/agent/jobs', requireUser, (req, res) => {
+  const jobs = [...agentJobs.values()]
+    .filter((j) => j.userId === req.user.id)
+    .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)))
+    .slice(0, 10)
+    .map(agentJobView);
+  res.json({ jobs });
+});
+
 // Draft teacher-ready paste-content for an ARBITRARY topic (the "New lesson"
 // path, where the teacher can type any topic). This one uses AI. Falls back to
 // the structured scaffold if no provider is configured or the call fails.
@@ -2734,6 +3012,11 @@ app.post('/api/admin/rewards/:id/resolve', requireUser, async (req, res) => {
 
 app.get('/app', requirePageUser, (req, res) => {
   res.sendFile(path.join(PUBLIC_DIR, 'app.html'));
+});
+
+// The teacher AI Agent (bulk-fill Slides / Flashcards / Quiz for curriculum topics).
+app.get('/agent', requirePageUser, (req, res) => {
+  res.sendFile(path.join(PUBLIC_DIR, 'agent.html'));
 });
 
 app.get('/library', requirePageUser, (req, res) => {

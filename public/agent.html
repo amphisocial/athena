@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <link rel="icon" type="image/png" href="/favicon.png" />
+  <link rel="apple-touch-icon" href="/img/boardsy-logo.png?v=boardsy13" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>AI Agent | Boardsy</title>
+  <meta name="robots" content="noindex" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/styles.css?v=boardsy13" />
+  <link rel="stylesheet" href="/theme-light.css?v=boardsy23" />
+  <link rel="stylesheet" href="/agent.css?v=boardsy1" />
+</head>
+<body data-page="agent">
+  <div class="shell">
+    <header class="topbar">
+      <a class="brand" href="/" aria-label="Boardsy home">
+        <span class="brand-mark">Boardsy</span>
+        <span>Board<span class="brand-suffix">sy</span></span>
+      </a>
+      <nav class="nav-links"></nav>
+      <div class="auth-area" id="authArea"></div>
+    </header>
+
+    <main class="agent-page">
+      <div class="agent-head">
+        <span class="section-kicker">AI Agent</span>
+        <h1>Fill in your lessons automatically</h1>
+        <p class="agent-sub">Pick a grade &amp; subject, choose a topic (or all of them), answer a few quick questions,
+          and the agent builds the slides, flashcards and quizzes for you. You'll get an email when it's done.</p>
+      </div>
+
+      <p class="status" id="statusText"></p>
+
+      <!-- STEP 1 — grade & subject -->
+      <section class="agent-step" id="step1">
+        <div class="step-title"><span class="step-num">1</span><h2>Choose grade &amp; subject</h2></div>
+        <div class="step-body">
+          <div class="field">
+            <label for="gradeSelect">Grade</label>
+            <select id="gradeSelect"><option value="">Loading…</option></select>
+          </div>
+          <div class="field">
+            <label>Subject</label>
+            <div class="subject-toggle" id="subjectToggle">
+              <button type="button" class="subj-btn" data-subject="math">Math</button>
+              <button type="button" class="subj-btn" data-subject="science">Science</button>
+            </div>
+          </div>
+          <button class="btn primary" id="loadTopicsBtn" disabled>Load topics →</button>
+        </div>
+      </section>
+
+      <!-- STEP 2 — topics -->
+      <section class="agent-step is-locked" id="step2">
+        <div class="step-title"><span class="step-num">2</span><h2>Choose topics</h2></div>
+        <div class="step-body">
+          <div class="topics-toolbar">
+            <label class="check-inline">
+              <input type="checkbox" id="selectAllTopics" /> <strong>Select all topics</strong>
+              <span class="muted" id="topicCountLabel"></span>
+            </label>
+            <span class="legend">
+              <span class="chip chip-has">Slides</span>
+              <span class="chip chip-has">Flashcards</span>
+              <span class="chip chip-has">Quiz</span>
+              <span class="muted">= already has content</span>
+            </span>
+          </div>
+          <div id="topicsList" class="topics-list"></div>
+        </div>
+      </section>
+
+      <!-- STEP 3 — questions -->
+      <section class="agent-step is-locked" id="step3">
+        <div class="step-title"><span class="step-num">3</span><h2>A few questions before I build</h2></div>
+        <div class="step-body">
+          <div class="field">
+            <label>What should I create?</label>
+            <div class="format-picker">
+              <label class="fmt-check"><input type="checkbox" class="fmtBox" value="slides" checked /> 🖥 Slides</label>
+              <label class="fmt-check"><input type="checkbox" class="fmtBox" value="flashcard" checked /> 🗂 Flashcards</label>
+              <label class="fmt-check"><input type="checkbox" class="fmtBox" value="quiz" checked /> ❓ Quiz</label>
+            </div>
+          </div>
+
+          <div class="counts-row">
+            <div class="field" data-count-for="slides">
+              <label for="slideCount">Number of slides</label>
+              <input id="slideCount" type="number" min="1" max="40" value="8" />
+            </div>
+            <div class="field" data-count-for="flashcard">
+              <label for="cardCount">Number of flashcards</label>
+              <input id="cardCount" type="number" min="1" max="40" value="12" />
+            </div>
+            <div class="field" data-count-for="quiz">
+              <label for="quizCount">Number of quiz questions</label>
+              <input id="quizCount" type="number" min="1" max="40" value="10" />
+            </div>
+          </div>
+
+          <div class="field">
+            <label for="difficulty">Difficulty level</label>
+            <select id="difficulty">
+              <option value="easy">Easy</option>
+              <option value="medium" selected>Medium</option>
+              <option value="hard">Hard</option>
+              <option value="mixed">Mixed</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label for="notes">Any extra instructions (optional)</label>
+            <input id="notes" placeholder="Example: keep language simple, use real-world examples, align to the state standard…" />
+          </div>
+
+          <label class="check-inline">
+            <input type="checkbox" id="overwrite" />
+            Replace existing content (rebuild topics that already have slides/flashcards/quiz)
+          </label>
+
+          <div class="run-row">
+            <button class="btn primary run-btn" id="runBtn">✨ Build my content</button>
+            <span class="muted" id="runHint"></span>
+          </div>
+        </div>
+      </section>
+
+      <!-- PROGRESS -->
+      <section class="agent-step" id="progressPanel" style="display:none">
+        <div class="step-title"><span class="step-num">▶</span><h2>Building…</h2></div>
+        <div class="step-body">
+          <div class="progress-wrap"><div class="progress-bar" id="progressBar"></div></div>
+          <p class="progress-meta" id="progressMeta">Starting…</p>
+          <p class="muted">You can leave this page — the agent keeps working and emails you when it's done.</p>
+          <div id="progressItems" class="progress-items"></div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script src="/common.js?v=boardsy13"></script>
+  <script src="/agent.js?v=boardsy1"></script>
+</body>
+</html>

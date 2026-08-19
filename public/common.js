@@ -145,7 +145,7 @@ window.AppCommon = (() => {
   function renderAppNav() {
     const page = document.body.dataset.page;
     // Only rewrite on in-app pages; the marketing landing keeps its own nav.
-    const inApp = ['app', 'library', 'notes', 'team', 'board', 'board-list', 'pricing', 'webinars'].includes(page);
+    const inApp = ['app', 'library', 'notes', 'team', 'board', 'board-list', 'pricing', 'webinars', 'agent'].includes(page);
     const nav = $('.nav-links');
     if (!nav || !inApp) return;
 
@@ -159,7 +159,7 @@ window.AppCommon = (() => {
     const activeFor = {
       'board-list': 'library', board: 'library', library: 'library',
       app: 'library', notes: 'library', webinars: 'webinars',
-      team: 'team', pricing: 'pricing'
+      team: 'team', pricing: 'pricing', agent: 'agent'
     }[page];
 
     const item = (key, href, label, show = true) =>
@@ -167,6 +167,7 @@ window.AppCommon = (() => {
 
     nav.innerHTML = [
       item('library', '/library', 'Library'),
+      item('agent', '/agent', 'AI Agent'),
       item('webinars', '/webinars', 'Webinars', showTeam),
       item('team', '/team', 'Team', showTeam),
       item('pricing', '/pricing', 'Pricing')
