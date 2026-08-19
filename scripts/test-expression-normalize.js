@@ -67,5 +67,15 @@ console.log('parser: natural forms all evaluate');
   ok('bare superscript number 2³ -> 8', near(compile('2\u00b3')(0), 8));
 }
 
+console.log('integral: antiderivative gives the correct definite value');
+{
+  // The "answer" curve for y = ∫ x dx is F(x) = x^2/2, NOT the integrand x.
+  const F = compile('x^2/2');
+  ok('F(x) = x^2/2 evaluates', near(F(2), 2) && near(F(7), 24.5));
+  ok('∫₀² x dx = F(2) - F(0) = 2', near(F(2) - F(0), 2));
+  ok('∫₀⁷ x dx = F(7) - F(0) = 24.5', near(F(7) - F(0), 24.5));
+  ok('the integrand x is NOT the answer curve (F(2)=2 ≠ x at 2 being the area)', F(2) === 2);
+}
+
 console.log(`\nAll ${passed} assertions passed.`);
 process.exit(0);

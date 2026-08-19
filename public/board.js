@@ -413,27 +413,28 @@
     if (0 >= yMin && 0 <= yMax) { ctx.moveTo(x, py(0)); ctx.lineTo(x + w, py(0)); }
     ctx.stroke();
 
-    // Integral area: shade the band between the first curve and the x-axis over
-    // [from, to] so a definite integral is shown as the area it measures.
-    if (obj.area && per[0] && Number.isFinite(obj.area.from) && Number.isFinite(obj.area.to)) {
-      const from = Math.max(obj.area.from, xMin), to = Math.min(obj.area.to, xMax);
-      const band = per[0].samples.filter((s) => s.x >= from && s.x <= to && Number.isFinite(s.y));
-      if (band.length > 1) {
-        ctx.save();
-        ctx.fillStyle = 'rgba(20,217,196,0.20)';
-        ctx.beginPath();
-        ctx.moveTo(px(band[0].x), py(0));
-        band.forEach((s) => ctx.lineTo(px(s.x), py(s.y)));
-        ctx.lineTo(px(band[band.length - 1].x), py(0));
-        ctx.closePath(); ctx.fill();
-        ctx.strokeStyle = 'rgba(20,217,196,0.55)'; ctx.lineWidth = 1 / view.scale;
-        ctx.beginPath();
-        ctx.moveTo(px(band[0].x), py(0)); ctx.lineTo(px(band[0].x), py(band[0].y));
-        ctx.moveTo(px(band[band.length - 1].x), py(0)); ctx.lineTo(px(band[band.length - 1].x), py(band[band.length - 1].y));
-        ctx.stroke();
-        ctx.restore();
-      }
-    }
+    // Integral area(s): shade the band between the referenced curve and the
+    // x-axis over [from,to]. Multiple integrals -> multiple coloured bands.
+    (obj.areas || []).forEach((ar) => {
+      const src = per[ar.ci]; if (!src || !Number.isFinite(ar.from) || !Number.isFinite(ar.to)) return;
+      const from = Math.max(ar.from, xMin), to = Math.min(ar.to, xMax);
+      const band = src.samples.filter((s) => s.x >= from && s.x <= to && Number.isFinite(s.y));
+      if (band.length < 2) return;
+      ctx.save();
+      ctx.fillStyle = ar.color || 'rgba(20,217,196,0.22)';
+      ctx.beginPath();
+      ctx.moveTo(px(band[0].x), py(0));
+      band.forEach((s) => ctx.lineTo(px(s.x), py(s.y)));
+      ctx.lineTo(px(band[band.length - 1].x), py(0));
+      ctx.closePath(); ctx.fill();
+      ctx.strokeStyle = (ar.color || 'rgba(20,217,196,0.5)').replace(/0?\.\d+\)/, '0.6)');
+      ctx.lineWidth = 1 / view.scale;
+      ctx.beginPath();
+      ctx.moveTo(px(band[0].x), py(0)); ctx.lineTo(px(band[0].x), py(band[0].y));
+      ctx.moveTo(px(band[band.length - 1].x), py(0)); ctx.lineTo(px(band[band.length - 1].x), py(band[band.length - 1].y));
+      ctx.stroke();
+      ctx.restore();
+    });
 
     per.forEach((cv) => {
       if (!cv) return;
@@ -1802,130 +1803,127 @@
     return `y = (${-c} - (${a})*x)/(${b})`;
   }
 
-  function syncAnalysisGraph(rawExprs) {
-    // Normalise to y = f(x) (solving implicit linear equations), then keep only
-    // distinct, plottable expressions.
-    const seen = new Set();
-    const exprs = [];
-    (rawExprs || []).forEach((e) => {
-      const expr = toExplicitY(e);
-      if (!expr) return;
+  const AREA_FILLS = ['rgba(20,217,196,0.22)', 'rgba(255,107,122,0.22)', 'rgba(124,92,255,0.22)', 'rgba(255,204,102,0.24)', 'rgba(91,208,255,0.22)'];
+
+  // Build/refresh the ONE analysis graph for the page. Everything the analyzer
+  // surfaces goes into a single coordinate system: each equation is a coloured
+  // curve; each integral contributes its antiderivative curve (the "answer",
+  // y = F(x)) AND its integrand curve with a coloured shaded band = the definite
+  // integral's value. Multiple integrals => multiple bands in different colours.
+  function syncAnalysisGraph(rawExprs, integrals) {
+    const existing = analysisGraphId ? page().objects.find((o) => o.id === analysisGraphId && o.type === 'graph') : null;
+    const prevColors = new Map((existing && existing.curves || []).map((c) => [normExpr(c.expression), c.color]));
+
+    const curves = [];
+    const areas = [];
+    const byKey = new Map();
+    const equationIdx = [];
+    function addCurve(expr) {
       const key = normExpr(expr);
-      if (seen.has(key)) return;
+      if (byKey.has(key)) return byKey.get(key);
       const params = detectParams(expr);
-      try { compileExpression(expr, params); } catch (_) { return; }
-      seen.add(key);
-      exprs.push({ expression: expr, color: CURVE_COLORS[exprs.length % CURVE_COLORS.length] });
-    });
-    if (!exprs.length) return;
+      try { compileExpression(expr, params); } catch (_) { return -1; }
+      const idx = curves.length;
+      curves.push({ expression: expr, color: prevColors.get(key) || CURVE_COLORS[idx % CURVE_COLORS.length] });
+      byKey.set(key, idx);
+      return idx;
+    }
 
-    let obj = analysisGraphId ? page().objects.find((o) => o.id === analysisGraphId && o.type === 'graph') : null;
-    if (!obj) {
-      const w = 380, h = 300;
-      // Drop the graph in clean space to the RIGHT of whatever's already on the
-      // page (handwriting + objects), so it never lands on top of the teacher's
-      // work. Falls back to the middle of the view on an empty page.
-      const cb = contentBounds();
-      let pos;
-      if (cb) {
-        pos = { x: cb.maxX + 48, y: cb.minY };
-        // Keep it from drifting absurdly far below if the content is a tall column.
-        if (pos.y + h > cb.maxY + 80) pos.y = Math.max(cb.minY, cb.minY + (cb.maxY - cb.minY) / 2 - h / 2);
-      } else {
-        const b = visibleWorldBounds();
-        pos = { x: b.x1 + (b.x2 - b.x1) / 2 - w / 2, y: b.y1 + (b.y2 - b.y1) / 2 - h / 2 };
+    (rawExprs || []).forEach((e) => { const expr = toExplicitY(e); if (!expr) return; const i = addCurve(expr); if (i >= 0) equationIdx.push(i); });
+
+    (integrals || []).forEach((intg) => {
+      const integrand = normalizeExpr(intg.integrand || '').trim();
+      const F = normalizeExpr(intg.antiderivative || '').trim();
+      const from = Number(intg.from), to = Number(intg.to);
+      const hasBounds = Number.isFinite(from) && Number.isFinite(to) && from !== to;
+      // The "answer": y = ∫ f dx = F(x). Plotted as its own curve.
+      if (F) addCurve(/=/.test(F) ? F : `y = ${F}`);
+      // The integrand, with a shaded band whose area equals the definite integral.
+      if (integrand) {
+        const ci = addCurve(/=/.test(integrand) ? integrand : `y = ${integrand}`);
+        if (ci >= 0 && hasBounds) areas.push({ ci, from: Math.min(from, to), to: Math.max(from, to), color: AREA_FILLS[areas.length % AREA_FILLS.length], value: intg.value, integrand, antiderivative: F });
       }
-      obj = {
-        id: `obj_${Math.random().toString(16).slice(2)}`, type: 'graph', analysisGraph: true,
-        x: pos.x, y: pos.y, w, h,
-        curves: exprs, params: {}, transform: { shiftX: 0, shiftY: 0 }, xMin: -10, xMax: 10
-      };
-      analysisGraphId = obj.id;
-      obj.intersections = computeIntersections(obj);
-      addObject(obj);
-    } else {
-      // Refresh curves in place, preserving colors for expressions that stayed.
-      const prev = new Map((obj.curves || []).map((c) => [normExpr(c.expression), c.color]));
-      obj.curves = exprs.map((c, i) => ({ expression: c.expression, color: prev.get(normExpr(c.expression)) || CURVE_COLORS[i % CURVE_COLORS.length] }));
-      obj.intersections = computeIntersections(obj);
-      redraw();
-      send({ type: 'object:update', pageId: pageId(), object: obj });
+    });
+    if (!curves.length) return;
+
+    // Domain: default -10..10, widened to comfortably include every integral band.
+    let xMin = -10, xMax = 10;
+    if (areas.length) {
+      let lo = 0, hi = 0; areas.forEach((a) => { lo = Math.min(lo, a.from); hi = Math.max(hi, a.to); });
+      xMin = Math.min(-1, lo - 1); xMax = Math.max(1, hi + 1);
     }
-    renderIntersectionNote(obj);
-  }
 
-  // Definite/indefinite integral: draw the integrand and SHADE the area between
-  // the curve and the x-axis over [from, to]. Reuses the one analysis graph.
-  function syncIntegralGraph(integral) {
-    const integrand = normalizeExpr(integral.integrand || '').trim();
-    if (!integrand) return;
-    const expr = /=/.test(integrand) ? integrand : `y = ${integrand}`;
-    try { compileExpression(expr, {}); } catch (_) { return; }
-    const from = Number(integral.from), to = Number(integral.to);
-    const hasBounds = Number.isFinite(from) && Number.isFinite(to) && from !== to;
-    const a = hasBounds ? Math.min(from, to) : null, bnd = hasBounds ? Math.max(from, to) : null;
-    const xMin = hasBounds ? Math.min(a, 0) - 1 : -10;
-    const xMax = hasBounds ? Math.max(bnd, 0) + 1 : 10;
-
-    let obj = analysisGraphId ? page().objects.find((o) => o.id === analysisGraphId && o.type === 'graph') : null;
+    let obj = existing;
     if (!obj) {
       const w = 380, h = 300;
+      // Clean space to the RIGHT of the written work, never on top of it.
       const cb = contentBounds();
       let pos;
-      if (cb) pos = { x: cb.maxX + 48, y: cb.minY };
+      if (cb) { pos = { x: cb.maxX + 48, y: cb.minY }; if (pos.y + h > cb.maxY + 80) pos.y = Math.max(cb.minY, cb.minY + (cb.maxY - cb.minY) / 2 - h / 2); }
       else { const b = visibleWorldBounds(); pos = { x: b.x1 + (b.x2 - b.x1) / 2 - w / 2, y: b.y1 + (b.y2 - b.y1) / 2 - h / 2 }; }
-      obj = {
-        id: `obj_${Math.random().toString(16).slice(2)}`, type: 'graph', analysisGraph: true,
-        x: pos.x, y: pos.y, w, h,
-        curves: [{ expression: expr, color: CURVE_COLORS[0] }], params: {}, transform: { shiftX: 0, shiftY: 0 },
-        xMin, xMax, area: hasBounds ? { from: a, to: bnd } : null, intersections: []
-      };
+      obj = { id: `obj_${Math.random().toString(16).slice(2)}`, type: 'graph', analysisGraph: true, x: pos.x, y: pos.y, w, h, params: {}, transform: { shiftX: 0, shiftY: 0 } };
+      obj.curves = curves; obj.areas = areas; obj.xMin = xMin; obj.xMax = xMax;
+      obj.intersections = equationIdx.length >= 2 ? computeIntersections(obj, equationIdx) : [];
       analysisGraphId = obj.id;
       addObject(obj);
     } else {
-      const color = (obj.curves && obj.curves[0] && obj.curves[0].color) || CURVE_COLORS[0];
-      obj.curves = [{ expression: expr, color }];
-      obj.xMin = xMin; obj.xMax = xMax; obj.area = hasBounds ? { from: a, to: bnd } : null; obj.intersections = [];
+      obj.curves = curves; obj.areas = areas; obj.xMin = xMin; obj.xMax = xMax; obj.area = null;
+      obj.intersections = equationIdx.length >= 2 ? computeIntersections(obj, equationIdx) : [];
       redraw();
       send({ type: 'object:update', pageId: pageId(), object: obj });
     }
-    renderIntegralNote(integral, integrand, hasBounds ? { from: a, to: bnd } : null);
+    renderAnalysisNote(obj, equationIdx, areas);
   }
 
-  function renderIntegralNote(integral, integrand, area) {
+  // One self-replacing AI note covering whatever the graph is showing:
+  // intersection points for a system, and each integral's antiderivative + value.
+  function renderAnalysisNote(obj, equationIdx, areas) {
     const body = $('#infoBody');
     if (!body) return;
     const prev = document.getElementById('analysisSideNote'); if (prev) prev.remove();
+    const curves = graphCurves(obj);
+    const blocks = [];
+
+    if ((areas || []).length) {
+      const rows = areas.map((a) => {
+        const bounds = `from ${fmtNum(a.from)} to ${fmtNum(a.to)}`;
+        const anti = a.antiderivative ? `∫ ${escapeHtml(a.integrand)} dx = ${escapeHtml(a.antiderivative)}` : `∫ ${escapeHtml(a.integrand)} dx`;
+        const val = (a.value !== undefined && a.value !== null) ? ` = <strong>${escapeHtml(String(a.value))}</strong>` : '';
+        return `<div class="insight-fact"><span style="border-left:3px solid ${a.color.replace('0.22', '0.9').replace('0.24', '0.9')};padding-left:6px">${anti}</span><span>${escapeHtml(bounds)}${val}</span></div>`;
+      }).join('');
+      blocks.push(`<h4>Integral — area under the curve</h4><div class="insight-facts">${rows}</div>
+        <div class="insight-method">The shaded band is the area between the integrand and the x-axis over the limits; that area IS the definite integral. The separate curve is the antiderivative y = ∫f dx (the result of integrating).</div>`);
+    }
+
+    if ((obj.intersections || []).length && (equationIdx || []).length >= 2) {
+      const pts = obj.intersections.map((p) => `<div class="insight-fact"><span>${escapeHtml(curves[p.i] ? curves[p.i].expression : '')} ∩ ${escapeHtml(curves[p.j] ? curves[p.j].expression : '')}</span><span>( ${fmtNum(p.x)}, ${fmtNum(p.y)} )</span></div>`).join('');
+      blocks.push(`<h4>Where these curves meet</h4><div class="insight-facts">${pts}</div>
+        <div class="insight-method">Set the two expressions equal — f(x) = g(x) — and solve; the roots are found numerically over the plotted window.</div>`);
+    }
+
+    if (!blocks.length) return;
     const card = document.createElement('div');
     card.className = 'insight-card'; card.id = 'analysisSideNote';
-    const val = (integral.value !== undefined && integral.value !== null) ? integral.value : null;
-    const bounds = area ? `from ${fmtNum(area.from)} to ${fmtNum(area.to)}` : '(indefinite)';
-    card.innerHTML = `
-      <span class="insight-kind">integral</span>
-      <h4>Area under the curve</h4>
-      <div class="insight-formula" style="border-left-color:${CURVE_COLORS[0]}">y = ${escapeHtml(integrand)}</div>
-      <div class="insight-facts">
-        <div class="insight-fact"><span>Region</span><span>${escapeHtml(bounds)}</span></div>
-        ${val !== null ? `<div class="insight-fact"><span>\u222b value (net area)</span><span>${escapeHtml(String(val))}</span></div>` : ''}
-      </div>
-      <div class="insight-method">Method: the shaded band is the signed area between y = ${escapeHtml(integrand)} and the x-axis over ${escapeHtml(bounds)}. A definite integral is exactly that area (regions below the axis count as negative).</div>`;
+    card.innerHTML = `<span class="insight-kind">graph</span>${blocks.join('')}`;
     body.insertBefore(card, body.firstChild);
   }
 
   // Numeric intersection finder: for each pair of curves, scan the graph's
   // domain for sign changes of f-g and refine each with a few bisections. Honors
   // the graph's shift transform so the points match what's drawn.
-  function computeIntersections(obj) {
+  function computeIntersections(obj, indices) {
     const curves = graphCurves(obj);
     if (curves.length < 2) return [];
     const tf = graphTransform(obj);
     const xMin = obj.xMin ?? -10, xMax = obj.xMax ?? 10;
     const fns = curves.map((c, ci) => { try { return ci === 0 ? graphFn(obj, c.expression) : compileExpression(c.expression, obj.params || {}); } catch { return null; } });
     const evalAt = (fn, x) => sampleCurve(fn, x, tf);
+    const use = (indices && indices.length) ? indices : curves.map((_, i) => i);
     const out = [];
     const N = 480;
-    for (let i = 0; i < fns.length; i += 1) {
-      for (let j = i + 1; j < fns.length; j += 1) {
+    for (let ii = 0; ii < use.length; ii += 1) {
+      for (let jj = ii + 1; jj < use.length; jj += 1) {
+        const i = use[ii], j = use[jj];
         if (!fns[i] || !fns[j]) continue;
         const d = (x) => { const a = evalAt(fns[i], x), b = evalAt(fns[j], x); return (Number.isFinite(a) && Number.isFinite(b)) ? a - b : NaN; };
         let prevX = xMin, prevD = d(xMin);
@@ -1960,36 +1958,6 @@
 
   // A single, self-replacing AI Note that names the intersection point(s) and
   // how they were found. Removed/re-added each refresh so it never stacks.
-  function renderIntersectionNote(obj) {
-    const body = $('#infoBody');
-    if (!body) return;
-    const existing = document.getElementById('analysisSideNote');
-    if (existing) existing.remove();
-    const curves = graphCurves(obj);
-    if (curves.length < 2) return;
-    const pts = obj.intersections || [];
-    const card = document.createElement('div');
-    card.className = 'insight-card';
-    card.id = 'analysisSideNote';
-    const eqList = curves.map((c) => `<span class="insight-formula" style="border-left-color:${c.color}">${escapeHtml(c.expression)}</span>`).join('');
-    let ptsHtml;
-    if (!pts.length) {
-      ptsHtml = '<p>No intersection within the plotted window (-10 to 10). The curves don\'t cross here.</p>';
-    } else {
-      ptsHtml = `<div class="insight-facts">${pts.map((p) => {
-        const a = curves[p.i] ? curves[p.i].expression : '';
-        const b = curves[p.j] ? curves[p.j].expression : '';
-        return `<div class="insight-fact"><span>${escapeHtml(a)} \u2229 ${escapeHtml(b)}</span><span>( ${fmtNum(p.x)}, ${fmtNum(p.y)} )</span></div>`;
-      }).join('')}</div>`;
-    }
-    card.innerHTML = `
-      <span class="insight-kind">intersection</span>
-      <h4>Where these curves meet</h4>
-      ${eqList}
-      ${ptsHtml}
-      <div class="insight-method">Method: set the two expressions equal - f(x) = g(x) - and solve for x. Here that root is found numerically (scan the -10 to 10 window for a sign change of f(x) - g(x), then bisect to pinpoint it); y is read back from either curve. Points are marked on the graph.</div>`;
-    body.insertBefore(card, body.firstChild);
-  }
   function fmtNum(n) { const r = Math.round(n * 100) / 100; return Object.is(r, -0) ? '0' : String(r); }
 
   // ---- Snapshots / export -------------------------------------------------
@@ -2845,10 +2813,12 @@
         const data = await postAnalyze(snapshot);
         lastAnalysis = data.analysis;
         renderInsight(data.analysis, { live: true });
-        // A definite/indefinite integral gets its area drawn; otherwise plot the
-        // equations the analysis surfaced into one shared coordinate system.
-        if (data.analysis.integral && data.analysis.integral.integrand) syncIntegralGraph(data.analysis.integral);
-        else syncAnalysisGraph(data.analysis.plots || []);
+        // Everything goes into ONE coordinate system: equations become curves,
+        // integrals add their antiderivative curve + a shaded area band. Accept
+        // both the new `integrals` array and the older singular `integral`.
+        const integrals = Array.isArray(data.analysis.integrals) ? data.analysis.integrals
+          : (data.analysis.integral ? [data.analysis.integral] : []);
+        syncAnalysisGraph(data.analysis.plots || [], integrals);
       } catch (e) { /* stay quiet on the auto path */ }
       finally { liveAnalyzeBusy = false; }
     }, 2200);

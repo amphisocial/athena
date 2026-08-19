@@ -161,7 +161,7 @@ console.log('\nwhiteboard graph rework + Exit-ends-live');
   ok('live-analyze refreshes ONE shared graph (no per-cycle duplicates)', /syncAnalysisGraph\(data\.analysis\.plots/.test(bjs) && !/plots \|\| \[\]\)\.forEach\(\(expr\) => plotOnBoard/.test(bjs));
   ok('a single analysis graph is tracked + reused', /analysisGraphId/.test(bjs) && /page\(\)\.objects\.find\(\(o\) => o\.id === analysisGraphId/.test(bjs));
   ok('intersections are computed and drawn', /function computeIntersections/.test(bjs) && /obj\.intersections/.test(bjs));
-  ok('an AI note explains the intersection method', /function renderIntersectionNote/.test(bjs) && /set the two expressions equal/.test(bjs));
+  ok('an AI note explains the intersection method', /function renderAnalysisNote/.test(bjs) && /Set the two expressions equal/i.test(bjs));
   ok('live-analyze note is self-replacing (no stacking)', /id="liveAnalyzeNote"|liveAnalyzeNote/.test(bjs) && /opts\.live/.test(bjs));
   ok('board Exit stops live before leaving', /#exitLink[\s\S]{0,400}stop-live/.test(bjs));
   ok('implicit linear equations are solved for y before plotting', /function toExplicitY/.test(bjs) && /function linearParts/.test(bjs) && /const expr = toExplicitY\(e\)/.test(bjs));
@@ -187,9 +187,9 @@ console.log('\nwhiteboard: natural expressions + integral area');
   const bsrv = read('server/board.js');
   ok('expressions are normalized (superscripts / symbols) before parsing', /function normalizeExpr/.test(bjs) && /const source = normalizeExpr\(raw\)/.test(bjs));
   ok('family detection + params also normalize', /rhsOf[\s\S]{0,120}normalizeExpr/.test(bjs) && /const rhs = normalizeExpr\(expression\)/.test(bjs));
-  ok('integrals draw a shaded area', /function syncIntegralGraph/.test(bjs) && /obj\.area/.test(bjs));
-  ok('integral routing precedes plain plots', /analysis\.integral && data\.analysis\.integral\.integrand\) syncIntegralGraph/.test(bjs));
-  ok('analyzer schema includes an integral field', /"integral": null OR/.test(bsrv) && /integrand/.test(bsrv));
+  ok('integrals draw shaded areas in one system', /function syncAnalysisGraph\(rawExprs, integrals\)/.test(bjs) && /obj\.areas = areas/.test(bjs));
+  ok('each integral adds an antiderivative curve + area band', /The "answer": y = /.test(bjs) && /areas\.push\(/.test(bjs));
+  ok('analyzer schema returns an integrals array with antiderivative', /"integrals": \[/.test(bsrv) && /antiderivative/.test(bsrv));
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);
