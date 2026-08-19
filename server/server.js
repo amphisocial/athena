@@ -2539,6 +2539,17 @@ app.get('/api/agent/topics', requireUser, async (req, res) => {
 // Kick off a background agent run. Responds immediately with a jobId; the work
 // (and the completion email) happens in the background.
 app.post('/api/agent/run', requireUser, async (req, res) => {
+  // Entitlement gate: the AI Agent is a Teams feature. Founders and admins
+  // resolve to 'team' via effectivePlan, so they're covered too. The page/UI
+  // itself is open to everyone — the block only fires here, on Run, so the
+  // teacher sees exactly what they'd get and a clear upgrade path.
+  if (!membership.effectiveLimits(req.user).whiteboardLive) {
+    return res.status(403).json({
+      error: 'The AI Agent is a Teams feature. Start a free 7-day Teams trial, or apply to become a Founding Teacher to unlock it.',
+      upgrade: true
+    });
+  }
+
   const grade = Number(req.body.grade);
   const subject = String(req.body.subject || '').toLowerCase();
   const formats = Array.isArray(req.body.formats) ? req.body.formats.filter((f) => AGENT_FORMATS.includes(f)) : [];

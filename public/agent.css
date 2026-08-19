@@ -95,3 +95,24 @@
   .agent-head h1 { font-size: 24px; }
   .counts-row .field { min-width: 100%; }
 }
+
+.overwrite-note { margin: -4px 0 0; }
+
+/* Teams gate CTA (shown only after Run is clicked without entitlement). */
+.gate-notice {
+  border: 1px solid #ffd9a8; background: #fff8ee; border-radius: 12px;
+  padding: 14px 16px; margin-top: 4px;
+}
+.gate-notice p { margin: 0 0 10px; color: #7a5320; font-weight: 600; }
+.gate-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+
+/* Overwrite confirmation dialog. */
+.agent-dialog {
+  border: none; border-radius: 16px; padding: 22px 24px; max-width: 460px; width: calc(100% - 40px);
+  box-shadow: 0 24px 60px rgba(15, 30, 53, 0.28);
+}
+.agent-dialog::backdrop { background: rgba(15, 30, 53, 0.45); }
+.agent-dialog h3 { margin: 0 0 8px; font-size: 19px; font-weight: 800; }
+.agent-dialog p { margin: 0 0 8px; color: #24324a; }
+.agent-dialog .muted { color: #7d8aa1; }
+.dialog-actions { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; margin-top: 14px; }

@@ -117,14 +117,19 @@
             <input id="notes" placeholder="Example: keep language simple, use real-world examples, align to the state standard…" />
           </div>
 
-          <label class="check-inline">
-            <input type="checkbox" id="overwrite" />
-            Replace existing content (rebuild topics that already have slides/flashcards/quiz)
-          </label>
+          <p class="muted overwrite-note">If a topic already has this content on your account, I'll ask whether to skip it or rebuild it before I start.</p>
 
           <div class="run-row">
             <button class="btn primary run-btn" id="runBtn">✨ Build my content</button>
             <span class="muted" id="runHint"></span>
+          </div>
+
+          <div class="gate-notice" id="gateNotice" style="display:none">
+            <p id="gateMsg"></p>
+            <div class="gate-actions">
+              <button class="btn primary" id="gateTrialBtn">Start free Teams trial</button>
+              <a class="btn ghost" href="/pricing">Become a Founding Teacher</a>
+            </div>
           </div>
         </div>
       </section>
@@ -143,6 +148,17 @@
   </div>
 
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <dialog id="overwriteDialog" class="agent-dialog">
+    <h3>Some topics already have content</h3>
+    <p id="overwriteMsg"></p>
+    <p class="muted">Skipping keeps what you already built and only fills the blanks. Rebuilding replaces your existing sets for those topics with fresh ones.</p>
+    <div class="dialog-actions">
+      <button class="btn ghost" data-choice="cancel">Cancel</button>
+      <button class="btn soft" data-choice="skip">Skip those — fill blanks only</button>
+      <button class="btn primary" data-choice="overwrite">Overwrite &amp; rebuild</button>
+    </div>
+  </dialog>
 
   <script src="/common.js?v=boardsy13"></script>
   <script src="/agent.js?v=boardsy1"></script>

@@ -107,35 +107,109 @@
     refreshRunHint();
   }
 
-  async function run() {
-    const topicIds = selectedTopicIds();
-    const formats = selectedFormats();
-    if (!topicIds.length) return setStatus('Pick at least one topic (or select all).', 'error');
-    if (!formats.length) return setStatus('Pick at least one of Slides, Flashcards, or Quiz.', 'error');
+  // How many selected (topic × format) pairs already have content on THIS
+  // teacher's account — drives whether we ask about overwriting.
+  function conflictCount(topicIds, formats) {
+    const byId = new Map(state.topics.map((t) => [t.id, t]));
+    let n = 0; const topicsHit = new Set();
+    topicIds.forEach((tid) => {
+      const t = byId.get(tid); if (!t || !t.has) return;
+      formats.forEach((f) => { if (t.has[f]) { n += 1; topicsHit.add(tid); } });
+    });
+    return { pairs: n, topics: topicsHit.size };
+  }
 
+  function buildPayload(overwrite) {
+    const topicIds = selectedTopicIds();
     const allChecked = $('#selectAllTopics').checked && topicIds.length === state.topics.length;
-    const payload = {
+    return {
       grade: Number(state.grade),
       subject: state.subject,
       topicIds: allChecked ? 'all' : topicIds,
-      formats,
+      formats: selectedFormats(),
       slideCount: Number($('#slideCount').value || 8),
       cardCount: Number($('#cardCount').value || 12),
       quizCount: Number($('#quizCount').value || 10),
       difficulty: $('#difficulty').value,
       notes: $('#notes').value.trim(),
-      overwrite: $('#overwrite').checked
+      overwrite: Boolean(overwrite)
     };
+  }
 
+  function run() {
+    hideGate();
+    const topicIds = selectedTopicIds();
+    const formats = selectedFormats();
+    if (!topicIds.length) return setStatus('Pick at least one topic (or select all).', 'error');
+    if (!formats.length) return setStatus('Pick at least one of Slides, Flashcards, or Quiz.', 'error');
+
+    // If any selected topic already has the selected content, ask first —
+    // this is the "overwrite?" question, and it also covers the ALL case.
+    const conflict = conflictCount(topicIds, formats);
+    if (conflict.pairs > 0) return askOverwrite(conflict);
+    doRun(false);
+  }
+
+  function askOverwrite(conflict) {
+    const dlg = $('#overwriteDialog');
+    $('#overwriteMsg').textContent = `${conflict.pairs} item${conflict.pairs === 1 ? '' : 's'} across ${conflict.topics} topic${conflict.topics === 1 ? '' : 's'} already ${conflict.pairs === 1 ? 'has' : 'have'} content on your account.`;
+    if (typeof dlg.showModal === 'function') dlg.showModal();
+    else doRun(window.confirm('Some topics already have content. OK = overwrite & rebuild, Cancel = skip and fill blanks only.'));
+  }
+
+  function resetRunBtn() {
+    const btn = $('#runBtn');
+    btn.disabled = false; btn.textContent = '✨ Build my content';
+  }
+
+  // Dedicated fetch (not the shared api helper) so we can read the 403 gate
+  // response body and status precisely and show the right upgrade CTA.
+  async function postRun(payload) {
+    const res = await fetch('/api/agent/run', {
+      method: 'POST', credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    return { ok: res.ok, status: res.status, data };
+  }
+
+  async function doRun(overwrite) {
     const btn = $('#runBtn');
     btn.disabled = true; btn.textContent = 'Starting…';
     try {
-      const data = await api('/api/agent/run', { method: 'POST', body: JSON.stringify(payload) });
+      const { ok, status, data } = await postRun(buildPayload(overwrite));
+      if (!ok) {
+        if (status === 401) { window.location.href = '/?login=1'; return; }
+        if (status === 403 && data.upgrade) { showGate(data.error); resetRunBtn(); return; }
+        setStatus(data.error || 'Could not start the run.', 'error');
+        resetRunBtn();
+        return;
+      }
       setStatus('', '');
       startProgress(data.jobId, data.total, data.skipped || 0);
     } catch (e) {
       setStatus(e.message, 'error');
-      btn.disabled = false; btn.textContent = '✨ Build my content';
+      resetRunBtn();
+    }
+  }
+
+  // ---- Teams gate CTA ----------------------------------------------------
+  function showGate(msg) {
+    $('#gateMsg').textContent = msg || 'The AI Agent is a Teams feature.';
+    $('#gateNotice').style.display = '';
+    $('#gateNotice').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+  function hideGate() { $('#gateNotice').style.display = 'none'; }
+
+  async function startTeamsTrial() {
+    const btn = $('#gateTrialBtn');
+    btn.disabled = true; btn.textContent = 'Starting…';
+    try {
+      const user = await window.AppCommon.startTrial('team');
+      if (user) { hideGate(); run(); }   // trial active — proceed with the run
+    } finally {
+      btn.disabled = false; btn.textContent = 'Start free Teams trial';
     }
   }
 
@@ -210,6 +284,16 @@
 
     $$('.fmtBox').forEach((b) => b.addEventListener('change', syncCountVisibility));
     $('#runBtn').addEventListener('click', run);
+
+    // Overwrite confirmation dialog choices.
+    $('#overwriteDialog').addEventListener('click', (e) => {
+      const b = e.target.closest('[data-choice]'); if (!b) return;
+      const choice = b.dataset.choice;
+      $('#overwriteDialog').close();
+      if (choice === 'cancel') return;
+      doRun(choice === 'overwrite');
+    });
+    $('#gateTrialBtn').addEventListener('click', startTeamsTrial);
 
     await initCommon();
     await loadOverview();
