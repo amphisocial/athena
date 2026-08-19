@@ -181,5 +181,16 @@ console.log('\nwhiteboard: graph placement + region-select move/delete');
   ok('the toolbar is styled', /#selectionTools/.test(css) && /\.sel-del/.test(css));
 }
 
+console.log('\nwhiteboard: natural expressions + integral area');
+{
+  const bjs = read('public/board.js');
+  const bsrv = read('server/board.js');
+  ok('expressions are normalized (superscripts / symbols) before parsing', /function normalizeExpr/.test(bjs) && /const source = normalizeExpr\(raw\)/.test(bjs));
+  ok('family detection + params also normalize', /rhsOf[\s\S]{0,120}normalizeExpr/.test(bjs) && /const rhs = normalizeExpr\(expression\)/.test(bjs));
+  ok('integrals draw a shaded area', /function syncIntegralGraph/.test(bjs) && /obj\.area/.test(bjs));
+  ok('integral routing precedes plain plots', /analysis\.integral && data\.analysis\.integral\.integrand\) syncIntegralGraph/.test(bjs));
+  ok('analyzer schema includes an integral field', /"integral": null OR/.test(bsrv) && /integrand/.test(bsrv));
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

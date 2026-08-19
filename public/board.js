@@ -413,6 +413,28 @@
     if (0 >= yMin && 0 <= yMax) { ctx.moveTo(x, py(0)); ctx.lineTo(x + w, py(0)); }
     ctx.stroke();
 
+    // Integral area: shade the band between the first curve and the x-axis over
+    // [from, to] so a definite integral is shown as the area it measures.
+    if (obj.area && per[0] && Number.isFinite(obj.area.from) && Number.isFinite(obj.area.to)) {
+      const from = Math.max(obj.area.from, xMin), to = Math.min(obj.area.to, xMax);
+      const band = per[0].samples.filter((s) => s.x >= from && s.x <= to && Number.isFinite(s.y));
+      if (band.length > 1) {
+        ctx.save();
+        ctx.fillStyle = 'rgba(20,217,196,0.20)';
+        ctx.beginPath();
+        ctx.moveTo(px(band[0].x), py(0));
+        band.forEach((s) => ctx.lineTo(px(s.x), py(s.y)));
+        ctx.lineTo(px(band[band.length - 1].x), py(0));
+        ctx.closePath(); ctx.fill();
+        ctx.strokeStyle = 'rgba(20,217,196,0.55)'; ctx.lineWidth = 1 / view.scale;
+        ctx.beginPath();
+        ctx.moveTo(px(band[0].x), py(0)); ctx.lineTo(px(band[0].x), py(band[0].y));
+        ctx.moveTo(px(band[band.length - 1].x), py(0)); ctx.lineTo(px(band[band.length - 1].x), py(band[band.length - 1].y));
+        ctx.stroke();
+        ctx.restore();
+      }
+    }
+
     per.forEach((cv) => {
       if (!cv) return;
       ctx.strokeStyle = cv.color;
@@ -477,8 +499,9 @@
   //   side of "y = ..." (or the whole thing if there's no "y =").
 
   function rhsOf(expression) {
-    const m = String(expression).split('=');
-    return (m.length > 1 ? m.slice(1).join('=') : expression).trim();
+    const s = normalizeExpr(expression);
+    const m = s.split('=');
+    return (m.length > 1 ? m.slice(1).join('=') : s).trim();
   }
 
   function analyzeFunction(expression) {
@@ -600,8 +623,20 @@
     return Number.isInteger(r) ? String(r) : String(r);
   }
 
+  // Normalize handwriting/AI artifacts so a teacher can write it naturally:
+  //  x²  -> x^2   (Unicode superscripts, incl. multi-digit x¹⁰ -> x^10)
+  //  2·x, 2×x     -> 2*x       √x -> sqrt x        − (U+2212) -> -
+  // Implicit multiplication (2x, mx, 2x^2) is already handled by the parser.
+  const SUPERSCRIPT = { '\u2070': '0', '\u00b9': '1', '\u00b2': '2', '\u00b3': '3', '\u2074': '4', '\u2075': '5', '\u2076': '6', '\u2077': '7', '\u2078': '8', '\u2079': '9' };
+  function normalizeExpr(raw) {
+    let s = String(raw == null ? '' : raw);
+    s = s.replace(/[\u2070\u00b9\u00b2\u00b3\u2074-\u2079]+/g, (m) => '^' + m.split('').map((c) => SUPERSCRIPT[c] || '').join(''));
+    s = s.replace(/[\u00b7\u2219\u00d7\u2022\u2217]/g, '*').replace(/\u00f7/g, '/').replace(/[\u2212\u2013\u2014]/g, '-').replace(/\u221a/g, 'sqrt');
+    return s;
+  }
+
   function compileExpression(raw, params = {}) {
-    const source = String(raw).split('=').pop().trim();
+    const source = normalizeExpr(raw).split('=').pop().trim();
     let pos = 0;
     const CONSTANTS = { pi: Math.PI, e: Math.E };
     const FUNCS = { sin: Math.sin, cos: Math.cos, tan: Math.tan, sqrt: Math.sqrt, abs: Math.abs, exp: Math.exp, log: Math.log10, ln: Math.log };
@@ -1659,7 +1694,7 @@
     const funcs = new Set(['sin', 'cos', 'tan', 'sqrt', 'abs', 'exp', 'log', 'ln', 'pi']);
     const skip = new Set(['x', 'y', 'e']);
     const params = {};
-    const rhs = String(expression).split('=').pop();
+    const rhs = normalizeExpr(expression).split('=').pop();
     // Consume known funcs/constants whole; split everything else letter by
     // letter, matching how compileExpression now tokenizes. "mx" -> param m.
     (rhs.match(/[a-zA-Z]+/g) || []).forEach((run) => {
@@ -1751,7 +1786,7 @@
     return { a, b, c };
   }
   function toExplicitY(raw) {
-    const s = String(raw || '').replace(/\s+/g, '');
+    const s = normalizeExpr(raw).replace(/\s+/g, '');
     if (!s) return null;
     if (!s.includes('=')) return /[a-wyz]/i.test(s) ? `y = ${raw}` : null; // bare expr in x
     const [lhs, rhs] = s.split('=');
@@ -1819,6 +1854,64 @@
     renderIntersectionNote(obj);
   }
 
+  // Definite/indefinite integral: draw the integrand and SHADE the area between
+  // the curve and the x-axis over [from, to]. Reuses the one analysis graph.
+  function syncIntegralGraph(integral) {
+    const integrand = normalizeExpr(integral.integrand || '').trim();
+    if (!integrand) return;
+    const expr = /=/.test(integrand) ? integrand : `y = ${integrand}`;
+    try { compileExpression(expr, {}); } catch (_) { return; }
+    const from = Number(integral.from), to = Number(integral.to);
+    const hasBounds = Number.isFinite(from) && Number.isFinite(to) && from !== to;
+    const a = hasBounds ? Math.min(from, to) : null, bnd = hasBounds ? Math.max(from, to) : null;
+    const xMin = hasBounds ? Math.min(a, 0) - 1 : -10;
+    const xMax = hasBounds ? Math.max(bnd, 0) + 1 : 10;
+
+    let obj = analysisGraphId ? page().objects.find((o) => o.id === analysisGraphId && o.type === 'graph') : null;
+    if (!obj) {
+      const w = 380, h = 300;
+      const cb = contentBounds();
+      let pos;
+      if (cb) pos = { x: cb.maxX + 48, y: cb.minY };
+      else { const b = visibleWorldBounds(); pos = { x: b.x1 + (b.x2 - b.x1) / 2 - w / 2, y: b.y1 + (b.y2 - b.y1) / 2 - h / 2 }; }
+      obj = {
+        id: `obj_${Math.random().toString(16).slice(2)}`, type: 'graph', analysisGraph: true,
+        x: pos.x, y: pos.y, w, h,
+        curves: [{ expression: expr, color: CURVE_COLORS[0] }], params: {}, transform: { shiftX: 0, shiftY: 0 },
+        xMin, xMax, area: hasBounds ? { from: a, to: bnd } : null, intersections: []
+      };
+      analysisGraphId = obj.id;
+      addObject(obj);
+    } else {
+      const color = (obj.curves && obj.curves[0] && obj.curves[0].color) || CURVE_COLORS[0];
+      obj.curves = [{ expression: expr, color }];
+      obj.xMin = xMin; obj.xMax = xMax; obj.area = hasBounds ? { from: a, to: bnd } : null; obj.intersections = [];
+      redraw();
+      send({ type: 'object:update', pageId: pageId(), object: obj });
+    }
+    renderIntegralNote(integral, integrand, hasBounds ? { from: a, to: bnd } : null);
+  }
+
+  function renderIntegralNote(integral, integrand, area) {
+    const body = $('#infoBody');
+    if (!body) return;
+    const prev = document.getElementById('analysisSideNote'); if (prev) prev.remove();
+    const card = document.createElement('div');
+    card.className = 'insight-card'; card.id = 'analysisSideNote';
+    const val = (integral.value !== undefined && integral.value !== null) ? integral.value : null;
+    const bounds = area ? `from ${fmtNum(area.from)} to ${fmtNum(area.to)}` : '(indefinite)';
+    card.innerHTML = `
+      <span class="insight-kind">integral</span>
+      <h4>Area under the curve</h4>
+      <div class="insight-formula" style="border-left-color:${CURVE_COLORS[0]}">y = ${escapeHtml(integrand)}</div>
+      <div class="insight-facts">
+        <div class="insight-fact"><span>Region</span><span>${escapeHtml(bounds)}</span></div>
+        ${val !== null ? `<div class="insight-fact"><span>\u222b value (net area)</span><span>${escapeHtml(String(val))}</span></div>` : ''}
+      </div>
+      <div class="insight-method">Method: the shaded band is the signed area between y = ${escapeHtml(integrand)} and the x-axis over ${escapeHtml(bounds)}. A definite integral is exactly that area (regions below the axis count as negative).</div>`;
+    body.insertBefore(card, body.firstChild);
+  }
+
   // Numeric intersection finder: for each pair of curves, scan the graph's
   // domain for sign changes of f-g and refine each with a few bisections. Honors
   // the graph's shift transform so the points match what's drawn.
@@ -1870,14 +1963,14 @@
   function renderIntersectionNote(obj) {
     const body = $('#infoBody');
     if (!body) return;
-    const existing = document.getElementById('intersectionNote');
+    const existing = document.getElementById('analysisSideNote');
     if (existing) existing.remove();
     const curves = graphCurves(obj);
     if (curves.length < 2) return;
     const pts = obj.intersections || [];
     const card = document.createElement('div');
     card.className = 'insight-card';
-    card.id = 'intersectionNote';
+    card.id = 'analysisSideNote';
     const eqList = curves.map((c) => `<span class="insight-formula" style="border-left-color:${c.color}">${escapeHtml(c.expression)}</span>`).join('');
     let ptsHtml;
     if (!pts.length) {
@@ -2752,10 +2845,10 @@
         const data = await postAnalyze(snapshot);
         lastAnalysis = data.analysis;
         renderInsight(data.analysis, { live: true });
-        // Put EVERY equation the analysis found into ONE shared coordinate
-        // system (so curves overlap and intersect), and refresh that same graph
-        // on each cycle instead of spawning a new one per equation per tick.
-        syncAnalysisGraph(data.analysis.plots || []);
+        // A definite/indefinite integral gets its area drawn; otherwise plot the
+        // equations the analysis surfaced into one shared coordinate system.
+        if (data.analysis.integral && data.analysis.integral.integrand) syncIntegralGraph(data.analysis.integral);
+        else syncAnalysisGraph(data.analysis.plots || []);
       } catch (e) { /* stay quiet on the auto path */ }
       finally { liveAnalyzeBusy = false; }
     }, 2200);
