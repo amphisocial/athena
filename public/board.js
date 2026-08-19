@@ -130,6 +130,25 @@
     return { x1: tl.x, y1: tl.y, x2: br.x, y2: br.y };
   }
 
+  // World-space bounding box of everything drawn on the current page (strokes +
+  // objects), optionally excluding one object id. Returns null for an empty page.
+  function contentBounds(excludeId) {
+    const p = page();
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    (p.strokes || []).forEach((s) => (s.points || []).forEach((pt) => {
+      minX = Math.min(minX, pt.x); minY = Math.min(minY, pt.y);
+      maxX = Math.max(maxX, pt.x); maxY = Math.max(maxY, pt.y);
+    }));
+    (p.objects || []).forEach((o) => {
+      if (excludeId && o.id === excludeId) return;
+      if (typeof o.x !== 'number' || typeof o.y !== 'number') return;
+      minX = Math.min(minX, o.x); minY = Math.min(minY, o.y);
+      maxX = Math.max(maxX, o.x + (o.w || 0)); maxY = Math.max(maxY, o.y + (o.h || 0));
+    });
+    if (!Number.isFinite(minX)) return null;
+    return { minX, minY, maxX, maxY };
+  }
+
   function drawTemplate(p) {
     if (!p.template || p.template === 'blank') return;
     const b = visibleWorldBounds();
@@ -301,7 +320,7 @@
       ctx.restore();
     }
   }
-  function redraw() { render(replay.active ? replay.index : undefined); }
+  function redraw() { render(replay.active ? replay.index : undefined); positionSelectionTools(); }
 
   // ---- Graph objects (plotted on the board itself) ------------------------
   // A graph object holds `curves` (each an expression + colour) and a shared
@@ -860,7 +879,13 @@
       if (tool.name === 'connect') { handleConnectTap(w); return; }
       if (tool.name === 'laser') { drawing = true; sendLaser(w, true); return; }
       if (tool.name === 'note' || tool.name === 'text') { createTextObject(tool.name, w); return; }
-      if (tool.name === 'select') { selectionRect = { x1: w.x, y1: w.y, x2: w.x, y2: w.y }; drawing = true; return; }
+      if (tool.name === 'select') {
+        // Pressing inside an existing selection drags it; otherwise start a new
+        // marquee. (The floating toolbar's grab handle does the same thing.)
+        if (selectionRect && selectionValid() && pointInSel(w)) { startMoveSelection(w); drawing = true; return; }
+        hideSelectionTools();
+        selectionRect = { x1: w.x, y1: w.y, x2: w.x, y2: w.y }; drawing = true; return;
+      }
       drawing = true; currentPoints = [w];
     });
 
@@ -899,7 +924,10 @@
 
       const w = pointerWorld(e);
       if (tool.name === 'laser') { sendLaser(w, true); drawLaser(w); return; }
-      if (tool.name === 'select') { selectionRect.x2 = w.x; selectionRect.y2 = w.y; redraw(); return; }
+      if (tool.name === 'select') {
+        if (movingSelection) { updateMoveSelection(w); return; }
+        selectionRect.x2 = w.x; selectionRect.y2 = w.y; redraw(); return;
+      }
       currentPoints.push(w);
       redraw();
       drawStroke({ tool: tool.name, color: tool.color, size: tool.size, points: currentPoints });
@@ -917,9 +945,10 @@
 
       if (tool.name === 'laser') { sendLaser(null, false); clearLaser(); return; }
       if (tool.name === 'select') {
-        const ok = selectionRect && Math.abs(selectionRect.x2 - selectionRect.x1) > 12 && Math.abs(selectionRect.y2 - selectionRect.y1) > 12;
+        if (movingSelection) { endMoveSelection(); return; }
+        const ok = selectionValid();
         $('#plotSelectionBtn').style.display = ok ? '' : 'none';
-        if (!ok) selectionRect = null;
+        if (!ok) { selectionRect = null; hideSelectionTools(); } else showSelectionTools();
         redraw(); return;
       }
       if (currentPoints.length < 2) { currentPoints = []; return; }
@@ -984,6 +1013,12 @@
     } else if (op.kind === 'object') {
       p.objects = p.objects.filter((o) => o.id !== op.object.id);
       send({ type: 'object:remove', pageId: op.pageId, objectId: op.object.id });
+    } else if (op.kind === 'bulk') {
+      // Undo a region delete: put every removed stroke/object back.
+      (op.strokes || []).forEach((s) => { p.strokes.push(s); send({ type: 'stroke:add', pageId: op.pageId, stroke: s }); });
+      (op.objects || []).forEach((o) => { p.objects.push(o); send({ type: 'object:add', pageId: op.pageId, object: o }); });
+    } else if (op.kind === 'moveSel') {
+      translateSelById(op.pageId, op.strokeIds, op.objectIds, -op.dx, -op.dy);
     }
     redoStack.push(op);
     updateUndoButtons(); redraw();
@@ -996,6 +1031,14 @@
     if (!p) return;
     if (op.kind === 'stroke') { p.strokes.push(op.stroke); send({ type: 'stroke:add', pageId: op.pageId, stroke: op.stroke }); }
     else if (op.kind === 'object') { p.objects.push(op.object); send({ type: 'object:add', pageId: op.pageId, object: op.object }); }
+    else if (op.kind === 'bulk') {
+      const ids = new Set((op.strokes || []).map((s) => s.id)), oids = new Set((op.objects || []).map((o) => o.id));
+      p.strokes = p.strokes.filter((s) => !ids.has(s.id)); p.objects = p.objects.filter((o) => !oids.has(o.id));
+      (op.strokes || []).forEach((s) => send({ type: 'stroke:remove', pageId: op.pageId, strokeId: s.id }));
+      (op.objects || []).forEach((o) => send({ type: 'object:remove', pageId: op.pageId, objectId: o.id }));
+    } else if (op.kind === 'moveSel') {
+      translateSelById(op.pageId, op.strokeIds, op.objectIds, op.dx, op.dy);
+    }
     undoStack.push(op);
     updateUndoButtons(); redraw();
   }
@@ -1088,6 +1131,134 @@
     if (!movingObject) return;
     send({ type: 'object:update', pageId: pageId(), object: movingObject.obj });
     movingObject = null;
+  }
+
+  // ---- Region select: move or delete the selected items ------------------
+  let movingSelection = null;
+  function normSel(r) { return { minX: Math.min(r.x1, r.x2), minY: Math.min(r.y1, r.y2), maxX: Math.max(r.x1, r.x2), maxY: Math.max(r.y1, r.y2) }; }
+  function selectionValid() { return selectionRect && Math.abs(selectionRect.x2 - selectionRect.x1) > 12 && Math.abs(selectionRect.y2 - selectionRect.y1) > 12; }
+  function pointInSel(w) { const r = normSel(selectionRect); return w.x >= r.minX && w.x <= r.maxX && w.y >= r.minY && w.y <= r.maxY; }
+  function strokeInSel(s, r) { return (s.points || []).some((p) => p.x >= r.minX && p.x <= r.maxX && p.y >= r.minY && p.y <= r.maxY); }
+  function objInSel(o, r) {
+    if (typeof o.x !== 'number' || typeof o.y !== 'number') return false;
+    const ox2 = o.x + (o.w || 0), oy2 = o.y + (o.h || 0);
+    return o.x <= r.maxX && ox2 >= r.minX && o.y <= r.maxY && oy2 >= r.minY;
+  }
+  function selectionItems() {
+    const r = normSel(selectionRect); const p = page();
+    return {
+      strokes: (p.strokes || []).filter((s) => strokeInSel(s, r)),
+      objects: (p.objects || []).filter((o) => objInSel(o, r))
+    };
+  }
+
+  function startMoveSelection(w) {
+    const items = selectionItems();
+    if (!items.strokes.length && !items.objects.length) { movingSelection = null; return; }
+    movingSelection = {
+      start: w, rect0: { ...selectionRect },
+      strokes: items.strokes.map((s) => ({ ref: s, pts0: (s.points || []).map((p) => ({ x: p.x, y: p.y })) })),
+      objects: items.objects.map((o) => ({ ref: o, x0: o.x, y0: o.y })),
+      moved: false
+    };
+  }
+  function updateMoveSelection(w) {
+    if (!movingSelection) return;
+    const dx = w.x - movingSelection.start.x, dy = w.y - movingSelection.start.y;
+    movingSelection.moved = Math.abs(dx) > 0.5 || Math.abs(dy) > 0.5;
+    movingSelection.strokes.forEach((it) => { it.ref.points = it.pts0.map((p) => ({ x: p.x + dx, y: p.y + dy })); });
+    movingSelection.objects.forEach((it) => { it.ref.x = it.x0 + dx; it.ref.y = it.y0 + dy; });
+    selectionRect = { x1: movingSelection.rect0.x1 + dx, y1: movingSelection.rect0.y1 + dy, x2: movingSelection.rect0.x2 + dx, y2: movingSelection.rect0.y2 + dy };
+    redraw(); positionSelectionTools();
+  }
+  function endMoveSelection() {
+    const ms = movingSelection; movingSelection = null;
+    if (!ms) return;
+    if (!ms.moved) { showSelectionTools(); return; }
+    const dx = (selectionRect.x1 - ms.rect0.x1), dy = (selectionRect.y1 - ms.rect0.y1);
+    // Broadcast: strokes move via remove+add (same id, new points); objects update.
+    ms.strokes.forEach((it) => {
+      send({ type: 'stroke:remove', pageId: pageId(), strokeId: it.ref.id });
+      send({ type: 'stroke:add', pageId: pageId(), stroke: it.ref });
+    });
+    ms.objects.forEach((it) => send({ type: 'object:update', pageId: pageId(), object: it.ref }));
+    undoStack.push({ kind: 'moveSel', pageId: pageId(), strokeIds: ms.strokes.map((s) => s.ref.id), objectIds: ms.objects.map((o) => o.ref.id), dx, dy });
+    redoStack.length = 0; updateUndoButtons();
+    showSelectionTools();
+  }
+  function translateSelById(pageId0, strokeIds, objectIds, dx, dy) {
+    const p = board.pages.find((x) => x.id === pageId0); if (!p) return;
+    strokeIds.forEach((id) => {
+      const s = p.strokes.find((k) => k.id === id); if (!s) return;
+      s.points = (s.points || []).map((pt) => ({ x: pt.x + dx, y: pt.y + dy }));
+      send({ type: 'stroke:remove', pageId: pageId0, strokeId: id });
+      send({ type: 'stroke:add', pageId: pageId0, stroke: s });
+    });
+    objectIds.forEach((id) => {
+      const o = p.objects.find((k) => k.id === id); if (!o) return;
+      o.x += dx; o.y += dy;
+      send({ type: 'object:update', pageId: pageId0, object: o });
+    });
+    redraw();
+  }
+
+  function deleteSelection() {
+    if (!isOwner || !selectionRect) return;
+    const items = selectionItems();
+    if (!items.strokes.length && !items.objects.length) { clearSelection(); return; }
+    const p = page();
+    const ids = new Set(items.strokes.map((s) => s.id));
+    const oids = new Set(items.objects.map((o) => o.id));
+    p.strokes = p.strokes.filter((s) => !ids.has(s.id));
+    p.objects = p.objects.filter((o) => !oids.has(o.id));
+    if (analysisGraphId && oids.has(analysisGraphId)) analysisGraphId = null;
+    items.strokes.forEach((s) => send({ type: 'stroke:remove', pageId: pageId(), strokeId: s.id }));
+    items.objects.forEach((o) => send({ type: 'object:remove', pageId: pageId(), objectId: o.id }));
+    undoStack.push({ kind: 'bulk', pageId: pageId(), strokes: items.strokes, objects: items.objects });
+    redoStack.length = 0; updateUndoButtons();
+    clearSelection();
+  }
+  function clearSelection() { selectionRect = null; hideSelectionTools(); $('#plotSelectionBtn').style.display = 'none'; redraw(); }
+
+  // Floating toolbar pinned to the selection's top-right: a grab handle to move
+  // and a trash button to delete. Repositioned whenever the view changes.
+  function ensureSelectionTools() {
+    let el = document.getElementById('selectionTools');
+    if (el) return el;
+    el = document.createElement('div');
+    el.id = 'selectionTools';
+    el.innerHTML = `
+      <button class="sel-tool sel-move" title="Drag to move the selection" aria-label="Move selection">✥</button>
+      <button class="sel-tool sel-del" title="Delete the selection" aria-label="Delete selection">🗑</button>`;
+    (document.getElementById('boardShell') || document.body).appendChild(el);
+    el.querySelector('.sel-del').addEventListener('click', (e) => { e.stopPropagation(); deleteSelection(); });
+    // The move handle is a drag grip: press it and drag to move the selection.
+    const handle = el.querySelector('.sel-move');
+    handle.addEventListener('pointerdown', (e) => {
+      e.preventDefault(); e.stopPropagation();
+      if (!selectionValid()) return;
+      startMoveSelection(screenToWorld(e.clientX, e.clientY));
+      const move = (ev) => { updateMoveSelection(screenToWorld(ev.clientX, ev.clientY)); };
+      const up = () => { window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); endMoveSelection(); };
+      window.addEventListener('pointermove', move); window.addEventListener('pointerup', up);
+    });
+    return el;
+  }
+  function showSelectionTools() {
+    if (!isOwner || !selectionValid()) { hideSelectionTools(); return; }
+    const el = ensureSelectionTools();
+    el.style.display = 'flex';
+    positionSelectionTools();
+  }
+  function hideSelectionTools() { const el = document.getElementById('selectionTools'); if (el) el.style.display = 'none'; }
+  function positionSelectionTools() {
+    const el = document.getElementById('selectionTools');
+    if (!el || el.style.display === 'none' || !selectionRect) return;
+    const r = normSel(selectionRect);
+    const tr = worldToScreen(r.maxX, r.minY);
+    const host = (document.getElementById('boardShell') || document.body).getBoundingClientRect();
+    el.style.left = `${tr.x - host.left + 8}px`;
+    el.style.top = `${tr.y - host.top - 4}px`;
   }
 
   // Tap one shape then another to join them. A second connector leaving the
@@ -1615,11 +1786,23 @@
 
     let obj = analysisGraphId ? page().objects.find((o) => o.id === analysisGraphId && o.type === 'graph') : null;
     if (!obj) {
-      const b = visibleWorldBounds();
       const w = 380, h = 300;
+      // Drop the graph in clean space to the RIGHT of whatever's already on the
+      // page (handwriting + objects), so it never lands on top of the teacher's
+      // work. Falls back to the middle of the view on an empty page.
+      const cb = contentBounds();
+      let pos;
+      if (cb) {
+        pos = { x: cb.maxX + 48, y: cb.minY };
+        // Keep it from drifting absurdly far below if the content is a tall column.
+        if (pos.y + h > cb.maxY + 80) pos.y = Math.max(cb.minY, cb.minY + (cb.maxY - cb.minY) / 2 - h / 2);
+      } else {
+        const b = visibleWorldBounds();
+        pos = { x: b.x1 + (b.x2 - b.x1) / 2 - w / 2, y: b.y1 + (b.y2 - b.y1) / 2 - h / 2 };
+      }
       obj = {
         id: `obj_${Math.random().toString(16).slice(2)}`, type: 'graph', analysisGraph: true,
-        x: b.x1 + (b.x2 - b.x1) / 2 - w / 2, y: b.y1 + (b.y2 - b.y1) / 2 - h / 2, w, h,
+        x: pos.x, y: pos.y, w, h,
         curves: exprs, params: {}, transform: { shiftX: 0, shiftY: 0 }, xMin: -10, xMax: 10
       };
       analysisGraphId = obj.id;
@@ -2673,7 +2856,7 @@
         const yellow = $$('.swatch').find((s) => s.dataset.color === '#ffcc66');
         if (yellow) { tool.color = '#ffcc66'; $$('.swatch').forEach((x) => x.classList.toggle('active', x === yellow)); }
       }
-      if (tool.name !== 'select') { selectionRect = null; $('#plotSelectionBtn').style.display = 'none'; redraw(); }
+      if (tool.name !== 'select') { selectionRect = null; hideSelectionTools(); $('#plotSelectionBtn').style.display = 'none'; redraw(); }
     }));
     $$('.swatch').forEach((b) => b.addEventListener('click', () => {
       tool.color = b.dataset.color;

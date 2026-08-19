@@ -270,6 +270,17 @@ body.presenting .live-strip .lr-kick.btn:hover { background: rgba(255,90,104,.26
 /* Belt-and-suspenders: students never see Clear page (the toolbar is hidden for
    non-owners; this covers any public view where it might slip through). */
 body.public-view #clearBoardBtn { display: none !important; }
+
+/* ---- Whiteboard: region-select floating toolbar (move / delete) ---- */
+#selectionTools { position: absolute; z-index: 40; display: none; gap: 6px; padding: 4px; border-radius: 12px;
+  background: rgba(12,20,38,.92); border: 1px solid rgba(255,255,255,.16); box-shadow: 0 10px 26px rgba(6,10,24,.4); }
+#selectionTools .sel-tool { width: 34px; height: 34px; display: grid; place-items: center; cursor: pointer; font-size: 1rem;
+  border-radius: 9px; border: 1px solid rgba(255,255,255,.18); background: rgba(255,255,255,.06); color: #eaf1ff; line-height: 1; }
+#selectionTools .sel-move { cursor: grab; }
+#selectionTools .sel-move:active { cursor: grabbing; }
+#selectionTools .sel-tool:hover { background: rgba(255,255,255,.14); }
+#selectionTools .sel-del { color: #ff8f9a; border-color: rgba(255,90,104,.5); background: rgba(255,90,104,.14); }
+#selectionTools .sel-del:hover { background: rgba(255,90,104,.26); }
 @media (max-width: 520px) {
   .la-panel, .la-teamroom { right: 8px; left: 8px; width: auto; }
   .la-launcher { right: 10px; bottom: 10px; }

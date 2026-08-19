@@ -168,5 +168,18 @@ console.log('\nwhiteboard graph rework + Exit-ends-live');
   ok('analyzer is told to always plot system equations', /every equation solved for y|rearranged into explicit y = f\(x\)/.test(read('server/board.js')));
 }
 
+console.log('\nwhiteboard: graph placement + region-select move/delete');
+{
+  const bjs = read('public/board.js');
+  const css = read('public/live-activities.css');
+  ok('analysis graph is placed to the right of content, not over it', /function contentBounds/.test(bjs) && /cb\.maxX \+ 48/.test(bjs));
+  ok('a selection shows a floating move/delete toolbar', /id = 'selectionTools'/.test(bjs) && /sel-del/.test(bjs) && /sel-move/.test(bjs));
+  ok('the toolbar tracks the selection on redraw', /function positionSelectionTools/.test(bjs) && /render\(replay\.active[\s\S]{0,60}positionSelectionTools/.test(bjs));
+  ok('delete removes the selected strokes + objects with undo', /function deleteSelection/.test(bjs) && /kind: 'bulk'/.test(bjs));
+  ok('move drags the selection and is undoable', /function startMoveSelection/.test(bjs) && /kind: 'moveSel'/.test(bjs));
+  ok('undo/redo handle bulk delete and selection move', /op\.kind === 'bulk'/.test(bjs) && /op\.kind === 'moveSel'/.test(bjs));
+  ok('the toolbar is styled', /#selectionTools/.test(css) && /\.sel-del/.test(css));
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
