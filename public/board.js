@@ -44,7 +44,12 @@
     LA = window.LiveActivities.attach({
       host: 'board',
       send: (o) => send(o),
-      loadBanks: async () => { const r = await api('/api/live/question-banks'); return (r && r.banks) || []; }
+      loadBanks: async () => {
+        // Scope prepared questions to the topic of the board we're live on.
+        const bid = (board && board.id) ? board.id : '';
+        const r = await api('/api/live/question-banks?host=board' + (bid ? '&id=' + encodeURIComponent(bid) : ''));
+        return (r && r.banks) || [];
+      }
     });
     return LA;
   }

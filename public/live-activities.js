@@ -39,7 +39,11 @@
     const state = {
       role: 'student',
       active: false,
-      banks: null,          // teacher: cached prepared questions
+      banks: null,          // teacher: cached prepared questions (this topic)
+      // Questions the teacher makes on the spot during this session. Kept only
+      // in memory for the life of the session, surfaced as a "This session"
+      // bank in both the Poll and Teams pickers.
+      adhoc: { id: '__session__', title: 'This session', owned: true, creator: 'You', subject: '', topic: '', questions: [] },
       poll: null,           // { pollId, question, choices, answerIndex, explanation, counts, total, voted }
       teams: null,          // student: { exId, team, quiz, answers:{}, } ; teacher: { exId, title, teams, standings, quizLen, log:[] }
       launchedQuiz: null,   // teacher: the quiz array launched (kept for export)
@@ -94,6 +98,14 @@
       if (state.banks) return state.banks;
       try { state.banks = await loadBanks(); } catch (_) { state.banks = []; }
       return state.banks;
+    }
+
+    // Prepared (topic-scoped) banks with the on-the-fly "This session" bank in
+    // front when it has any questions, so ad-hoc questions are pickable too.
+    function combinedBanks(prepared) {
+      const list = Array.isArray(prepared) ? prepared.slice() : [];
+      if (state.adhoc && state.adhoc.questions.length) list.unshift(state.adhoc);
+      return list;
     }
 
     function renderPanel(tab) {
@@ -164,33 +176,98 @@
       // If a poll is running, show the live graph instead of the picker.
       if (state.poll && state.role === 'teacher') { renderTeacherPollLive(body); return; }
       body.innerHTML = '<div class="la-loading">Loading your prepared questions…</div>';
-      const banks = await ensureBanks();
-      if (!banks.length) {
-        body.innerHTML = '<div class="la-empty">No prepared questions yet. Add a quiz to one of your lessons — any lesson you own or one shared with you — then pick a question here to poll the room.</div>';
-        return;
-      }
+      const banks = combinedBanks(await ensureBanks());
       const noStudents = state.studentCount < 1;
+      const hasBanks = banks.length > 0;
       body.innerHTML = `
-        <p class="la-hint">Pick one prepared question. It pops up on every student's screen; as answers land, a live graph builds here and on their screens.</p>
+        <p class="la-hint">Pick a prepared question for this topic, or make one on the spot. It pops up on every student's screen; as answers land, a live graph builds here and on their screens.</p>
         ${noStudents ? '<div class="la-notice">No students have joined yet. The poll will be ready to send as soon as someone arrives.</div>' : ''}
-        <div class="la-field"><span>Lesson</span><div id="laPollBank"></div></div>
-        <div id="laPollList" class="la-qlist${noStudents ? ' disabled' : ''}"></div>
-        <label class="la-check"><input type="checkbox" id="laSurvey" /> Survey — no right answer (just gather opinions)</label>`;
-      const paint = (bank) => {
-        body.querySelector('#laPollList').innerHTML = bank.questions.map((q, i) => `
-          <button class="la-qpick" data-i="${i}"${noStudents ? ' disabled' : ''}>
-            <span class="la-qpick-q">${esc(q.front)}</span>
-            <span class="la-qpick-meta">${q.choices.length} choices${q.answerIndex >= 0 ? '' : ' · survey'}</span>
-          </button>`).join('');
-        body.querySelectorAll('.la-qpick').forEach((btn) => btn.addEventListener('click', () => {
-          if (state.studentCount < 1) { flash('No students have joined yet.'); return; }
-          const q = bank.questions[Number(btn.dataset.i)];
-          const survey = body.querySelector('#laSurvey').checked;
-          send({ type: 'activity:poll:launch', question: q.front, choices: q.choices, answerIndex: survey ? -1 : q.answerIndex, explanation: q.explanation });
-        }));
-      };
-      const picker = bankPicker(body.querySelector('#laPollBank'), banks, paint);
-      paint(picker.getSelected());
+        ${hasBanks ? `
+          <div class="la-field"><span>Lesson</span><div id="laPollBank"></div></div>
+          <div id="laPollList" class="la-qlist${noStudents ? ' disabled' : ''}"></div>
+          <label class="la-check"><input type="checkbox" id="laSurvey" /> Survey — no right answer (just gather opinions)</label>`
+          : '<div class="la-empty">No quiz for this topic yet. Make a quick question below and it\'ll be ready to send.</div>'}
+        <div class="la-newpoll">
+          <button type="button" class="la-linkbtn" id="laNewPollToggle">＋ New question</button>
+          <div id="laNewPollForm" hidden></div>
+        </div>`;
+      if (hasBanks) {
+        const paint = (bank) => {
+          body.querySelector('#laPollList').innerHTML = bank.questions.map((q, i) => `
+            <button class="la-qpick" data-i="${i}"${noStudents ? ' disabled' : ''}>
+              <span class="la-qpick-q">${esc(q.front)}</span>
+              <span class="la-qpick-meta">${q.choices.length} choices${q.answerIndex >= 0 ? '' : ' · survey'}</span>
+            </button>`).join('');
+          body.querySelectorAll('.la-qpick').forEach((btn) => btn.addEventListener('click', () => {
+            if (state.studentCount < 1) { flash('No students have joined yet.'); return; }
+            const q = bank.questions[Number(btn.dataset.i)];
+            const survey = body.querySelector('#laSurvey').checked;
+            send({ type: 'activity:poll:launch', question: q.front, choices: q.choices, answerIndex: survey ? -1 : q.answerIndex, explanation: q.explanation });
+          }));
+        };
+        const picker = bankPicker(body.querySelector('#laPollBank'), banks, paint);
+        paint(picker.getSelected());
+      }
+      wireNewPollForm(body);
+    }
+
+    // ----- Teacher: make a poll question on the spot ----------------------
+    // Lets the teacher add a 4-option question mid-session without leaving Go
+    // Live. It's stored in the in-memory "This session" bank and immediately
+    // pickable in both the Poll and Teams tabs.
+    function wireNewPollForm(body) {
+      const toggle = body.querySelector('#laNewPollToggle');
+      const host = body.querySelector('#laNewPollForm');
+      if (!toggle || !host) return;
+      toggle.addEventListener('click', () => {
+        if (host.hidden) { host.hidden = false; toggle.textContent = '✕ Cancel'; renderNewPollForm(host); }
+        else { host.hidden = true; host.innerHTML = ''; toggle.textContent = '＋ New question'; }
+      });
+    }
+
+    function renderNewPollForm(host) {
+      host.innerHTML = `
+        <div class="la-npform">
+          <input class="la-np-q" id="laNpQ" placeholder="Type your question…" maxlength="600" />
+          <div class="la-np-opts">
+            ${[0, 1, 2, 3].map((i) => `
+              <label class="la-np-opt">
+                <input type="radio" name="laNpCorrect" value="${i}"${i === 0 ? ' checked' : ''} title="Mark as correct answer" />
+                <input class="la-np-o" data-i="${i}" placeholder="Option ${i + 1}" maxlength="200" />
+              </label>`).join('')}
+          </div>
+          <label class="la-check"><input type="checkbox" id="laNpSurvey" /> No right answer (survey)</label>
+          <div class="la-panel-actions">
+            <button type="button" class="btn primary" id="laNpAdd">Add to session</button>
+          </div>
+        </div>`;
+      const survey = host.querySelector('#laNpSurvey');
+      const radios = [...host.querySelectorAll('input[name="laNpCorrect"]')];
+      survey.addEventListener('change', () => radios.forEach((r) => { r.disabled = survey.checked; }));
+      host.querySelector('#laNpAdd').addEventListener('click', () => addAdhocQuestion(host));
+    }
+
+    function addAdhocQuestion(host) {
+      const q = host.querySelector('#laNpQ').value.trim();
+      const raw = [...host.querySelectorAll('.la-np-o')].map((n) => n.value.trim());
+      const choices = raw.filter(Boolean);
+      if (!q) { flash('Add a question first.'); return; }
+      if (choices.length < 2) { flash('Add at least two options.'); return; }
+      const survey = host.querySelector('#laNpSurvey').checked;
+      let answerIndex = -1;
+      if (!survey) {
+        // The "correct" radio is over all four slots; map it onto the compacted
+        // (non-empty) choices so the index stays valid after blanks are dropped.
+        const checked = host.querySelector('input[name="laNpCorrect"]:checked');
+        const rawIdx = checked ? Number(checked.value) : 0;
+        let seen = -1; answerIndex = 0;
+        for (let i = 0; i < raw.length; i += 1) {
+          if (raw[i]) { seen += 1; if (i === rawIdx) { answerIndex = seen; break; } }
+        }
+      }
+      state.adhoc.questions.push({ front: q, choices, answerIndex, explanation: '' });
+      flash('Question added to this session.');
+      renderPollTab();   // re-render: the "This session" bank now leads the picker
     }
 
     function renderTeacherPollLive(body) {
@@ -220,9 +297,9 @@
       const body = panel.querySelector('#laPanelBody');
       if (state.teams && state.role === 'teacher') { renderTeacherTeamsLive(body); return; }
       body.innerHTML = '<div class="la-loading">Loading your prepared questions…</div>';
-      const banks = await ensureBanks();
+      const banks = combinedBanks(await ensureBanks());
       if (!banks.length) {
-        body.innerHTML = '<div class="la-empty">No prepared questions yet. Add a quiz to a lesson — one you own or one shared with you — then run it as a team exercise here.</div>';
+        body.innerHTML = '<div class="la-empty">No quiz for this topic yet. Add one on the Poll tab with “New question”, or add a quiz to this lesson, then run it as a team exercise here.</div>';
         return;
       }
       const tooFew = state.studentCount < 2;

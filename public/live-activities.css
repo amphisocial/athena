@@ -285,3 +285,17 @@ body.public-view #clearBoardBtn { display: none !important; }
   .la-panel, .la-teamroom { right: 8px; left: 8px; width: auto; }
   .la-launcher { right: 10px; bottom: 10px; }
 }
+
+/* On-the-fly poll maker (teacher adds a question mid-session). */
+.la-newpoll { margin-top: 12px; padding-top: 10px; border-top: 1px dashed var(--line, rgba(0,0,0,.14)); }
+.la-npform { margin-top: 10px; display: flex; flex-direction: column; gap: 10px; }
+.la-np-q, .la-np-o {
+  font: inherit; padding: 9px 10px; border-radius: 10px;
+  border: 1px solid var(--line, rgba(0,0,0,.16)); background: var(--panel, #fff); color: var(--text, #12203a);
+}
+.la-np-q:focus, .la-np-o:focus { outline: none; border-color: var(--brand, #7c5cff); }
+.la-np-opts { display: flex; flex-direction: column; gap: 8px; }
+.la-np-opt { display: flex; align-items: center; gap: 8px; }
+.la-np-opt input[type="radio"] { flex: 0 0 auto; width: 16px; height: 16px; accent-color: var(--brand, #7c5cff); cursor: pointer; }
+.la-np-opt input[type="radio"]:disabled { opacity: .4; cursor: not-allowed; }
+.la-np-o { flex: 1; }

@@ -953,7 +953,12 @@
     LA = window.LiveActivities.attach({
       host: 'lesson',
       send: (o) => liveSend(o),
-      loadBanks: async () => { const r = await api('/api/live/question-banks'); return (r && r.banks) || []; }
+      loadBanks: async () => {
+        // Scope prepared questions to the topic of the lesson we're live on.
+        const sid = Live.setId || '';
+        const r = await api('/api/live/question-banks?host=lesson' + (sid ? '&id=' + encodeURIComponent(sid) : ''));
+        return (r && r.banks) || [];
+      }
     });
     return LA;
   }

@@ -1809,28 +1809,65 @@ app.get('/api/join/:code', (req, res) => {
 
 app.get('/api/live/question-banks', requireUser, (req, res) => {
   const store = readStore();
-  const readable = store.quizlets.filter((s) => userCanReadQuizlet(req.user, s, store));
-  const banks = readable
-    .map((s) => {
-      const questions = (s.cards || [])
-        .filter((c) => c.type !== 'slide' && Array.isArray(c.choices) && c.choices.length >= 2)
-        .map((c) => ({
-          front: String(c.front || '').slice(0, 600),
-          choices: c.choices.map((x) => String(x)).slice(0, 6),
-          answerIndex: Number.isInteger(c.answerIndex) ? c.answerIndex : -1,
-          explanation: String(c.explanation || '').slice(0, 1200)
-        }));
-      const owned = s.ownerId === req.user.id;
-      return {
-        id: s.id, title: s.title || 'Untitled set',
-        subject: s.subject || s.category || '', topic: s.topic || '',
-        owned, creator: owned ? 'You' : creatorName(store, s.ownerId),
-        questions
-      };
-    })
-    .filter((b) => b.questions.length)
-    // Your own lessons first, then alphabetical — so the picker is predictable.
-    .sort((a, b) => (Number(b.owned) - Number(a.owned)) || a.title.localeCompare(b.title));
+  const norm = (s) => String(s || '').trim().toLowerCase().replace(/\s+/g, ' ');
+
+  // Resolve the live session's topic context from the lesson set or whiteboard
+  // the teacher is currently live on, so the picker only offers THIS teacher's
+  // quizzes for THIS topic (a topic can have several). The host + id come from
+  // the live UI (board.js / app.js). Boards carry a topic string; lessons carry
+  // a topicId (reliable) and a topic string.
+  const host = String(req.query.host || '').toLowerCase();
+  const ctxId = String(req.query.id || '').trim();
+  let ctxTopicId = ''; let ctxTopic = ''; let ctxSubject = '';
+  if (ctxId && host === 'lesson') {
+    const s = store.quizlets.find((x) => x.id === ctxId);
+    if (s) { ctxTopicId = s.topicId || ''; ctxTopic = s.topic || ''; ctxSubject = s.subject || ''; }
+  } else if (ctxId && host === 'board') {
+    let boards = [];
+    try { boards = require('./board').readBoardStore().boards || []; } catch (_) { boards = []; }
+    const b = boards.find((x) => x.id === ctxId);
+    if (b) { ctxTopicId = b.topicId || ''; ctxTopic = b.topic || ''; ctxSubject = b.subject || ''; }
+  }
+  const haveContext = Boolean(ctxTopicId || ctxTopic);
+
+  const toBank = (s) => ({
+    id: s.id, title: s.title || 'Untitled set',
+    subject: s.subject || s.category || '', topic: s.topic || '',
+    owned: true, creator: 'You',
+    questions: (s.cards || [])
+      .filter((c) => c.type !== 'slide' && Array.isArray(c.choices) && c.choices.length >= 2)
+      .map((c) => ({
+        front: String(c.front || '').slice(0, 600),
+        choices: c.choices.map((x) => String(x)).slice(0, 6),
+        answerIndex: Number.isInteger(c.answerIndex) ? c.answerIndex : -1,
+        explanation: String(c.explanation || '').slice(0, 1200)
+      }))
+  });
+
+  // Only THIS teacher's own quiz-bearing sets are offered (not others' shared
+  // lessons) — the picker is for the teacher's own material for this topic.
+  const mine = store.quizlets.filter((s) => s.ownerId === req.user.id);
+
+  const matchesTopic = (s) => {
+    if (ctxTopicId && s.topicId) return s.topicId === ctxTopicId;   // reliable key
+    if (ctxTopic) return norm(s.topic) === norm(ctxTopic) && (!ctxSubject || !s.subject || norm(s.subject) === norm(ctxSubject));
+    return false;
+  };
+
+  // With a topic context, scope strictly to it — if the teacher has no quiz for
+  // this topic yet, the list is empty (the panel shows the empty state + the
+  // "New question" maker) rather than falling back to every lesson, which was
+  // the bug. Without any context (older client / board with no topic set), fall
+  // back to the teacher's own quizzes.
+  const candidates = (haveContext ? mine.filter(matchesTopic) : mine.slice())
+    .sort((a, b) => {
+      const aCur = a.id === ctxId ? 1 : 0; const bCur = b.id === ctxId ? 1 : 0;
+      return (bCur - aCur)
+        || String(b.updatedAt || b.createdAt || '').localeCompare(String(a.updatedAt || a.createdAt || ''))
+        || String(a.title || '').localeCompare(String(b.title || ''));
+    });
+
+  const banks = candidates.map(toBank).filter((b) => b.questions.length);
   res.json({ banks });
 });
 
