@@ -573,6 +573,10 @@ function attachBoardRoutes(app, deps) {
       board: {
         id: board.id,
         title: board.title,
+        topicId: board.topicId || '',
+        topic: board.topic || '',
+        subject: board.subject || null,
+        grade: board.grade || '',
         pages: board.pages,
         insights: Array.isArray(board.insights) ? board.insights : []
       },

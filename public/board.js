@@ -3192,6 +3192,15 @@
     updateZoomLabel();
     updateUndoButtons();
     resizeCanvas();
+    // Topic-aware nav: link across Slides / Flashcards / Quiz / Whiteboard for
+    // this board's curriculum topic (floating so it never reflows the canvas).
+    if (window.TopicStrip && board) {
+      window.TopicStrip.mount({
+        mode: 'floating', currentKind: 'board', currentId: board.id || '',
+        topicId: board.topicId || '', topic: board.topic || '',
+        subject: board.subject || '', grade: board.grade || ''
+      });
+    }
     if (!NOLOGIN) connect();
     checkAudioConfig();
     if (!NOLOGIN && isOwner && new URLSearchParams(location.search).get('share') === '1') {
@@ -3211,6 +3220,13 @@
       if (pageIndex >= board.pages.length) pageIndex = 0;
       $('#boardTitle').textContent = board.title || 'Shared whiteboard';
       setPill(board.isLive ? 'Live' : 'Snapshot', board.isLive ? 'live' : 'shared');
+      if (window.TopicStrip && (board.topicId || board.topic)) {
+        window.TopicStrip.mount({
+          mode: 'floating', currentKind: 'board', currentId: board.id || '',
+          topicId: board.topicId || '', topic: board.topic || '',
+          subject: board.subject || '', grade: board.grade || ''
+        });
+      }
       if (Array.isArray(board.insights)) {
         board.insights.forEach((a) => renderInsight(a, { fromTeacher: true, archived: true }));
       }

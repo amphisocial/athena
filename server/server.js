@@ -2382,6 +2382,103 @@ app.get('/api/learning/my-topic-content', requireUser, (req, res) => {
   }
 });
 
+// Topic navigation strip. Given a topic (by id, or inferred from the set/board
+// currently open), resolve the viewer's Slides / Flashcards / Quiz / Whiteboard
+// for that SAME topic, so the lesson and board pages can offer one-tap
+// switching between all four while staying on the topic. Resolution per slot:
+// the currently-open item wins its own slot; then the viewer's own newest;
+// then the newest public one for the topic (so public-lesson viewers can
+// navigate too). Optional auth — works signed-out with public content only.
+app.get('/api/topic/nav', async (req, res) => {
+  try {
+    const user = getCurrentUser(req);
+    const uid = user ? user.id : null;
+    const store = readStore();
+    const norm = (s) => String(s || '').trim().toLowerCase().replace(/\s+/g, ' ');
+    const newer = (a, b) => String((a && (a.updatedAt || a.createdAt)) || '') > String((b && (b.updatedAt || b.createdAt)) || '');
+
+    let topicId = String(req.query.topicId || '').trim();
+    let topic = String(req.query.topic || '').trim();
+    let subject = String(req.query.subject || '').trim().toLowerCase();
+    let grade = String(req.query.grade || '').trim();
+    const currentId = String(req.query.currentId || '').trim();
+    const currentKind = String(req.query.currentKind || '').trim(); // 'lesson' | 'board'
+
+    // Derive topic context from the open item when possible (authoritative).
+    let boards = [];
+    try { boards = require('./board').readBoardStore().boards || []; } catch (_) { boards = []; }
+    if (currentId && currentKind === 'lesson') {
+      const s = store.quizlets.find((x) => x.id === currentId);
+      if (s) { topicId = topicId || s.topicId || ''; topic = topic || s.topic || ''; subject = subject || String(s.subject || '').toLowerCase(); grade = grade || String(s.grade || ''); }
+    } else if (currentId && currentKind === 'board') {
+      const b = boards.find((x) => x.id === currentId);
+      if (b) { topicId = topicId || b.topicId || ''; topic = topic || b.topic || ''; subject = subject || String(b.subject || '').toLowerCase(); grade = grade || String(b.grade || ''); }
+    }
+
+    if (!topicId && !topic) return res.json({ signedIn: Boolean(user), topic: null, nav: null });
+
+    // Curriculum meta (best-effort; the strip still works from the raw strings).
+    let meta = null;
+    if (topicId) {
+      try {
+        const t = await curriculum.getTopicContent(db, topicId);
+        if (t) meta = { id: t.id, title: t.title, grade: t.grade, subject: t.subject, strand: t.strand || '', standard: t.standard || '', template: t.template || null };
+      } catch (_) { meta = null; }
+    }
+    const outTopic = meta || { id: topicId || '', title: topic || 'Topic', grade: grade || '', subject: subject || '', strand: '', standard: '', template: null };
+
+    const matchSet = (s) => (topicId && s.topicId)
+      ? s.topicId === topicId
+      : (topic ? norm(s.topic) === norm(topic) && (!subject || !s.subject || norm(s.subject) === subject) : false);
+    const matchBoard = (b) => (topicId && b.topicId)
+      ? b.topicId === topicId
+      : (topic ? norm(b.topic) === norm(topic) && (!subject || !b.subject || norm(b.subject) === subject) : false);
+
+    const setsForTopic = store.quizlets.filter(matchSet);
+    const boardsForTopic = boards.filter(matchBoard);
+    const fmtMatch = (s, fmt) => (s.format === fmt || s.format === 'mixed');
+
+    const pickLesson = (fmt) => {
+      // The open set wins its own slot so the chip you're on stays highlighted.
+      if (currentId && currentKind === 'lesson') {
+        const cur = setsForTopic.find((s) => s.id === currentId);
+        if (cur && fmtMatch(cur, fmt)) return { id: cur.id, kind: 'lesson', owned: cur.ownerId === uid, title: cur.title || '', current: true };
+      }
+      let owned = null; let pub = null;
+      for (const s of setsForTopic) {
+        if (!fmtMatch(s, fmt)) continue;
+        if (uid && s.ownerId === uid) { if (newer(s, owned)) owned = s; }
+        else if (s.public) { if (newer(s, pub)) pub = s; }
+      }
+      const chosen = owned || pub;
+      return chosen ? { id: chosen.id, kind: 'lesson', owned: Boolean(uid && chosen.ownerId === uid), title: chosen.title || '' } : null;
+    };
+
+    const pickBoard = () => {
+      if (currentId && currentKind === 'board') {
+        const cur = boardsForTopic.find((b) => b.id === currentId);
+        if (cur) return { id: cur.id, kind: 'board', owned: cur.teacherId === uid, title: cur.title || '', current: true };
+      }
+      let owned = null; let pub = null;
+      for (const b of boardsForTopic) {
+        if (uid && b.teacherId === uid) { if (newer(b, owned)) owned = b; }
+        else if (b.public) { if (newer(b, pub)) pub = b; }
+      }
+      const chosen = owned || pub;
+      return chosen ? { id: chosen.id, kind: 'board', owned: Boolean(uid && chosen.teacherId === uid), title: chosen.title || '' } : null;
+    };
+
+    res.json({
+      signedIn: Boolean(user),
+      topic: outTopic,
+      nav: { slides: pickLesson('slides'), flashcard: pickLesson('flashcard'), quiz: pickLesson('quiz'), whiteboard: pickBoard() }
+    });
+  } catch (e) {
+    console.error('topic nav failed:', e.message);
+    res.status(500).json({ error: 'Could not load topic navigation.' });
+  }
+});
+
 // ---- Teacher AI Agent: bulk-fill Slides / Flashcards / Quiz ---------------
 // A background agent that fills a curriculum topic's (currently blank)
 // Slides / Flashcards / Quiz for a teacher. They pick a grade + subject and

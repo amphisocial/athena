@@ -1,0 +1,77 @@
+/* topic-strip.js styles — shared by the lesson (inline) and board (floating). */
+
+.topic-strip {
+  --ts-brand: #2563ff;
+  margin: 0 0 14px;
+  background: #fff;
+  border: 1px solid #e2e9f5;
+  border-radius: 14px;
+  box-shadow: 0 6px 18px rgba(15, 30, 53, 0.05);
+}
+.topic-strip .ts-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding: 12px 16px;
+  position: relative;
+}
+
+.ts-topic { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; min-width: 0; }
+.ts-kicker {
+  font-size: 11px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase;
+  color: var(--ts-brand); background: color-mix(in srgb, var(--ts-brand) 12%, transparent);
+  padding: 2px 8px; border-radius: 20px; flex: none;
+}
+.ts-title { font-size: 17px; font-weight: 800; color: #0f1e35; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 46vw; }
+.ts-meta { font-size: 13px; color: #6a7893; font-weight: 600; }
+
+.ts-chips { display: flex; gap: 8px; flex-wrap: wrap; }
+.ts-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 7px 13px; border-radius: 10px; font-weight: 700; font-size: 13px;
+  border: 1px solid #d8e2f2; color: #24324a; background: #f7faff; text-decoration: none;
+  transition: background .15s ease, border-color .15s ease, transform .05s ease;
+  white-space: nowrap;
+}
+.ts-chip .ts-ico { font-size: 14px; line-height: 1; }
+.ts-chip.has:hover { background: #eef4ff; border-color: #b9ccec; }
+.ts-chip.has:active { transform: translateY(1px); }
+.ts-chip.current { background: var(--ts-brand); border-color: var(--ts-brand); color: #fff; box-shadow: 0 4px 12px rgba(37, 99, 255, 0.28); }
+.ts-chip.shared:not(.current) { border-style: dashed; }
+.ts-chip.make { color: #2f7a44; background: #eef7f0; border-color: #bfe0c9; border-style: dashed; }
+.ts-chip.make:hover { background: #e2f1e7; }
+.ts-chip.off { color: #9aa6ba; background: #f2f5fa; border-color: #e4eaf3; cursor: default; }
+
+/* Floating variant (whiteboard) — never reflows the canvas. */
+.topic-strip.floating {
+  position: fixed; top: 66px; left: 50%; transform: translateX(-50%);
+  z-index: 40; margin: 0; max-width: min(920px, 94vw);
+  backdrop-filter: saturate(1.2) blur(2px);
+}
+.topic-strip.floating .ts-inner { padding: 8px 14px; }
+.topic-strip.floating .ts-title { max-width: 34vw; font-size: 15px; }
+.topic-strip.floating.collapsed .ts-topic .ts-meta,
+.topic-strip.floating.collapsed .ts-chips { display: none; }
+.topic-strip.floating.collapsed { opacity: .9; }
+
+.ts-collapse {
+  position: absolute; top: -9px; right: -9px;
+  width: 22px; height: 22px; border-radius: 50%;
+  border: 1px solid #d8e2f2; background: #fff; color: #6a7893;
+  font-size: 12px; line-height: 1; cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center;
+  box-shadow: 0 2px 6px rgba(15, 30, 53, 0.15);
+}
+.ts-collapse:hover { color: #24324a; }
+
+@media (max-width: 640px) {
+  .topic-strip .ts-inner { gap: 10px; }
+  .ts-title { max-width: 70vw; }
+  .topic-strip.floating { top: 58px; left: 8px; right: 8px; transform: none; max-width: none; }
+  .topic-strip.floating .ts-title { max-width: 60vw; }
+}
+
+/* Dark board background: keep the floating strip readable. */
+body[data-page="board"] .topic-strip.floating { border-color: rgba(255,255,255,.12); }

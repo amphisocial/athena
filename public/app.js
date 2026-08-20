@@ -481,6 +481,15 @@
     study.flipped = false;
     study.answers = {};
     renderStudy();
+    // Topic-aware nav: when this set belongs to a curriculum topic, show the
+    // strip that links across Slides / Flashcards / Quiz / Whiteboard for it.
+    if (window.TopicStrip) {
+      window.TopicStrip.mount({
+        mode: 'inline', currentKind: 'lesson', currentId: set && set.id,
+        topicId: (set && set.topicId) || '', topic: (set && set.topic) || '',
+        subject: (set && set.subject) || '', grade: (set && set.grade) || ''
+      });
+    }
     // Teachers land on the preview after building/opening a set; students and
     // the public viewer stay where they are.
     if (!document.body.classList.contains('public-lesson') && Live.role !== 'student') {
